@@ -1,0 +1,19 @@
+import { Avatar, AvatarFallback } from '@cherrystudio/ui/components/primitives/avatar'
+import { cn } from '@cherrystudio/ui/lib/utils'
+
+import { type IconAvatarProps } from '../../types'
+import { StepDark } from './dark'
+import { StepLight } from './light'
+
+export function StepAvatar({ size = 32, shape = 'circle', className }: Omit<IconAvatarProps, 'icon'>) {
+  return (
+    <Avatar
+      className={cn('overflow-hidden', shape === 'circle' ? 'rounded-full' : 'rounded-[20%]', className)}
+      style={{ width: size, height: size }}>
+      <AvatarFallback className="text-foreground">
+        <StepLight className="dark:hidden" style={{ width: size, height: size }} />
+        <StepDark className="hidden dark:block" style={{ width: size, height: size }} />
+      </AvatarFallback>
+    </Avatar>
+  )
+}
