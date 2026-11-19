@@ -26,7 +26,6 @@ import { SettingTitle } from '@renderer/components/SettingsPrimitives'
 import { useExitPresence } from '@renderer/hooks/useExitPresence'
 import { useMcpServers } from '@renderer/hooks/useMcpServer'
 import { ipcApi } from '@renderer/ipc'
-import EnvironmentDependencies from '@renderer/pages/settings/DependenciesSettings/EnvironmentDependencies'
 import { toast } from '@renderer/services/toast'
 import type { AppRouter } from '@renderer/types/router'
 import { matchKeywordsInString } from '@renderer/utils/match'
@@ -320,7 +319,6 @@ const McpServersList: FC = () => {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <EnvironmentDependencies mini />
             <DropdownMenu open={isAddMenuOpen} onOpenChange={setIsAddMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button variant="default" size="sm" className="shrink-0">

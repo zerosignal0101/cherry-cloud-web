@@ -12,6 +12,8 @@ import { LifecycleManager, Phase, ServiceContainer, type ServiceConstructor } fr
 import { PowerService } from '@main/core/power/PowerService'
 import { SchedulerService } from '@main/core/scheduler/SchedulerService'
 import { FileManager } from '@main/services/file/FileManager'
+import { ProviderRegistryUpdaterService } from '@main/services/ProviderRegistryUpdaterService'
+import { WebSearchService } from '@main/services/webSearch/WebSearchService'
 import { loggerService } from '@logger'
 
 import { WebDbService } from '../data/dbService'
@@ -20,6 +22,7 @@ import {
   WebAutomationReplService,
   WebBrowserSessionService,
   WebIpcApiService,
+  WebProtocolService,
   WebWindowManager
 } from './webServices'
 
@@ -41,11 +44,14 @@ const webServices = [
   WebIpcApiService,
   WebBrowserSessionService,
   WebAutomationReplService,
+  WebProtocolService,
   PowerService,
   RuntimeActivityService,
   SchedulerService,
   JobManager,
   FileManager,
+  ProviderRegistryUpdaterService,
+  WebSearchService,
   McpPackageService,
   McpRuntimeService,
   McpCatalogService,

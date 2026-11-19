@@ -53,7 +53,14 @@ export const app = {
   /** The server is always a deployed build; dev-only path diversion must not run. */
   isPackaged: true,
   name: 'cherry-cloud-web',
-  getVersion: (): string => process.env.APP_VERSION ?? '0.0.0',
+  /**
+   * Registry compatibility keys off this value. The check accepts
+   * `minAppVersion <= version <= sourceAppVersion`, and the GitCode mirror's
+   * catalog is generated from 2.2.0 while the bundled catalog tracks 2.2.2.
+   * Reporting 2.2.0 is the newest value both mirrors accept; override with
+   * `APP_VERSION` when syncing to a different upstream tag.
+   */
+  getVersion: (): string => process.env.APP_VERSION ?? '2.2.0',
   getAppPath: (): string => process.cwd(),
   getPath: (name: AppPathName): string => appPaths[name] ?? paths.root,
   setPath: (_name: AppPathName, _value: string): void => {},

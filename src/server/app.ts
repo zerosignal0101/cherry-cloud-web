@@ -16,7 +16,7 @@ import { AuthGuard } from './auth/guard'
 import { AuthStore } from './auth/password'
 import { SessionSigner } from './auth/session'
 import { startAiRuntime, stopAiRuntime } from './ai/runtime'
-import { registerAiRoutes, registerFileIpcRoutes } from './ai/routes'
+import { registerAiRoutes, registerCapabilityRoutes, registerFileIpcRoutes } from './ai/routes'
 import { configureWindowManager } from './ai/webServices'
 import type { ServerConfig } from './config'
 import { openDatabase, type DatabaseHandle } from './data/database'
@@ -90,6 +90,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   registerHostRoutes(registry)
   registerAiRoutes(registry)
   registerFileIpcRoutes(registry)
+  registerCapabilityRoutes(registry)
   registerPreferenceRoutes(registry, connections)
 
   const db = openDatabase({

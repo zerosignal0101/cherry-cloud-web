@@ -131,3 +131,25 @@ export class WebAutomationReplService extends BaseService {
     throw new Error('Automation is not available in the web build')
   }
 }
+
+/**
+ * Desktop protocol handlers (`cherry://`, pending MCP install links) are fed by
+ * OS-level URL events. A browser tab cannot receive them, so the pending list is
+ * always empty and install requests are rejected. The MCP settings page polls
+ * the list on mount; a registered service keeps that poll quiet.
+ */
+@Injectable('ProtocolService')
+@ServicePhase(Phase.WhenReady)
+export class WebProtocolService extends BaseService {
+  listPendingMcpInstallRequests(_windowId: string): unknown[] {
+    return []
+  }
+
+  installPendingMcpInstallRequest(_windowId: string, _requestId: string): Promise<never> {
+    return Promise.reject(new Error('Protocol-based MCP install is not available in the web build'))
+  }
+
+  cancelPendingMcpInstallRequest(_windowId: string, _requestId: string): void {}
+
+  onMainRendererReady(_windowId: string): void {}
+}

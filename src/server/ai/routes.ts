@@ -1,7 +1,11 @@
 import { aiHandlers } from '@main/ipc/handlers/ai'
 import { fileHandlers } from '@main/ipc/handlers/file'
+import { mcpHandlers } from '@main/ipc/handlers/mcp'
+import { webSearchHandlers } from '@main/ipc/handlers/webSearch'
 import { aiRequestSchemas } from '@shared/ipc/schemas/ai'
 import { fileRequestSchemas } from '@shared/ipc/schemas/file'
+import { mcpRequestSchemas } from '@shared/ipc/schemas/mcp'
+import { webSearchRequestSchemas } from '@shared/ipc/schemas/webSearch'
 
 import type { RpcRegistry } from '../transport/registry'
 
@@ -28,4 +32,15 @@ export function registerAiRoutes(registry: RpcRegistry): void {
  */
 export function registerFileIpcRoutes(registry: RpcRegistry): void {
   registry.register(fileRequestSchemas, fileHandlers)
+}
+
+/**
+ * Capability routes owned by the settings surfaces: web-search provider checks
+ * and MCP server interactions. Their services are part of the web lifecycle;
+ * protocol-install routes still depend on `ProtocolService` and only fail if a
+ * caller asks for an install flow this build does not expose.
+ */
+export function registerCapabilityRoutes(registry: RpcRegistry): void {
+  registry.register(webSearchRequestSchemas, webSearchHandlers)
+  registry.register(mcpRequestSchemas, mcpHandlers)
 }

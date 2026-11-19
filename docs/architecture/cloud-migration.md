@@ -33,6 +33,11 @@
   - 文件页上传改为浏览器语义：按钮与拖放都走 `POST /api/files`，不再依赖桌面路径；图片预览 URL 对 internal 条目使用 `/media/:id`。
   - 新库会种入一个无模型的默认助手与空话题（`WebDefaultAssistantSeeder`），避免首次打开是一片空白；模型由用户在供应商设置中选择。
   - 仍待清理：路径式预览（`FilePreview` 仍按物理路径调用 file IPC）、Markdown 图片导出/备份等依赖路径的导出流程，以及删除残留的桌面专属页面与组件（菜单与路由已不可达或不在菜单中）。
+- M6 完成（供应商与设置能力）：
+  - 供应商与模型继续走 DataApi；服务端注册 `ProviderRegistryUpdaterService`，启动 30 秒后按需拉取镜像目录，校验 schema/版本/修订号后写入 `DATA_DIR/provider-registry` 并通知数据层刷新。版本兼容取上游 `minAppVersion..sourceAppVersion` 区间，默认报告 `2.2.0`（可被 `APP_VERSION` 覆盖），已验证 GitCode 镜像的 `models.json` / `provider-models.json` 成功落盘。
+  - 注册 `WebSearchService` 与 `web_search.*` RPC 路由，设置页的联网搜索提供商开关、API Key、检查按钮均可用；未配置密钥时返回领域错误而非 `ROUTE_NOT_FOUND`。
+  - 注册 `mcp.*` RPC 路由（服务器增删启停、工具/资源/提示词、交互回复）；`McpRuntimeService`/`McpCatalogService` 已在生命周期中。桌面协议的 MCP 安装入口由 `WebProtocolService` 占位（列表为空、安装请求明确拒绝），MCP 设置页不再展示桌面二进制依赖面板。
+  - 已验证：供应商/模型/联网搜索/MCP 设置页渲染无控制台错误，web_search 与 mcp 路由均有响应，目录更新在启动后自动完成。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
 - 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；它们已不在导航/路由中，删除工作留到 M9 收口。
 - `pnpm lint` 目前只覆盖 `src/server`、`src/platform` 与脚本；`src/shared`、`src/renderer` 待 `window.api` 真实类型收敛后再纳入。
