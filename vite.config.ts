@@ -48,7 +48,18 @@ export default defineConfig({
     __APP_RELEASE_VERSION__: JSON.stringify(''),
     __APP_RELEASE_HISTORY__: JSON.stringify([])
   },
-  plugins: [tanstackRouter({ target: 'react', autoCodeSplitting: true }), react(), tailwindcss()],
+  plugins: [
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true,
+      // The plugin resolves these against `root` (src/renderer) by default and
+      // would look for src/renderer/src/routes; state both paths explicitly.
+      routesDirectory: resolvePath('./src/renderer/routes'),
+      generatedRouteTree: resolvePath('./src/renderer/routeTree.gen.ts')
+    }),
+    react(),
+    tailwindcss()
+  ],
   server: {
     port: Number(process.env.WEB_PORT ?? 5173),
     proxy: {

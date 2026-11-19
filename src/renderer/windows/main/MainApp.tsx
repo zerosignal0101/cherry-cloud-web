@@ -14,8 +14,7 @@ import { ConversationNotificationRuntime } from '@renderer/components/Conversati
 import { DictationShortcutHost } from '@renderer/components/DictationShortcutHost'
 import { ErrorBoundary } from '@renderer/components/ErrorBoundary'
 import { FileEditSessionProvider } from '@renderer/components/FileEditSessionProvider'
-import { AppShell } from '@renderer/components/layout/AppShell'
-import { TabsProvider } from '@renderer/components/layout/TabsProvider'
+import { UrlTabsProvider } from '@renderer/components/layout/UrlTabsProvider'
 import { MandatoryGateProvider } from '@renderer/components/MandatoryGateProvider'
 import { McpInteractionHost } from '@renderer/components/McpInteractionHost'
 import { PopupHost } from '@renderer/components/PopupHost'
@@ -28,10 +27,10 @@ import { useAutoReadPreferenceSync } from '@renderer/hooks/useAutoReadPreference
 import { useIsPrivacyUpdateRequired } from '@renderer/hooks/useIsPrivacyUpdateRequired'
 import { useStorageMonitorNotification } from '@renderer/hooks/useStorageMonitorNotification'
 import { useWindowRuntime } from '@renderer/hooks/useWindowRuntime'
+import { router } from '@renderer/router'
 import { registerImageModeChooser } from '@renderer/services/imageExportModeChooser'
-import { getSidebarDefaultLandingUrl } from '@renderer/utils/sidebar'
 import { WindowFileEditRecovery } from '@renderer/windows/WindowFileEditRecovery'
-import type { Tab } from '@shared/data/cache/cacheValueTypes'
+import { RouterProvider } from '@tanstack/react-router'
 
 import { useAppUpdateHandler } from './hooks/useAppUpdateHandler'
 import { useAutoBackupEvents } from './hooks/useAutoBackupEvents'
@@ -101,35 +100,23 @@ function MainWindowRuntime(): null {
 
 export function MainWindowContent(): React.ReactElement {
   const [providerSetupStatus] = usePreference('app.onboarding.provider_setup.status')
-  const [sidebarShortcuts] = usePreference('ui.sidebar_shortcut')
-  const [defaultPaintingProvider] = usePreference('feature.paintings.default_provider')
   const sidebarShortcutRegistry = useMemo(() => new SidebarShortcutRegistry(CORE_SIDEBAR_SHORTCUT_PROVIDERS), [])
   const privacyUpdateRequired = useIsPrivacyUpdateRequired()
   // Onboarding collects privacy consent itself, so the gate only owns the window afterwards.
   const privacyGateOpen = providerSetupStatus !== 'pending' && privacyUpdateRequired
 
-  const initialDefaultTab = useMemo<Tab>(
-    () => ({
-      id: 'home',
-      type: 'route',
-      url: getSidebarDefaultLandingUrl(sidebarShortcuts, defaultPaintingProvider) || '/app/launchpad',
-      title: '',
-      lastAccessTime: Date.now(),
-      isDormant: false
-    }),
-    [defaultPaintingProvider, sidebarShortcuts]
-  )
-
   return (
-    <TabsProvider initialDefaultTab={initialDefaultTab}>
-      <SidebarShortcutRegistryProvider registry={sidebarShortcutRegistry}>
-        <MandatoryGateProvider open={privacyGateOpen}>
+    <SidebarShortcutRegistryProvider registry={sidebarShortcutRegistry}>
+      <MandatoryGateProvider open={privacyGateOpen}>
+        {/* Above `RouterProvider` on purpose: the window-scoped hosts below the
+            route tree (navigation bridge, popups) also resolve `useTabs()`. */}
+        <UrlTabsProvider>
           {providerSetupStatus === 'pending' ? (
             <Suspense fallback={<BootFallback />}>
               <OnboardingPage />
             </Suspense>
           ) : (
-            <AppShell />
+            <RouterProvider router={router} />
           )}
           <MainWindowRuntime />
           <ConversationNotificationRuntime />
@@ -140,9 +127,9 @@ export function MainWindowContent(): React.ReactElement {
           <DictationShortcutHost />
           <VoicePlaybackHost />
           {providerSetupStatus === 'pending' ? null : <PrivacyPolicyUpdateGate />}
-        </MandatoryGateProvider>
-      </SidebarShortcutRegistryProvider>
-    </TabsProvider>
+        </UrlTabsProvider>
+      </MandatoryGateProvider>
+    </SidebarShortcutRegistryProvider>
   )
 }
 

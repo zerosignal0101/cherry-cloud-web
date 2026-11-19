@@ -1,4 +1,7 @@
 import type { SerializedIpcError } from '@shared/ipc/errors/IpcError'
+import { IpcChannel } from '@shared/IpcChannel'
+
+import { ipcApi } from './ipcApi'
 
 type Listener = (payload: unknown) => void
 
@@ -210,14 +213,72 @@ function dataTransportFailure(
   }
 }
 
+/**
+ * `window.api.preference` — the desktop preload exposed these as
+ * `ipcRenderer.invoke(Preference_*)`; here they are IpcApi routes backed by the
+ * same main-process `PreferenceService`.
+ *
+ * `onChanged` listens on the legacy `preference:changed` channel because that is
+ * the name the server broadcasts on, so one event name covers both transports.
+ */
+const preference = {
+  get: (key: string) => ipcApi.request('preference.get', { key }),
+  getMultipleRaw: (keys: string[]) => ipcApi.request('preference.get_multiple_raw', { keys }),
+  getAll: () => ipcApi.request('preference.get_all'),
+  set: (key: string, value: unknown) => ipcApi.request('preference.set', { key, value }),
+  setMultiple: (updates: Record<string, unknown>) => ipcApi.request('preference.set_multiple', { updates }),
+  subscribe: (keys: string[]) => ipcApi.request('preference.subscribe', { keys }),
+  onChanged: (callback: (key: string, value: unknown) => void): (() => void) =>
+    on(IpcChannel.Preference_Changed, (payload) => {
+      const change = payload as { key?: unknown; value?: unknown } | undefined
+      if (typeof change?.key === 'string') callback(change.key, change.value)
+    })
+}
+
+/**
+ * `window.electron` — `@electron-toolkit/preload` on desktop. The renderer still
+ * reads `process.env` for log levels and platform branches, and a few desktop
+ * call sites invoke channels that have no server counterpart (log forwarding,
+ * tab tear-off, Python worker). They get inert implementations rather than an
+ * undefined global, which is what used to crash the tree on first render.
+ */
+function installElectronShim(): void {
+  if (window.electron) return
+  const noop = (): void => {}
+  const noopUnsubscribe = (): void => {}
+  window.electron = {
+    ipcRenderer: {
+      invoke: async (): Promise<undefined> => undefined,
+      send: noop,
+      sendSync: (): undefined => undefined,
+      sendTo: noop,
+      sendToHost: noop,
+      postMessage: noop,
+      on: noopUnsubscribe,
+      once: noopUnsubscribe,
+      addListener: noopUnsubscribe,
+      removeListener: noop,
+      removeAllListeners: noop
+    },
+    process: {
+      platform: 'web',
+      env: {
+        NODE_ENV: import.meta.env.PROD ? 'production' : 'development'
+      }
+    }
+  }
+}
+
 /** Installs the browser implementation of the preload bridge. Idempotent. */
 export function installWebApi(): void {
+  installElectronShim()
   if (window.api?.ipcApi) return
   window.api = {
     ipcApi: { request, on },
     dataApi: {
       request: dataRequest,
       onDataChanged: (callback: Listener) => on('data-api:data-changed', callback)
-    }
+    },
+    preference
   }
 }

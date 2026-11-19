@@ -5,6 +5,8 @@ import { PreferenceSeeder } from '@data/db/seeding/seeders/preferenceSeeder'
 import { PresetProviderSeeder } from '@data/db/seeding/seeders/presetProviderSeeder'
 import { TranslateLanguageSeeder } from '@data/db/seeding/seeders/translateLanguageSeeder'
 
+import { WebDefaultsSeeder } from './seeders/webDefaultsSeeder'
+
 /**
  * Seeders the server runs on a fresh database.
  *
@@ -18,6 +20,9 @@ import { TranslateLanguageSeeder } from '@data/db/seeding/seeders/translateLangu
  *                                 Catalog data comes from the
  *                                 `@cherrystudio/provider-registry` package.
  * - `ConversationListSortSeeder`— keeps the conversation list order invariant.
+ * - `WebDefaultsSeeder`         — first-run defaults this build overrides
+ *                                 (no onboarding, no data collection); must run
+ *                                 before `PreferenceSeeder`, which skips existing rows.
  * - `PreferenceSeeder`          — default preferences every page reads on first load.
  * - `TranslateLanguageSeeder`   — built-in language pairs for the translate API.
  *
@@ -31,6 +36,7 @@ export const webSeeders: ISeeder[] = [
   new KnowledgeBaseOrderSeeder(),
   new PresetProviderSeeder(),
   new ConversationListSortSeeder(),
+  new WebDefaultsSeeder(),
   new PreferenceSeeder(),
   new TranslateLanguageSeeder()
 ]

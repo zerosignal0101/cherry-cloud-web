@@ -28,6 +28,8 @@ import { MAX_UPLOAD_BYTES } from './files/service'
 import { deriveKeyFromSecret, loadOrCreateKeyFile } from './platform/secrets'
 import { registerAuthRoutes } from './routes/auth'
 import { getApiServer, registerDataRoutes } from './routes/data'
+import { registerHostRoutes } from './routes/host'
+import { registerPreferenceRoutes } from './routes/preference'
 import { registerSystemRoutes } from './routes/system'
 import { ConnectionRegistry } from './transport/connections'
 import { EventHub } from './transport/events'
@@ -85,7 +87,9 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   const connections = new ConnectionRegistry()
   const registry = new RpcRegistry()
   registerSystemRoutes(registry)
+  registerHostRoutes(registry)
   registerAiRoutes(registry)
+  registerPreferenceRoutes(registry, connections)
 
   const db = openDatabase({
     databasePath: dataPaths.database,

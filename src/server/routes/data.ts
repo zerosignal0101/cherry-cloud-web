@@ -12,7 +12,11 @@ const dataRequestSchema = z.object({
   id: z.string().min(1),
   method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
   path: z.string().min(1),
-  params: z.record(z.string(), z.string()).optional(),
+  // `params` doubles as both path substitution (`:id`) and query values, and the
+  // renderer's typed client sends them as plain JS values (`limit: 20`). Callers
+  // are validated per endpoint inside `ApiServer`; narrowing here would reject
+  // requests the desktop app accepts.
+  params: z.record(z.string(), z.unknown()).optional(),
   body: z.unknown().optional(),
   headers: z.record(z.string(), z.string()).optional(),
   metadata: z.object({ timestamp: z.number(), spanContext: z.unknown().optional() }).optional()
