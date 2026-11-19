@@ -2,6 +2,13 @@
 
 本文记录 cherry-cloud-web 的目标形态、关键决策与实施顺序。后续实现以本文为准，变更需先改本文。
 
+## 0. 当前状态
+
+- M0 完成：源码基线入库，SPA 可构建，服务端可启动（`/api/health`、静态资源、深链回退均验证通过），`pnpm typecheck` 与 `pnpm lint` 通过。
+- 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
+- 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；这些文件在 M5 删除。
+- `pnpm lint` 目前只覆盖 `src/server` 与新脚本；`src/shared`、`src/renderer` 待 M1 完成 `window.api` 真实类型后再纳入。
+
 ## 1. 目标
 
 把 cherry-studio（Electron 桌面端）改造为公网访问、单一使用者的 Web 应用：

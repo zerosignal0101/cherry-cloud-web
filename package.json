@@ -18,8 +18,8 @@
     "start": "node --env-file-if-exists=.env dist/server/main.js",
     "typecheck": "tsc -p tsconfig.web.json --noEmit && tsc -p tsconfig.server.json --noEmit",
     "test": "vitest run",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
+    "lint": "oxlint src/server scripts/lint",
+    "lint:fix": "oxlint --fix src/server scripts/lint",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
   },
