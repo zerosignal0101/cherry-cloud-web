@@ -3,8 +3,8 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 import type { FastifyInstance } from 'fastify'
-import WebSocket from 'ws'
 import { afterEach, describe, expect, it } from 'vitest'
+import WebSocket from 'ws'
 
 import { buildApp } from '../../app'
 import type { ServerConfig } from '../../config'
@@ -148,7 +148,7 @@ describe('WS /api/ws', () => {
     const cookie = await login(app)
     const port = await listen(app)
 
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/ws`, { headers: { cookie } })
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/ws?client=test-client-1`, { headers: { cookie } })
     await new Promise<void>((resolve, reject) => {
       socket.once('open', () => resolve())
       socket.once('error', reject)
@@ -167,8 +167,18 @@ describe('WS /api/ws', () => {
     const app = await createApp()
     const port = await listen(app)
 
-    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/ws`)
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/ws?client=no-session-client`)
     const code = await new Promise<number>((resolve) => socket.once('close', (value) => resolve(value)))
     expect(code).toBe(4401)
+  })
+
+  it('closes upgrades without a client id', async () => {
+    const app = await createApp()
+    const cookie = await login(app)
+    const port = await listen(app)
+
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/api/ws`, { headers: { cookie } })
+    const code = await new Promise<number>((resolve) => socket.once('close', (value) => resolve(value)))
+    expect(code).toBe(4400)
   })
 })

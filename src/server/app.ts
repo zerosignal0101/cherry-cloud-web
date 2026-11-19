@@ -2,29 +2,33 @@ import { createHmac } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { application } from '@application'
-import { resolveDataPaths } from '@platform/dataPaths'
 import fastifyCookie from '@fastify/cookie'
 import fastifyMultipart from '@fastify/multipart'
 import fastifyRateLimit from '@fastify/rate-limit'
 import fastifyStatic from '@fastify/static'
 import fastifyWebsocket from '@fastify/websocket'
+import { resolveDataPaths } from '@platform/dataPaths'
 import Fastify, { type FastifyInstance } from 'fastify'
+
+import { application } from '@application'
 
 import { AuthGuard } from './auth/guard'
 import { AuthStore } from './auth/password'
 import { SessionSigner } from './auth/session'
+import type { ServerConfig } from './config'
 import { openDatabase, type DatabaseHandle } from './data/database'
 import { webSeeders } from './data/seeders'
-import { MAX_UPLOAD_BYTES } from './files/service'
+import { installWindowManager, uninstallWindowManager } from './data/windowManager'
 import { registerFileRoutes } from './files/routes'
+import { MAX_UPLOAD_BYTES } from './files/service'
+import { deriveKeyFromSecret, loadOrCreateKeyFile } from './platform/secrets'
 import { registerAuthRoutes } from './routes/auth'
+import { getApiServer, registerDataRoutes } from './routes/data'
 import { registerSystemRoutes } from './routes/system'
+import { ConnectionRegistry } from './transport/connections'
 import { EventHub } from './transport/events'
 import { registerRpcRoutes, registerWebSocketRoute } from './transport/plugins'
 import { RpcRegistry } from './transport/registry'
-import { deriveKeyFromSecret, loadOrCreateKeyFile } from './platform/secrets'
-import type { ServerConfig } from './config'
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -74,6 +78,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   })
 
   const events = new EventHub()
+  const connections = new ConnectionRegistry()
   const registry = new RpcRegistry()
   registerSystemRoutes(registry)
 
@@ -83,11 +88,13 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
     seeders: webSeeders
   })
   application.register('DbService', db)
+  installWindowManager(connections)
 
   app.decorate('events', events)
   app.decorate('db', db)
   app.addHook('onClose', async () => {
     events.closeAll()
+    uninstallWindowManager()
     db.close()
     application.unregister('DbService')
   })
@@ -109,9 +116,10 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   })
 
   await registerAuthRoutes(app, { guard, store, signer })
-  await registerRpcRoutes(app, { registry, guard })
-  await registerWebSocketRoute(app, { registry, guard })
+  await registerRpcRoutes(app, { registry, guard, connections })
+  await registerWebSocketRoute(app, { registry, guard, connections })
   await registerFileRoutes(app, { guard })
+  await registerDataRoutes(app, { guard, apiServer: getApiServer() })
 
   app.get('/api/health', async () => ({
     ok: true,

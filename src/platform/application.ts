@@ -31,6 +31,31 @@ export interface SqliteDatabaseService {
 }
 
 /**
+ * `CacheService` is the one upstream service whose call sites pass a type
+ * argument through `application.get(...)` (`cache.get<T>(key)`). Typing it
+ * here keeps those generic calls compiling; everything else stays `any` because
+ * the server registers instances by name and code that needs a real type
+ * imports the module that owns the service.
+ */
+export interface CacheServiceLike {
+  get<T = unknown>(key: string): T | undefined
+  set<T = unknown>(key: string, value: T, ttlMs?: number): void
+  has(key: string): boolean
+  delete(key: string): boolean
+  getShared<T = unknown>(key: string): T | undefined
+  setShared<T = unknown>(key: string, value: T, ttlMs?: number): void
+  hasShared(key: string): boolean
+  deleteShared(key: string): boolean
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getPersist(key: string): any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setPersist(key: string, value: any): void
+  hasPersist(key: string): boolean
+  deletePersist(key: string): void
+  getListenerCount(key?: string): number
+}
+
+/**
  * Service name → instance. Deliberately open: every other upstream data service
  * only ever asks for `DbService`, and a name nobody registered fails loudly in
  * `get()`. Server code that wants a typed handle imports the module that owns
@@ -39,6 +64,7 @@ export interface SqliteDatabaseService {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface WebServiceMap {
   DbService: SqliteDatabaseService
+  CacheService: CacheServiceLike
   [name: string]: any
 }
 

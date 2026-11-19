@@ -6,16 +6,31 @@ const listeners = new Map<string, Set<Listener>>()
 const RECONNECT_BASE_MS = 500
 const RECONNECT_MAX_MS = 30_000
 const HEARTBEAT_MS = 25_000
+const CLIENT_ID_KEY = 'ccw_client_id'
 
 let socket: WebSocket | null = null
 let reconnectAttempts = 0
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
+/**
+ * Stable per-tab identity. The server addresses directed stream events to this
+ * id (the web equivalent of a WindowId), so it must survive reconnects and be
+ * the same value on the RPC request and the WebSocket upgrade.
+ */
+function clientId(): string {
+  let id = sessionStorage.getItem(CLIENT_ID_KEY)
+  if (!id) {
+    id = crypto.randomUUID()
+    sessionStorage.setItem(CLIENT_ID_KEY, id)
+  }
+  return id
+}
+
 function websocketUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   // The session cookie authenticates the upgrade; no query-string token exists.
-  return `${protocol}//${window.location.host}/api/ws`
+  return `${protocol}//${window.location.host}/api/ws?client=${encodeURIComponent(clientId())}`
 }
 
 /** Session expired or missing: send the browser to the login page and stop retrying. */
@@ -94,7 +109,7 @@ async function request(route: string, input?: unknown): Promise<unknown> {
   try {
     response = await fetch('/api/rpc', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-client-id': clientId() },
       credentials: 'same-origin',
       body: JSON.stringify({ route, input })
     })
@@ -143,8 +158,66 @@ function on(event: string, callback: Listener): () => void {
   }
 }
 
+/**
+ * Data API transport: the same `DataRequest → DataResponse` envelope the desktop
+ * preload carried over IPC, now an HTTP request. The server answers 200 with the
+ * envelope for both success and failure, so business errors stay in `error`.
+ */
+async function dataRequest(request: unknown): Promise<unknown> {
+  let response: Response
+  try {
+    response = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-client-id': clientId() },
+      credentials: 'same-origin',
+      body: JSON.stringify(request)
+    })
+  } catch (error) {
+    return dataTransportFailure(request, error)
+  }
+
+  if (response.status === 401) {
+    redirectToLogin()
+    return dataTransportFailure(request, 'Authentication required')
+  }
+
+  const text = await response.text()
+  if (!text) return dataTransportFailure(request, `Empty response (HTTP ${response.status})`)
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return dataTransportFailure(request, `Malformed response (HTTP ${response.status})`)
+  }
+}
+
+function dataTransportFailure(
+  request: unknown,
+  cause: unknown
+): {
+  id: string
+  status: number
+  error: { code: string; message: string }
+} {
+  const id = typeof request === 'object' && request !== null && 'id' in request ? String(request.id) : ''
+  return {
+    id,
+    status: 503,
+    error: {
+      code: 'SERVICE_UNAVAILABLE',
+      message: cause instanceof Error ? cause.message : String(cause)
+    }
+  }
+}
+
 /** Installs the browser implementation of the preload bridge. Idempotent. */
 export function installWebApi(): void {
   if (window.api?.ipcApi) return
-  window.api = { ipcApi: { request, on } }
+  window.api = {
+    ipcApi: { request, on },
+    dataApi: {
+      request: dataRequest,
+      onDataChanged: (callback: Listener) => on('data-api:data-changed', callback)
+    }
+  }
 }

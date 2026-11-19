@@ -15,7 +15,8 @@ cherry-cloud-web 是 cherry-studio 的 Web 化分支：服务端持有数据与�
 
 ## 通信约定
 
-- 渲染进程只通过 `window.api.ipcApi.request(route, input)` 与 `window.api.ipcApi.on(event, cb)` 访问服务端。
+- 渲染进程只通过 `window.api.ipcApi.request(route, input)` 与 `window.api.ipcApi.on(event, cb)` 访问服务端；业务数据的增删改查走 `window.api.dataApi.request(DataRequest)`（`POST /api/data`）。
+- 每个标签页有稳定的 client id（RPC 头 `x-client-id`、WS 查询串 `?client=`），服务端 `IpcContext.senderId` 用它定位连接；需要定向推送时不要广播。
 - 新增能力时先改 `src/shared/ipc` 的 zod schema，再实现服务端 handler，最后接页面。
 - 一元调用走 HTTP，事件与流式走 WebSocket；不要为新功能另开传输方式。
 - 新增 HTTP/WS 入口默认要求会话（`AuthGuard`），需要公开时在 `isPublicPath` 或路由内显式放行；跨站写入必须校验 `Origin`。

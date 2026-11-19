@@ -3,6 +3,7 @@ import * as z from 'zod'
 
 import { ForbiddenError, UnauthorizedError, type AuthGuard } from '../auth/guard'
 import { forbidden, unauthorized } from '../routes/auth'
+import { normalizeClientId, type ConnectionRegistry } from './connections'
 import type { RpcRegistry } from './registry'
 
 const rpcRequestSchema = z.object({
@@ -13,6 +14,7 @@ const rpcRequestSchema = z.object({
 export interface RpcPluginOptions {
   registry: RpcRegistry
   guard: AuthGuard
+  connections: ConnectionRegistry
 }
 
 export async function registerRpcRoutes(app: FastifyInstance, options: RpcPluginOptions): Promise<void> {
@@ -34,7 +36,12 @@ export async function registerRpcRoutes(app: FastifyInstance, options: RpcPlugin
       })
     }
 
-    return options.registry.dispatch(parsed.data.route, parsed.data.input, { senderId: null })
+    // The tab's WebSocket connection is the caller's identity. Handlers that
+    // stream back to the caller (`ai.stream.*`) resolve it through
+    // `IpcContext.senderId`, exactly like a WindowId in the desktop app.
+    const senderId = normalizeClientId(request.headers['x-client-id'])
+
+    return options.registry.dispatch(parsed.data.route, parsed.data.input, { senderId })
   })
 }
 
@@ -55,7 +62,17 @@ export async function registerWebSocketRoute(app: FastifyInstance, options: RpcP
       socket.close(4401, 'unauthorized')
       return
     }
+
+    const query = request.query as Record<string, unknown> | undefined
+    const clientId = normalizeClientId(query?.client)
+    if (!clientId) {
+      socket.close(4400, 'missing client id')
+      return
+    }
+
     app.events.add(socket)
+    const connection = options.connections.attach(clientId, socket)
+    socket.on('close', () => options.connections.detach(clientId, connection))
 
     socket.on('message', (raw) => {
       let message: unknown

@@ -17,6 +17,11 @@
   - 保护面：`/api/rpc`、`/api/files`、`/media/:id`、SPA 页面均需会话；未登录页面请求 302 到 `/login?next=`，API 返回 401。
   - 登录页为服务端渲染的独立 HTML（M5 由 React 登录页替换），登录接口限速 10 次 / 5 分钟并带失败延迟。
   - 跨站防护：POST 与 WebSocket 升级校验 `Origin`（同源或 `ALLOWED_ORIGINS`），WebSocket 复用会话 Cookie，不再使用查询串 ticket。
+- M4 进行中（对话核心，传输层已完成）：
+  - DataApi 走 HTTP：`POST /api/data` 复用上游 `ApiServer.handleRequest` 与完整 `apiHandlers`（主题、消息、助手、供应商、文件、标签等），请求/响应信封不变；浏览器 `window.api.dataApi.request` 已对接。
+  - 数据变更通知：上游 `notifyDataApiDataChange` 仍调用 `WindowManager.broadcast`，服务端用 `src/server/data/windowManager.ts` 适配到 WebSocket 连接（事件 `data-api:data-changed`），写操作提交后各标签页自行收敛。
+  - 连接身份：每个标签页在 `sessionStorage` 生成稳定 client id，RPC 带 `x-client-id`、WebSocket 升级带 `?client=`；`IpcContext.senderId` 即该 id，`ai.stream.*` 的定向推送据此路由（等价于桌面端的 WindowId）。
+  - 待决：上游 `AiService`/`AiStreamManager` 静态依赖整个桌面 AI 栈（Agents、Claude Code、Pi runtime、浏览器、通道、`import.meta.env`、Vite `?raw`/`?nodeWorker`），无法在 Node 进程内直接装载。需要在“服务端精简对话引擎”与“整体引入上游依赖”之间选定，详见 §6。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
 - 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；这些文件在 M5 删除。
 - `pnpm lint` 目前只覆盖 `src/server`、`src/platform` 与脚本；`src/shared`、`src/renderer` 待 `window.api` 真实类型收敛后再纳入。
@@ -38,6 +43,7 @@
 ```
 GET  /                 静态 SPA（dist/web），未命中路由回退 index.html
 POST /api/rpc          一元调用：{ id, route, input } -> IpcResult 信封
+POST /api/data         DataApi 信封：DataRequest -> DataResponse（主题/消息/助手/供应商等）
 WS   /api/ws           事件推送与 AI 流式（event + payload；会话 Cookie + Origin 校验）
 POST /api/auth/login   密码登录，写入会话 Cookie
 POST /api/auth/logout  清除会话 Cookie
