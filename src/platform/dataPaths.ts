@@ -14,7 +14,12 @@ export interface DataPaths {
   files: string
   logs: string
   providerRegistry: string
+  /** Encrypted-secret key material for provider credentials. */
   secrets: string
+  /** Password hash for the single account. */
+  auth: string
+  /** HMAC key for session cookies, derived from `APP_SECRET` when set. */
+  sessionKey: string
 }
 
 export function resolveDataDir(configured: string | undefined = process.env.DATA_DIR): string {
@@ -30,7 +35,9 @@ export function resolveDataPaths(root: string): DataPaths {
     files: resolve(absoluteRoot, 'files'),
     logs: resolve(absoluteRoot, 'logs'),
     providerRegistry: resolve(absoluteRoot, 'provider-registry'),
-    secrets: resolve(absoluteRoot, 'secret.key')
+    secrets: resolve(absoluteRoot, 'secret.key'),
+    auth: resolve(absoluteRoot, 'auth.json'),
+    sessionKey: resolve(absoluteRoot, 'session.key')
   }
 }
 

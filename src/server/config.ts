@@ -11,8 +11,15 @@ export interface ServerConfig {
   migrationsDir: string
   webDist: string
   isProduction: boolean
-  /** Temporary shared token; replaced by password sessions in M3. */
-  authToken?: string
+  /** Used only on the first start, when `DATA_DIR/auth.json` does not exist yet. */
+  adminPassword?: string
+  /** Session cookie lifetime in days. */
+  sessionTtlDays: number
+  /** Force the `Secure` cookie flag when a proxy terminates TLS but rewrites the protocol. */
+  forceSecureCookie: boolean
+  /** Extra origins allowed for POSTs and WebSocket upgrades, beyond the request host. */
+  allowedOrigins: string[]
+  /** Key material for encrypting provider credentials and signing sessions. */
   appSecret?: string
 }
 
@@ -29,15 +36,18 @@ export function loadConfig(): ServerConfig {
   const port = Number(process.env.PORT ?? 8787)
   const webDist = resolve(process.env.WEB_DIST?.trim() || resolve(process.cwd(), 'dist/web'))
   const host = process.env.HOST?.trim() || '127.0.0.1'
-  const authToken = process.env.APP_TOKEN?.trim() || undefined
+  const sessionTtlDays = Number(process.env.SESSION_TTL_DAYS ?? 30)
 
   if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`Invalid PORT: ${process.env.PORT}`)
   }
-
-  // Milestone M1 has no user authentication yet, so a non-loopback bind must be token-gated.
-  if (!authToken && !isLoopbackHost(host)) {
-    throw new Error('APP_TOKEN is required when HOST is not a loopback address')
+  if (!Number.isFinite(sessionTtlDays) || sessionTtlDays <= 0) {
+    throw new Error(`Invalid SESSION_TTL_DAYS: ${process.env.SESSION_TTL_DAYS}`)
+  }
+  if (!isLoopbackHost(host) && !process.env.ADMIN_PASSWORD && !existsSync(resolve(resolveDataDir(), 'auth.json'))) {
+    throw new Error(
+      'ADMIN_PASSWORD is required for the first start on a non-loopback address (at least 8 characters)'
+    )
   }
 
   return {
@@ -47,7 +57,13 @@ export function loadConfig(): ServerConfig {
     migrationsDir: resolveMigrationsDir(),
     webDist,
     isProduction: process.env.NODE_ENV === 'production',
-    authToken,
+    adminPassword: process.env.ADMIN_PASSWORD?.trim() || undefined,
+    sessionTtlDays,
+    forceSecureCookie: process.env.COOKIE_SECURE === 'true',
+    allowedOrigins: (process.env.ALLOWED_ORIGINS ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
     appSecret: process.env.APP_SECRET?.trim() || undefined
   }
 }

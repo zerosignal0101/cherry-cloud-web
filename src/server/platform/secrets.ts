@@ -15,7 +15,7 @@ export class SecretBox {
   private readonly key: Buffer
 
   constructor(secret: string | undefined, keyFile: string) {
-    this.key = secret?.trim() ? deriveKey(secret.trim()) : loadOrCreateKeyFile(keyFile)
+    this.key = secret?.trim() ? deriveKeyFromSecret(secret.trim()) : loadOrCreateKeyFile(keyFile)
   }
 
   encrypt(plaintext: string): string {
@@ -38,11 +38,11 @@ export class SecretBox {
   }
 }
 
-function deriveKey(secret: string): Buffer {
+export function deriveKeyFromSecret(secret: string): Buffer {
   return scryptSync(secret, 'cherry-cloud-web', KEY_BYTES)
 }
 
-function loadOrCreateKeyFile(keyFile: string): Buffer {
+export function loadOrCreateKeyFile(keyFile: string): Buffer {
   if (existsSync(keyFile)) {
     return Buffer.from(readFileSync(keyFile, 'utf8').trim(), 'base64')
   }

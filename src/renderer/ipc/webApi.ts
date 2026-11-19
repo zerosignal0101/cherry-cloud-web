@@ -14,9 +14,15 @@ let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
 function websocketUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const params = new URLSearchParams(window.location.search)
-  const token = params.get('token')
-  return `${protocol}//${window.location.host}/api/ws${token ? `?token=${encodeURIComponent(token)}` : ''}`
+  // The session cookie authenticates the upgrade; no query-string token exists.
+  return `${protocol}//${window.location.host}/api/ws`
+}
+
+/** Session expired or missing: send the browser to the login page and stop retrying. */
+function redirectToLogin(): void {
+  if (window.location.pathname === '/login') return
+  const next = window.location.pathname + window.location.search
+  window.location.assign(`/login?next=${encodeURIComponent(next)}`)
 }
 
 function dispatch(event: string, payload: unknown): void {
@@ -69,10 +75,14 @@ function connect(): void {
     if (frame.type === 'event' && typeof frame.event === 'string') dispatch(frame.event, frame.payload)
   })
 
-  next.addEventListener('close', () => {
+  next.addEventListener('close', (event) => {
     if (heartbeatTimer) clearInterval(heartbeatTimer)
     heartbeatTimer = null
     if (socket === next) socket = null
+    if (event.code === 4401) {
+      redirectToLogin()
+      return
+    }
     scheduleReconnect()
   })
 
@@ -90,6 +100,11 @@ async function request(route: string, input?: unknown): Promise<unknown> {
     })
   } catch (error) {
     return transportFailure(error)
+  }
+
+  if (response.status === 401) {
+    redirectToLogin()
+    return { ok: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } }
   }
 
   const text = await response.text()

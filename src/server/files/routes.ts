@@ -2,25 +2,27 @@ import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 
 import mime from 'mime'
-import type { FastifyInstance, FastifyReply } from 'fastify'
+import type { FastifyInstance } from 'fastify'
 
 import { resolvePhysicalPath } from '@main/services/file/utils/pathResolver'
 import { FileEntryIdSchema } from '@shared/data/types/file'
 
-import type { AccessGuard } from '../auth/guard'
-import { UnauthorizedError } from '../auth/guard'
+import { ForbiddenError, UnauthorizedError, type AuthGuard } from '../auth/guard'
+import { forbidden, unauthorized } from '../routes/auth'
 import { findFileEntry, storeUploadedFile } from './service'
 
 export interface FileRouteOptions {
-  guard: AccessGuard
+  guard: AuthGuard
 }
 
 export async function registerFileRoutes(app: FastifyInstance, options: FileRouteOptions): Promise<void> {
   app.post('/api/files', async (request, reply) => {
     try {
-      options.guard.assertHttp(request)
+      options.guard.assertSameOrigin(request)
+      options.guard.assertAuthenticated(request)
     } catch (error) {
-      if (error instanceof UnauthorizedError) return sendUnauthorized(reply)
+      if (error instanceof ForbiddenError) return forbidden(reply)
+      if (error instanceof UnauthorizedError) return unauthorized(reply)
       throw error
     }
 
@@ -38,11 +40,17 @@ export async function registerFileRoutes(app: FastifyInstance, options: FileRout
   })
 
   /**
-   * Media is served without the access token: `<img src>`/`<audio src>` cannot set
-   * an Authorization header. The URL is unguessable (uuid v7) and the route becomes
-   * session-gated together with the rest of the app in M3.
+   * Media reads ride the session cookie: same-origin `<img src>`/`<audio src>`
+   * requests carry it automatically, so previews work without exposing URLs.
    */
   app.get('/media/:id', async (request, reply) => {
+    try {
+      options.guard.assertAuthenticated(request)
+    } catch (error) {
+      if (error instanceof UnauthorizedError) return unauthorized(reply)
+      throw error
+    }
+
     const parsed = FileEntryIdSchema.safeParse((request.params as { id?: string }).id)
     if (!parsed.success) return reply.code(404).send({ error: 'not_found' })
 
@@ -83,10 +91,6 @@ export async function registerFileRoutes(app: FastifyInstance, options: FileRout
     reply.header('content-length', info.size)
     return reply.send(createReadStream(physicalPath))
   })
-}
-
-function sendUnauthorized(reply: FastifyReply): FastifyReply {
-  return reply.code(401).send({ ok: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } })
 }
 
 function entryToResponse(id: string, name: string, ext: string | null, size: number | null) {

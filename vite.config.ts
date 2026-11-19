@@ -39,7 +39,9 @@ export default defineConfig({
     port: Number(process.env.WEB_PORT ?? 5173),
     proxy: {
       '/api': { target: API_TARGET, changeOrigin: true, ws: true },
-      '/media': { target: API_TARGET, changeOrigin: true }
+      '/media': { target: API_TARGET, changeOrigin: true },
+      // The login page is server-rendered; in dev it lives on the API server.
+      '/login': { target: API_TARGET, changeOrigin: true }
     }
   },
   build: {

@@ -5,15 +5,21 @@
 ## 0. 当前状态
 
 - M0 完成：源码基线入库，SPA 可构建，服务端可启动（`/api/health`、静态资源、深链回退均验证通过），`pnpm typecheck` 与 `pnpm lint` 通过。
-- M1 完成：`POST /api/rpc` 复用上游 `IpcRouter` 与 zod 契约，`WS /api/ws` 推送事件；浏览器侧 `window.api.ipcApi` 改由 `src/renderer/ipc/webApi.ts` 实现（HTTP 一元调用 + WS 事件 + 重连）；新增 Node 平台层（数据目录、密钥加密）；`system.ping` 端到端验证通过。鉴权暂为 `APP_TOKEN`，M3 替换。
+- M1 完成：`POST /api/rpc` 复用上游 `IpcRouter` 与 zod 契约，`WS /api/ws` 推送事件；浏览器侧 `window.api.ipcApi` 改由 `src/renderer/ipc/webApi.ts` 实现（HTTP 一元调用 + WS 事件 + 重连）；新增 Node 平台层（数据目录、密钥加密）；`system.ping` 端到端验证通过（当时的 `APP_TOKEN` 在 M3 由密码会话取代）。
 - M2 完成（数据与文件）：
   - SQLite 启动即建库：沿用上游 `migrations/sqlite-drizzle`，`openDatabase` 负责完整性检查、WAL/外键 pragma、迁移与 Web 子集种子；`application.get('DbService')` 由服务端注册，上游数据服务（`FileEntryService` 等）原样可用。
   - `src/platform/electron` 是 `electron` 的服务端替身（`app`/`ipcMain`/`dialog`/`shell`/`clipboard`），`tsconfig.server.json` 把 `electron` 指向它；上游 `src/main` 代码因此无需改动即可在 Node 下运行。
   - 文件只走服务端：`POST /api/files`（multipart，上限 100MB）写入 `DATA_DIR/files` 并生成 `file_entry` 行；`GET /media/:id` 支持 Range/ETag/304，供图片、音视频与预览使用。浏览器不再接触物理路径（`window.api.file` 的适配在 M4/M5 完成）。
   - 种子仅保留 Web 需要的子集（偏好、知识库排序、会话排序、翻译语言）；桌面功能与 Cherry 品牌相关的种子显式排除。
+- M3 完成（鉴权）：
+  - 单密码：`ADMIN_PASSWORD` 首次启动写入 `DATA_DIR/auth.json`（scrypt 哈希，0600），之后忽略该变量；重置需删除文件。
+  - 会话：HMAC-SHA256 签名的无状态 Cookie（HttpOnly、SameSite=Lax、Path=/、按请求协议决定 Secure），有效期 `SESSION_TTL_DAYS`。
+  - 保护面：`/api/rpc`、`/api/files`、`/media/:id`、SPA 页面均需会话；未登录页面请求 302 到 `/login?next=`，API 返回 401。
+  - 登录页为服务端渲染的独立 HTML（M5 由 React 登录页替换），登录接口限速 10 次 / 5 分钟并带失败延迟。
+  - 跨站防护：POST 与 WebSocket 升级校验 `Origin`（同源或 `ALLOWED_ORIGINS`），WebSocket 复用会话 Cookie，不再使用查询串 ticket。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
 - 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；这些文件在 M5 删除。
-- `pnpm lint` 目前只覆盖 `src/server` 与新脚本；`src/shared`、`src/renderer` 待 M1 完成 `window.api` 真实类型后再纳入。
+- `pnpm lint` 目前只覆盖 `src/server`、`src/platform` 与脚本；`src/shared`、`src/renderer` 待 `window.api` 真实类型收敛后再纳入。
 
 ## 1. 目标
 
@@ -32,7 +38,11 @@
 ```
 GET  /                 静态 SPA（dist/web），未命中路由回退 index.html
 POST /api/rpc          一元调用：{ id, route, input } -> IpcResult 信封
-WS   /api/ws           事件推送与 AI 流式（event + payload）
+WS   /api/ws           事件推送与 AI 流式（event + payload；会话 Cookie + Origin 校验）
+POST /api/auth/login   密码登录，写入会话 Cookie
+POST /api/auth/logout  清除会话 Cookie
+GET  /api/auth/status  当前会话状态
+GET  /login            服务端渲染登录页（M5 由 SPA 页面替换）
 POST /api/files        附件上传（multipart，单文件）-> FileEntry 描述 + /media/:id
 GET  /media/:id        文件读取（Range / ETag）
 ```
@@ -98,3 +108,5 @@ packages/ui/   vendored UI 包
 - 文件子系统改造面大（`window.api.file` 约 250 处）：先做同名适配层，再逐页清理。
 - webview 型能力无法迁移：首版删除，后续用 sandbox iframe + 服务端代理重做。
 - 单进程 SQLite 不支持多副本：部署强制单实例，备份用 SQLite backup 而非拷贝。
+- 无状态会话无法逐条吊销：登出只清 Cookie，泄露的令牌在过期前仍有效；用 `SESSION_TTL_DAYS` 收敛窗口，如需即时失效则删除 `DATA_DIR/session.key`（会使全部会话失效）。
+- 密码校验用 scrypt（约几十毫秒/次），登录限速 10 次 / 5 分钟；暴力破解面已很小，但仍应把服务放在反向代理之后。

@@ -23,6 +23,10 @@ function testConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
     migrationsDir: resolve(process.cwd(), 'migrations/sqlite-drizzle'),
     webDist: resolve(process.cwd(), 'dist/web'),
     isProduction: false,
+    adminPassword: 'test-password',
+    sessionTtlDays: 30,
+    forceSecureCookie: false,
+    allowedOrigins: [],
     ...overrides
   }
 }
@@ -46,6 +50,13 @@ function multipartBody(filename: string, content: string, boundary = 'ccw-bounda
   return { body, headers: { 'content-type': `multipart/form-data; boundary=${boundary}` } }
 }
 
+async function login(app: FastifyInstance): Promise<string> {
+  const response = await app.inject({ method: 'POST', url: '/api/auth/login', payload: { password: 'test-password' } })
+  const cookie = response.cookies.find((entry) => entry.name === 'ccw_session')
+  if (!cookie) throw new Error('session cookie missing')
+  return `ccw_session=${cookie.value}`
+}
+
 afterEach(async () => {
   for (const app of apps.splice(0)) await app.close()
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
@@ -56,7 +67,12 @@ describe('POST /api/files', () => {
     const app = await createApp()
     const { body, headers } = multipartBody('notes.txt', 'hello web')
 
-    const response = await app.inject({ method: 'POST', url: '/api/files', payload: body, headers })
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/files',
+      payload: body,
+      headers: { ...headers, cookie: await login(app) }
+    })
 
     expect(response.statusCode).toBe(201)
     const uploaded = response.json<{ id: string; name: string; ext: string; size: number; url: string }>()
@@ -64,8 +80,8 @@ describe('POST /api/files', () => {
     expect(uploaded.url).toBe(`/media/${uploaded.id}`)
   })
 
-  it('rejects an upload without the access token when one is configured', async () => {
-    const app = await createApp(testConfig({ authToken: 'secret' }))
+  it('rejects an upload without a session', async () => {
+    const app = await createApp()
     const { body, headers } = multipartBody('notes.txt', 'hello')
 
     const unauthorized = await app.inject({ method: 'POST', url: '/api/files', payload: body, headers })
@@ -75,7 +91,7 @@ describe('POST /api/files', () => {
       method: 'POST',
       url: '/api/files',
       payload: body,
-      headers: { ...headers, authorization: 'Bearer secret' }
+      headers: { ...headers, cookie: await login(app) }
     })
     expect(authorized.statusCode).toBe(201)
   })
@@ -86,7 +102,7 @@ describe('POST /api/files', () => {
       method: 'POST',
       url: '/api/files',
       payload: '',
-      headers: { 'content-type': 'multipart/form-data; boundary=ccw-boundary' }
+      headers: { 'content-type': 'multipart/form-data; boundary=ccw-boundary', cookie: await login(app) }
     })
     expect(response.statusCode).toBe(400)
   })
@@ -95,37 +111,58 @@ describe('POST /api/files', () => {
 describe('GET /media/:id', () => {
   it('serves the stored bytes with metadata and range support', async () => {
     const app = await createApp()
+    const cookie = await login(app)
     const { body, headers } = multipartBody('notes.txt', 'hello web')
-    const upload = await app.inject({ method: 'POST', url: '/api/files', payload: body, headers })
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/api/files',
+      payload: body,
+      headers: { ...headers, cookie }
+    })
     const { id, url } = upload.json<{ id: string; url: string }>()
 
-    const full = await app.inject({ method: 'GET', url })
+    const full = await app.inject({ method: 'GET', url, headers: { cookie } })
     expect(full.statusCode).toBe(200)
     expect(full.headers['content-type']).toContain('text/plain')
     expect(full.headers['accept-ranges']).toBe('bytes')
     expect(full.body).toBe('hello web')
 
-    const partial = await app.inject({ method: 'GET', url, headers: { range: 'bytes=0-4' } })
+    const partial = await app.inject({ method: 'GET', url, headers: { cookie, range: 'bytes=0-4' } })
     expect(partial.statusCode).toBe(206)
     expect(partial.headers['content-range']).toBe('bytes 0-4/9')
     expect(partial.body).toBe('hello')
 
-    const unsatisfiable = await app.inject({ method: 'GET', url, headers: { range: 'bytes=50-60' } })
+    const unsatisfiable = await app.inject({ method: 'GET', url, headers: { cookie, range: 'bytes=50-60' } })
     expect(unsatisfiable.statusCode).toBe(416)
 
-    const conditional = await app.inject({ method: 'GET', url, headers: { 'if-none-match': full.headers.etag as string } })
+    const conditional = await app.inject({
+      method: 'GET',
+      url,
+      headers: { cookie, 'if-none-match': full.headers.etag as string }
+    })
     expect(conditional.statusCode).toBe(304)
 
     expect(id).toMatch(/^[0-9a-f-]{36}$/)
   })
 
+  it('requires a session', async () => {
+    const app = await createApp()
+    const response = await app.inject({ method: 'GET', url: '/media/01a1f36c-0000-7000-8000-000000000000' })
+    expect(response.statusCode).toBe(401)
+  })
+
   it('returns 404 for unknown or malformed ids', async () => {
     const app = await createApp()
+    const cookie = await login(app)
 
-    const unknown = await app.inject({ method: 'GET', url: '/media/01a1f36c-0000-7000-8000-000000000000' })
+    const unknown = await app.inject({
+      method: 'GET',
+      url: '/media/01a1f36c-0000-7000-8000-000000000000',
+      headers: { cookie }
+    })
     expect(unknown.statusCode).toBe(404)
 
-    const malformed = await app.inject({ method: 'GET', url: '/media/not-an-id' })
+    const malformed = await app.inject({ method: 'GET', url: '/media/not-an-id', headers: { cookie } })
     expect(malformed.statusCode).toBe(404)
   })
 })
