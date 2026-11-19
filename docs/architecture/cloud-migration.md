@@ -6,6 +6,11 @@
 
 - M0 完成：源码基线入库，SPA 可构建，服务端可启动（`/api/health`、静态资源、深链回退均验证通过），`pnpm typecheck` 与 `pnpm lint` 通过。
 - M1 完成：`POST /api/rpc` 复用上游 `IpcRouter` 与 zod 契约，`WS /api/ws` 推送事件；浏览器侧 `window.api.ipcApi` 改由 `src/renderer/ipc/webApi.ts` 实现（HTTP 一元调用 + WS 事件 + 重连）；新增 Node 平台层（数据目录、密钥加密）；`system.ping` 端到端验证通过。鉴权暂为 `APP_TOKEN`，M3 替换。
+- M2 完成（数据与文件）：
+  - SQLite 启动即建库：沿用上游 `migrations/sqlite-drizzle`，`openDatabase` 负责完整性检查、WAL/外键 pragma、迁移与 Web 子集种子；`application.get('DbService')` 由服务端注册，上游数据服务（`FileEntryService` 等）原样可用。
+  - `src/platform/electron` 是 `electron` 的服务端替身（`app`/`ipcMain`/`dialog`/`shell`/`clipboard`），`tsconfig.server.json` 把 `electron` 指向它；上游 `src/main` 代码因此无需改动即可在 Node 下运行。
+  - 文件只走服务端：`POST /api/files`（multipart，上限 100MB）写入 `DATA_DIR/files` 并生成 `file_entry` 行；`GET /media/:id` 支持 Range/ETag/304，供图片、音视频与预览使用。浏览器不再接触物理路径（`window.api.file` 的适配在 M4/M5 完成）。
+  - 种子仅保留 Web 需要的子集（偏好、知识库排序、会话排序、翻译语言）；桌面功能与 Cherry 品牌相关的种子显式排除。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
 - 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；这些文件在 M5 删除。
 - `pnpm lint` 目前只覆盖 `src/server` 与新脚本；`src/shared`、`src/renderer` 待 M1 完成 `window.api` 真实类型后再纳入。
@@ -28,8 +33,8 @@
 GET  /                 静态 SPA（dist/web），未命中路由回退 index.html
 POST /api/rpc          一元调用：{ id, route, input } -> IpcResult 信封
 WS   /api/ws           事件推送与 AI 流式（event + payload）
-POST /api/upload       附件上传
-GET  /media/:id        文件读取（支持 Range）
+POST /api/files        附件上传（multipart，单文件）-> FileEntry 描述 + /media/:id
+GET  /media/:id        文件读取（Range / ETag）
 ```
 
 - TLS、压缩、请求体上限由反向代理负责。

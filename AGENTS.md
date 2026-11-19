@@ -6,7 +6,7 @@ cherry-cloud-web 是 cherry-studio 的 Web 化分支：服务端持有数据与�
 
 ## 不可违反的约束
 
-- `src/platform/` 之外禁止 `import 'electron'`。
+- `src/platform/` 之外禁止 `import 'electron'`。服务端编译时 `electron` 被解析到 `src/platform/electron`（见 `tsconfig.server.json`），`@application` 指向 `src/platform/application`，因此上游 `src/main` 代码可保持原样。
 - 桌面专属能力不再引入：托盘、快捷键、自动更新、多窗口、划词助手、快捷助手、截图、webview 浏览器。
 - 不使用 Cherry 官方账号、订阅、支付、CherryIN 与埋点。
 - 数据只存在服务端：禁止让浏览器直接读写本地文件系统；附件一律经上传接口进入 `DATA_DIR/files`，通过 `/media/:id` 读取。

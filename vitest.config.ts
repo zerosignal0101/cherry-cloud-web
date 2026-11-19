@@ -9,7 +9,12 @@ export default defineConfig({
     alias: {
       '@shared': resolvePath('./src/shared'),
       '@main': resolvePath('./src/main'),
-      '@server': resolvePath('./src/server')
+      '@server': resolvePath('./src/server'),
+      '@platform': resolvePath('./src/platform'),
+      '@data': resolvePath('./src/main/data'),
+      '@logger': resolvePath('./src/main/core/logger/LoggerService.ts'),
+      '@application': resolvePath('./src/platform/application.ts'),
+      electron: resolvePath('./src/platform/electron/index.ts')
     }
   },
   test: {

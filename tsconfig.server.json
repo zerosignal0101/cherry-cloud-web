@@ -26,7 +26,7 @@
     ],
     "paths": {
       "@application": [
-        "./src/main/core/application/Application"
+        "./src/platform/application"
       ],
       "@data/*": [
         "./src/main/data/*"
@@ -37,13 +37,20 @@
       "@main/*": [
         "./src/main/*"
       ],
+      "@platform/*": [
+        "./src/platform/*"
+      ],
       "@shared/*": [
         "./src/shared/*"
+      ],
+      "electron": [
+        "./src/platform/electron/index"
       ]
     }
   },
   "include": [
     "src/server/**/*",
+    "src/platform/**/*",
     "src/shared/**/*"
   ],
   "exclude": [

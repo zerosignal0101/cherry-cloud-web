@@ -1,6 +1,7 @@
+import { ensureDataPaths, resolveDataPaths } from '@platform/dataPaths'
+
 import { buildApp } from './app'
 import { assertWebDist, loadConfig } from './config'
-import { ensureDataPaths, resolveDataPaths } from './platform/paths'
 
 async function main(): Promise<void> {
   const config = loadConfig()

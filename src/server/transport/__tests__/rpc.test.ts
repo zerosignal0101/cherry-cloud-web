@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+
 import type { FastifyInstance } from 'fastify'
 import WebSocket from 'ws'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -6,12 +10,16 @@ import { buildApp } from '../../app'
 import type { ServerConfig } from '../../config'
 
 const apps: FastifyInstance[] = []
+const tempDirs: string[] = []
 
 function config(overrides: Partial<ServerConfig> = {}): ServerConfig {
+  const dataDir = mkdtempSync(join(tmpdir(), 'ccw-rpc-'))
+  tempDirs.push(dataDir)
   return {
     host: '127.0.0.1',
     port: 0,
-    dataDir: '/tmp/cherry-cloud-web-test',
+    dataDir,
+    migrationsDir: resolve(process.cwd(), 'migrations/sqlite-drizzle'),
     webDist: '/tmp/cherry-cloud-web-no-dist',
     isProduction: true,
     ...overrides
@@ -26,6 +34,7 @@ async function createApp(overrides: Partial<ServerConfig> = {}): Promise<Fastify
 
 afterEach(async () => {
   for (const app of apps.splice(0)) await app.close()
+  for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
 describe('POST /api/rpc', () => {

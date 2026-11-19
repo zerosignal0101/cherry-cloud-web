@@ -1,10 +1,14 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+import { resolveDataDir } from '@platform/dataPaths'
+
 export interface ServerConfig {
   host: string
   port: number
   dataDir: string
+  /** Drizzle migration folder copied from upstream (`migrations/sqlite-drizzle`). */
+  migrationsDir: string
   webDist: string
   isProduction: boolean
   /** Temporary shared token; replaced by password sessions in M3. */
@@ -12,9 +16,9 @@ export interface ServerConfig {
   appSecret?: string
 }
 
-function resolveDataDir(): string {
-  const configured = process.env.DATA_DIR?.trim()
-  return resolve(configured && configured.length > 0 ? configured : './.data')
+function resolveMigrationsDir(): string {
+  const configured = process.env.MIGRATIONS_DIR?.trim()
+  return resolve(configured && configured.length > 0 ? configured : './migrations/sqlite-drizzle')
 }
 
 function isLoopbackHost(host: string): boolean {
@@ -40,6 +44,7 @@ export function loadConfig(): ServerConfig {
     host,
     port,
     dataDir: resolveDataDir(),
+    migrationsDir: resolveMigrationsDir(),
     webDist,
     isProduction: process.env.NODE_ENV === 'production',
     authToken,

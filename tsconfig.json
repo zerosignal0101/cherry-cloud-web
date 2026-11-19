@@ -2,10 +2,12 @@
   "files": [],
   "compilerOptions": {
     "paths": {
-      "@application": ["./src/main/core/application/Application"],
+      "@application": ["./src/platform/application"],
       "@data/*": ["./src/main/data/*"],
       "@logger": ["./src/main/core/logger/LoggerService"],
+      "electron": ["./src/platform/electron/index"],
       "@main/*": ["./src/main/*"],
+      "@platform/*": ["./src/platform/*"],
       "@renderer/*": ["./src/renderer/*"],
       "@server/*": ["./src/server/*"],
       "@shared/*": ["./src/shared/*"],
