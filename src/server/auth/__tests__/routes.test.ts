@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import { buildApp } from '../../app'
 import type { ServerConfig } from '../../config'
-import { sanitizeNext } from '../../routes/loginPage'
+import { sanitizeNext } from '../../routes/auth'
 
 const apps: FastifyInstance[] = []
 const tempDirs: string[] = []
@@ -116,14 +116,26 @@ describe('login page and SPA gate', () => {
     expect(response.headers.location).toBe('/login?next=%2Fchat%2Fabc')
   })
 
-  it('serves the login page without a session', async () => {
-    const app = await createApp()
-    const response = await app.inject({ method: 'GET', url: '/login' })
+  it('serves the SPA shell (not a redirect) without a session', async () => {
+    const webDist = mkdtempSync(join(tmpdir(), 'ccw-auth-web-'))
+    tempDirs.push(webDist)
+    writeFileSync(join(webDist, 'index.html'), '<!doctype html><html><body><div id="root"></div></body></html>')
+
+    const app = await createApp({ webDist })
+    const response = await app.inject({ method: 'GET', url: '/login?next=%2Fapp%2Fchat' })
 
     expect(response.statusCode).toBe(200)
     expect(response.headers['content-type']).toContain('text/html')
     expect(response.headers['cache-control']).toBe('no-store')
-    expect(response.body).toContain('name="password"')
+    expect(response.body).toContain('<div id="root">')
+  })
+
+  it('explains a missing web build instead of redirecting', async () => {
+    const app = await createApp()
+    const response = await app.inject({ method: 'GET', url: '/login' })
+
+    expect(response.statusCode).toBe(503)
+    expect(response.json()).toEqual({ error: 'web_build_missing' })
   })
 
   it('bounces an authenticated visitor away from /login', async () => {

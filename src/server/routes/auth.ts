@@ -5,7 +5,6 @@ import type { AuthGuard } from '../auth/guard'
 import { ForbiddenError } from '../auth/guard'
 import type { AuthStore } from '../auth/password'
 import type { SessionSigner } from '../auth/session'
-import { renderLoginPage, sanitizeNext } from './loginPage'
 
 const loginSchema = z.object({ password: z.string().min(1).max(1024) })
 
@@ -63,24 +62,18 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
     options.guard.clearSession(reply)
     return { ok: true, data: { authenticated: false } }
   })
-
-  app.get('/login', async (request, reply) => {
-    const next = sanitizeNext((request.query as { next?: string } | undefined)?.next)
-    if (options.guard.isAuthenticated(request)) return redirect(reply, next)
-    return sendLoginPage(reply, { next })
-  })
 }
 
-/** Renders the login page for a request that lost its session. */
-export function sendLoginPage(
-  reply: FastifyReply,
-  options: { next: string; error?: string; status?: number }
-): FastifyReply {
-  return reply
-    .code(options.status ?? 200)
-    .header('cache-control', 'no-store')
-    .type('text/html; charset=utf-8')
-    .send(renderLoginPage({ next: options.next, error: options.error }))
+/**
+ * `next` may only point inside this app: a single leading slash, never a
+ * protocol-relative URL or a header-injection attempt. The SPA login view keeps
+ * the value in the address bar and returns here after a successful login.
+ */
+export function sanitizeNext(raw: string | undefined): string {
+  if (!raw) return '/'
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return '/'
+  if (raw.includes('\n') || raw.includes('\r')) return '/'
+  return raw
 }
 
 export function redirect(reply: FastifyReply, location: string): FastifyReply {

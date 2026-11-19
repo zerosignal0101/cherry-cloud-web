@@ -26,7 +26,7 @@ import { installWindowManager, uninstallWindowManager } from './data/windowManag
 import { registerFileRoutes } from './files/routes'
 import { MAX_UPLOAD_BYTES } from './files/service'
 import { deriveKeyFromSecret, loadOrCreateKeyFile } from './platform/secrets'
-import { registerAuthRoutes } from './routes/auth'
+import { registerAuthRoutes, sanitizeNext } from './routes/auth'
 import { getApiServer, registerDataRoutes } from './routes/data'
 import { registerHostRoutes } from './routes/host'
 import { registerPreferenceRoutes } from './routes/preference'
@@ -147,6 +147,25 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   if (hasWebBuild) {
     await app.register(fastifyStatic, { root: config.webDist, wildcard: false })
   }
+
+  /**
+   * The login view is part of the SPA (M5 replaced the server-rendered form).
+   * Unauthenticated visitors get `index.html`; the renderer decides whether to
+   * show the login screen or the application from `/api/auth/status`. An
+   * authenticated visitor is bounced to `next` so a stale bookmark cannot keep
+   * them on a form they no longer need.
+   */
+  app.get('/login', async (request, reply) => {
+    const next = sanitizeNext((request.query as { next?: string } | undefined)?.next)
+    if (guard.isAuthenticated(request)) return reply.header('cache-control', 'no-store').redirect(next, 302)
+    if (!hasWebBuild) return reply.code(503).send({ error: 'web_build_missing' })
+    // The shell itself must not be cached: it is the same document for the
+    // authenticated app and the login gate. Hashed assets keep their default.
+    return reply
+      .header('cache-control', 'no-store')
+      .type('text/html')
+      .sendFile('index.html', { cacheControl: false })
+  })
 
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith('/api/') || request.url.startsWith('/media/')) {
