@@ -67,7 +67,14 @@ export function PageSidebar({
           data-ui="part:conversation-navigation"
           data-resource-list-pane
           data-resizing={isResizing || undefined}
-          className={cn('group/resource-list-pane relative shrink-0 overflow-visible', className)}
+          className={cn(
+            'group/resource-list-pane relative shrink-0 overflow-visible',
+            // Phones have no room for a docked list: opening it would leave a
+            // ~100px conversation column. Below `md` the same pane floats above
+            // the chat instead (ChatAppShell renders a tap-to-close backdrop).
+            'max-md:absolute max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:bg-background max-md:shadow-xl',
+            className
+          )}
           style={style}>
           {/* Keep the list clipped without covering its scrollbar with the resize hit area. */}
           <div data-resource-list-pane-content className="h-full min-h-0 overflow-hidden">
@@ -83,7 +90,7 @@ export function PageSidebar({
               label: t('common.resize_panel'),
               onResize: setPaneWidth
             })}
-            className="group/resource-list-resize-handle absolute top-0 bottom-0 left-full z-10 w-2 cursor-col-resize focus-visible:bg-border-strong focus-visible:outline-none">
+            className="group/resource-list-resize-handle absolute top-0 bottom-0 left-full z-10 hidden w-2 cursor-col-resize focus-visible:bg-border-strong focus-visible:outline-none md:block">
             <div className="absolute top-0 left-0 h-full w-0.5 bg-border opacity-0 transition-opacity group-hover/resource-list-resize-handle:opacity-100 group-data-[resizing=true]/resource-list-pane:bg-border-strong group-data-[resizing=true]/resource-list-pane:opacity-100" />
           </div>
         </motion.div>

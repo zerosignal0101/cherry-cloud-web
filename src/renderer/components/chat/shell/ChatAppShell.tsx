@@ -322,6 +322,14 @@ export function ChatAppShell({
         <PageSidebar open={leftPaneOpen} onPaneCollapse={onPaneCollapse} onResizingChange={setListResizing}>
           {panePosition === 'left' ? pane : undefined}
         </PageSidebar>
+        {/* Below `md` the list is an overlay; tapping the chat closes it. */}
+        {leftPaneOpen && (
+          <div
+            aria-hidden="true"
+            onClick={onPaneCollapse}
+            className="absolute inset-0 z-30 hidden bg-black/30 max-md:block"
+          />
+        )}
 
         <div data-chat-app-shell-main-region className="relative flex min-w-0 flex-1 overflow-hidden">
           <div className="relative flex min-w-0 flex-1 flex-col">
