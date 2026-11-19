@@ -1,0 +1,31 @@
+{
+  "name": "@cherrystudio/agent-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Harness-neutral agent runtime contracts and observation utilities.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "typecheck": "pnpm --workspace-root exec tsrs --noEmit -p packages/agent-runtime/tsconfig.json"
+  },
+  "dependencies": {
+    "ai": "6.0.185"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.4",
+    "tsdown": "^0.22.14",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "vitest": "^5.0.1"
+  },
+  "types": "./src/index.ts",
+  "main": "./src/index.ts"
+}

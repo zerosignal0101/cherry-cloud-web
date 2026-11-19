@@ -17,6 +17,20 @@ export default defineConfig({
       { find: '@shared', replacement: resolvePath('./src/shared') },
       { find: '@data', replacement: resolvePath('./src/renderer/data') },
       { find: '@logger', replacement: resolvePath('./src/renderer/services/LoggerService') },
+      // Vendored upstream packages consumed from source. Subpaths are listed
+      // before the bare specifier so a prefix match cannot append onto the
+      // replacement file.
+      { find: /^@cherrystudio\/ai-core\/contextOverflow$/, replacement: resolvePath('./vendor/ai-core/src/contextOverflow.ts') },
+      { find: /^@cherrystudio\/ai-core\/provider$/, replacement: resolvePath('./vendor/ai-core/src/core/providers') },
+      {
+        find: /^@cherrystudio\/ai-core\/built-in\/plugins$/,
+        replacement: resolvePath('./vendor/ai-core/src/core/plugins/built-in')
+      },
+      { find: /^@cherrystudio\/ai-core\/(.*)$/, replacement: resolvePath('./vendor/ai-core/src/$1') },
+      { find: /^@cherrystudio\/ai-core$/, replacement: resolvePath('./vendor/ai-core/src/index.ts') },
+      { find: /^@cherrystudio\/ai-sdk-provider$/, replacement: resolvePath('./vendor/ai-sdk-provider/src/index.ts') },
+      { find: /^@cherrystudio\/agent-runtime$/, replacement: resolvePath('./packages/agent-runtime/src/index.ts') },
+      { find: /^@cherrystudio\/agent-behavior$/, replacement: resolvePath('./packages/agent-behavior/src/index.ts') },
       { find: /^@cherrystudio\/ui\/styles\/(.*)$/, replacement: resolvePath('./packages/ui/src/styles/$1') },
       { find: '@cherrystudio/file-preview/core', replacement: resolvePath('./packages/file-preview/src/core.ts') },
       { find: '@cherrystudio/file-preview/react', replacement: resolvePath('./packages/file-preview/src/react.ts') },

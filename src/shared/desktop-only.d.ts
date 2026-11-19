@@ -5,11 +5,3 @@
 declare module 'selection-hook' {
   export type TextSelectionData = any
 }
-
-/** Agent runtime is not part of the first Web release; Agents ship in a later milestone. */
-declare module '@cherrystudio/agent-runtime' {
-  export type ContextCategoryKey = string
-  export type ThreadContextUsage = any
-  export type OperationResult<T = unknown> = any
-  export const runtimeId: string
-}

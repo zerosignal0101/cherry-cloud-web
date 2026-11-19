@@ -6,7 +6,10 @@
  */
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 
-const CLIENT_SECRET = import.meta.env.MAIN_VITE_CHERRYAI_CLIENT_SECRET
+// Web adaptation: the server build has no Vite `import.meta.env`. Cherry cloud
+// is out of scope for this build, so an unset secret simply makes signing fail
+// if anything still reaches this provider.
+const CLIENT_SECRET = import.meta.env?.MAIN_VITE_CHERRYAI_CLIENT_SECRET
 const CLIENT_ID = 'cherry-studio'
 const CLIENT_SECRET_SUFFIX = 'GvI6I5ZrEHcGOWjO5AKhJKGmnwwGfM62XKpWqkjhvzRU2NZIinM77aTGIqhqys0g'
 

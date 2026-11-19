@@ -293,7 +293,7 @@ export async function buildAgentParams(input: BuildAgentParamsInput): Promise<Bu
               }
             },
             signal ? AbortSignal.any([signal, automationAbort.signal]) : automationAbort.signal
-          )
+          ) as Promise<AutomationRun>
           return automationRun
         }
       : undefined

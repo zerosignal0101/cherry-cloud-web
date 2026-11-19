@@ -15,8 +15,12 @@ import { application } from '@application'
 import { AuthGuard } from './auth/guard'
 import { AuthStore } from './auth/password'
 import { SessionSigner } from './auth/session'
+import { startAiRuntime, stopAiRuntime } from './ai/runtime'
+import { registerAiRoutes } from './ai/routes'
+import { configureWindowManager } from './ai/webServices'
 import type { ServerConfig } from './config'
 import { openDatabase, type DatabaseHandle } from './data/database'
+import { configureDbService } from './data/dbService'
 import { webSeeders } from './data/seeders'
 import { installWindowManager, uninstallWindowManager } from './data/windowManager'
 import { registerFileRoutes } from './files/routes'
@@ -81,6 +85,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   const connections = new ConnectionRegistry()
   const registry = new RpcRegistry()
   registerSystemRoutes(registry)
+  registerAiRoutes(registry)
 
   const db = openDatabase({
     databasePath: dataPaths.database,
@@ -88,11 +93,13 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
     seeders: webSeeders
   })
   application.register('DbService', db)
-  installWindowManager(connections)
+  configureDbService(db)
+  configureWindowManager(installWindowManager(connections))
 
   app.decorate('events', events)
   app.decorate('db', db)
   app.addHook('onClose', async () => {
+    await stopAiRuntime()
     events.closeAll()
     uninstallWindowManager()
     db.close()
@@ -120,6 +127,10 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   await registerWebSocketRoute(app, { registry, guard, connections })
   await registerFileRoutes(app, { guard })
   await registerDataRoutes(app, { guard, apiServer: getApiServer() })
+
+  // The AI stack plugs into the upstream lifecycle; start it only after the
+  // database and the transport are ready, since its services resolve both.
+  await startAiRuntime()
 
   app.get('/api/health', async () => ({
     ok: true,

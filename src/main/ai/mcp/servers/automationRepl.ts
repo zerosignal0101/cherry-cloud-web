@@ -18,6 +18,7 @@ function toMcpResult({ content, isError }: CallToolResult): CallToolResult {
 
 export function createAutomationReplServer(sessionId: string, agentId: string): McpServer {
   const server = new McpServer({ name: 'automation', version: '1.0.0' })
+  // Both services are resolved by name, so the lookups are untyped.
   const service = application.get('AutomationReplService')
   const runtime = application.get('AgentSessionRuntimeService')
   const owner = {
@@ -70,7 +71,9 @@ export function createAutomationReplServer(sessionId: string, agentId: string): 
   const currentRun = async () => {
     await finishing
     access()
-    run ??= service.beginRun(owner, runtime.getLiveAssistantMessageId(sessionId)!, access)
+    // Cast for the same reason as `application.get` above: an `any` result would
+    // leave `run` optional and make every `currentRun()` result possibly undefined.
+    run ??= service.beginRun(owner, runtime.getLiveAssistantMessageId(sessionId)!, access) as AutomationRun
     return run
   }
   server.registerTool(

@@ -7,6 +7,7 @@ import { loggerService } from '@logger'
 import { getBinaryExecutionEnv } from '@main/utils/binaryEnv'
 import { CommandFailedError, executeCommand } from '@main/utils/processRunner'
 import { getRawShellEnv } from '@main/utils/shellEnv'
+import type { BinaryToolSnapshot } from '@shared/types/binary'
 const logger = loggerService.withContext('Utils:Rtk')
 
 const RTK_MIN_VERSION = '0.23.0'
@@ -65,11 +66,13 @@ async function probeRtk(): Promise<ProbeOutcome> {
   // PreToolUse hook await this inline, so a thrown snapshot query must degrade to
   // "no rewrite", never propagate out and fail the tool call.
   try {
-    const snapshot = await withTimeout(
+    // `BinaryManager` is registered by name, so `application.get` is untyped
+    // here; state the snapshot shape so the probe result is not `{}`.
+    const snapshot = await withTimeout<BinaryToolSnapshot>(
       application
         .get('BinaryManager')
         .getToolSnapshots(['rtk'])
-        .then((snapshots) => snapshots.rtk),
+        .then((snapshots: Record<string, BinaryToolSnapshot>) => snapshots.rtk),
       PROBE_TIMEOUT_MS
     )
     if (snapshot === null) {

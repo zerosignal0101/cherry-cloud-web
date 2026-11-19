@@ -73,12 +73,22 @@
       },
       "files": [
         "src/main/**",
+        "src/server/**",
+        "src/platform/**",
         "resources/scripts/**",
         "scripts/**",
         "playwright.config.ts",
         "electron.vite.config.ts",
         "packages/ui/scripts/**"
       ]
+    },
+    {
+      // The platform and server shims implement upstream interfaces with
+      // parameters they never read; `_` marks them as intentionally unused.
+      "files": ["src/platform/**/*.ts", "src/server/**/*.ts"],
+      "rules": {
+        "no-unused-vars": ["error", { "caughtErrors": "none", "argsIgnorePattern": "^_" }]
+      }
     },
     {
       "env": {

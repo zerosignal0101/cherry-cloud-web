@@ -1055,7 +1055,12 @@ export class McpRuntimeService extends BaseService {
   ): McpInteractionContext | undefined {
     if (!context) return undefined
     if (context.sessionId) {
-      const host = application.get('AgentSessionRuntimeService').getMcpInteractionHost(context.sessionId)
+      // `application.get` is untyped in the web build; state the host shape so
+      // the merge below does not widen `context` back to its optional parameter
+      // type (which would make the guard on the next line fail to narrow).
+      const host: Partial<McpInteractionContext> | undefined = application
+        .get('AgentSessionRuntimeService')
+        .getMcpInteractionHost(context.sessionId)
       if (!host) return undefined
       context = { ...context, ...host }
     }

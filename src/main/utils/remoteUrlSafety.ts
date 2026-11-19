@@ -1,7 +1,7 @@
 import type { LookupAddress } from 'node:dns'
 import { lookup } from 'node:dns/promises'
 
-import * as ipaddr from 'ipaddr.js'
+import ipaddr from 'ipaddr.js'
 
 export type RemoteFetchAddress = {
   readonly address: string

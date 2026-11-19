@@ -342,7 +342,10 @@ export class AutomationReplService extends BaseService {
               if (name === 'documentation') return { ok: true, value: { status: 'documentation-emitted' } }
               let result
               if (domain === 'browser') {
-                browser ??= application.get('BrowserSessionService').createControl(owner)
+                // `application.get` is untyped in the web build; the cast keeps the
+                // `??=` assignment narrowing `browser` instead of widening it back
+                // to `BrowserControlSession | undefined`.
+                browser ??= application.get('BrowserSessionService').createControl(owner) as BrowserControlSession
                 result = await browser.execute(name, args, target, childSignal)
               } else {
                 computer ??= application
@@ -359,7 +362,7 @@ export class AutomationReplService extends BaseService {
                       }
                     },
                     waiting: (waiting) => approvalWaiting(waiting)
-                  })
+                  }) as ComputerUseTask
                 computerSession ??= new ComputerAutomationSession(application.get('ComputerUseService'), computer)
                 result = await computerSession.execute(name, args, target, childSignal, (app) => {
                   if (!apps.some((entry) => entry.id === app.id))

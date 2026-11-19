@@ -38,11 +38,11 @@ export interface SqliteDatabaseService {
  * imports the module that owns the service.
  */
 export interface CacheServiceLike {
-  get<T = unknown>(key: string): T | undefined
+  get<T = any>(key: string): T | undefined
   set<T = unknown>(key: string, value: T, ttlMs?: number): void
   has(key: string): boolean
   delete(key: string): boolean
-  getShared<T = unknown>(key: string): T | undefined
+  getShared<T = any>(key: string): T | undefined
   setShared<T = unknown>(key: string, value: T, ttlMs?: number): void
   hasShared(key: string): boolean
   deleteShared(key: string): boolean
@@ -72,9 +72,20 @@ export class WebApplication {
   private readonly services = new Map<string, unknown>()
   private readonly ensuredPaths = new Set<string>()
   private dataPaths: DataPaths
+  private resolver: ((name: string) => unknown) | undefined
 
   constructor(dataDir?: string) {
     this.dataPaths = resolveDataPaths(dataDir ?? resolveDataDir())
+  }
+
+  /**
+   * Second lookup step for names this registry does not hold. The server points
+   * it at the upstream service container so the services that upstream code
+   * resolves by name (`AiService`, `JobManager`, …) reach the lifecycle-managed
+   * instances without this module importing the container.
+   */
+  setResolver(resolver: (name: string) => unknown): void {
+    this.resolver = resolver
   }
 
   /** Point the path registry at `DATA_DIR`; called once during server bootstrap. */
@@ -95,7 +106,7 @@ export class WebApplication {
   }
 
   get<K extends string>(name: K): WebServiceMap[K] {
-    const service = this.services.get(name)
+    const service = this.lookup(name)
     if (service === undefined) {
       throw new Error(`Service '${String(name)}' is not registered`)
     }
@@ -103,7 +114,11 @@ export class WebApplication {
   }
 
   getOptional<K extends string>(name: K): WebServiceMap[K] | undefined {
-    return this.services.get(name)
+    return this.lookup(name)
+  }
+
+  private lookup(name: string): unknown {
+    return this.services.get(name) ?? this.resolver?.(name)
   }
 
   /** Upstream calls this on services that may legitimately be absent. */
@@ -114,6 +129,9 @@ export class WebApplication {
   isReady(): boolean {
     return true
   }
+
+  /** Upstream asks for process exit on fatal paths; the server owns its shutdown. */
+  quit(_reason?: 'user' | 'system-shutdown'): void {}
 
   /**
    * Resolve a registered data path. The key set is upstream's `PathKey`; the web

@@ -4,9 +4,24 @@ import PQueue from 'p-queue'
 
 import { loggerService } from '@logger'
 
+import { runReadableContentTask } from './readableContentWorker'
 import type { ReadableContentWorkerInput, ReadableContentWorkerMessage } from './readableContentWorker'
-// oxlint-disable-next-line import/default -- Electron Vite exposes ?nodeWorker imports as default worker factories.
-import createReadableContentWorker from './readableContentWorker?nodeWorker'
+
+// Web adaptation: the worker factory comes from Electron Vite's `?nodeWorker`
+// hook, which the Node server does not have. Resolve it lazily; when it is
+// unavailable the parse runs in-process behind the same queue and timeout.
+const WORKER_SPECIFIER = './readableContentWorker?nodeWorker'
+
+type WorkerFactory = (options: { workerData: unknown }) => Worker
+
+let workerFactory: Promise<WorkerFactory | null> | null = null
+
+function loadWorkerFactory(): Promise<WorkerFactory | null> {
+  workerFactory ??= import(/* @vite-ignore */ WORKER_SPECIFIER)
+    .then((module) => (typeof module.default === 'function' ? (module.default as WorkerFactory) : null))
+    .catch(() => null)
+  return workerFactory
+}
 
 const logger = loggerService.withContext('ReadableContentService')
 
@@ -106,18 +121,23 @@ export class ReadableContentService {
     })
   }
 
-  private runWorker(
+  private async runWorker(
     input: ReadableContentWorkerInput,
     signal: AbortSignal,
     requestedTimeoutMs?: number
   ): Promise<ReadableContentResult> {
     if (signal.aborted) {
-      return Promise.reject(getAbortReason(signal))
+      throw getAbortReason(signal)
+    }
+
+    const timeoutMs = requestedTimeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS
+    const createReadableContentWorker = await loadWorkerFactory()
+    if (!createReadableContentWorker) {
+      return this.runInline(input, signal)
     }
 
     return new Promise((resolve, reject) => {
       const worker = createReadableContentWorker({ workerData: input })
-      const timeoutMs = requestedTimeoutMs ?? DEFAULT_PARSE_TIMEOUT_MS
       let settled = false
 
       const cleanup = (): void => {
@@ -168,6 +188,26 @@ export class ReadableContentService {
         handleAbort()
       }
     })
+  }
+
+  private async runInline(
+    input: ReadableContentWorkerInput,
+    signal: AbortSignal
+  ): Promise<ReadableContentResult> {
+    if (signal.aborted) {
+      throw getAbortReason(signal)
+    }
+
+    // The parse is synchronous, so a timeout cannot preempt it; aborting only
+    // short-circuits the result once the work returns.
+    const message = runReadableContentTask(input)
+    if (signal.aborted) {
+      throw getAbortReason(signal)
+    }
+    if (message.type === 'error') {
+      throw new Error(message.message)
+    }
+    return { title: message.title, content: message.content }
   }
 
   private async terminateWorker(worker: Worker): Promise<void> {

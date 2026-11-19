@@ -76,6 +76,8 @@ export const ipcMain = {
   on: (_channel: string, _listener: IpcMainListener): typeof ipcMain => ipcMain,
   once: (_channel: string, _listener: IpcMainListener): typeof ipcMain => ipcMain,
   off: (_channel: string, _listener: IpcMainListener): typeof ipcMain => ipcMain,
+  removeListener: (_channel: string, _listener: IpcMainListener): typeof ipcMain => ipcMain,
+  removeAllListeners: (_channel?: string): typeof ipcMain => ipcMain,
   emit: (): boolean => false
 }
 
@@ -106,9 +108,123 @@ export const shell = {
   showItemInFolder: (_path: string): void => {}
 }
 
+/**
+ * Provider requests run on Node's `fetch`, not Chromium's network stack. The
+ * one Electron-specific behaviour upstream relies on is the User-Agent
+ * smuggling in `src/main/ai/utils/customFetch.ts`: Chromium overwrites the
+ * `User-Agent` header, so upstream sends `x-cherry-studio-user-agent` and
+ * restores it in a session interceptor. Node does not overwrite headers, so the
+ * rewrite happens here and the interceptor below stays a no-op.
+ */
+export const net = {
+  fetch: async (input: string | Request, init?: RequestInit): Promise<Response> => {
+    const request = new Request(input, init)
+    const userAgent = request.headers.get('x-cherry-studio-user-agent')
+    if (!userAgent) return fetch(request)
+
+    const headers = new Headers(request.headers)
+    headers.delete('x-cherry-studio-user-agent')
+    headers.set('user-agent', userAgent)
+    return fetch(new Request(request, { headers }))
+  }
+}
+
+export const session = {
+  defaultSession: {
+    webRequest: {
+      onBeforeSendHeaders: (_listener: unknown): void => {}
+    }
+  },
+  fromPartition: (_partition: string): typeof session.defaultSession => session.defaultSession
+}
+
+/** The server has no OS keychain; encrypted-at-rest secrets are not supported. */
+export const safeStorage = {
+  isEncryptionAvailable: (): boolean => false,
+  encryptString: (_text: string): Buffer => {
+    throw new Error('safeStorage is not available in the web build')
+  },
+  decryptString: (_buffer: Buffer): string => {
+    throw new Error('safeStorage is not available in the web build')
+  }
+}
+
 export const nativeTheme = {
   shouldUseDarkColors: false,
   themeSource: 'system' as 'system' | 'light' | 'dark'
 }
 
-export default { app, ipcMain, dialog, shell, clipboard, ClipboardItem, nativeTheme }
+/**
+ * Power state lives with the OS session, which the server does not own: every
+ * suspend/resume/lock hook simply never fires, and sleep prevention is a no-op.
+ * `PowerService` still runs so the rest of the lifecycle keeps its shape.
+ */
+export const powerMonitor = {
+  onBatteryPower: false,
+  on: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor => powerMonitor,
+  once: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor => powerMonitor,
+  off: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor => powerMonitor,
+  removeListener: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor =>
+    powerMonitor,
+  isOnBatteryPower: (): boolean => false,
+  getSystemIdleTime: (): number => 0
+}
+
+export const powerSaveBlocker = {
+  start: (_type: string): number => 0,
+  stop: (_id: number): void => {},
+  isStarted: (_id: number): boolean => false
+}
+
+/** No windows exist server-side; callers only ever iterate or probe this API. */
+export class BrowserWindow {
+  static getAllWindows(): BrowserWindow[] {
+    return []
+  }
+  static getFocusedWindow(): BrowserWindow | null {
+    return null
+  }
+  static fromWebContents(_contents: unknown): BrowserWindow | null {
+    return null
+  }
+  readonly webContents = { send: (_channel: string, ..._args: unknown[]): void => {}, id: 0 }
+  isDestroyed(): boolean {
+    return true
+  }
+  destroy(): void {}
+  on(_event: string, _listener: (...args: unknown[]) => void): this {
+    return this
+  }
+  once(_event: string, _listener: (...args: unknown[]) => void): this {
+    return this
+  }
+  removeListener(_event: string, _listener: (...args: unknown[]) => void): this {
+    return this
+  }
+  isVisible(): boolean {
+    return false
+  }
+  show(): void {}
+  hide(): void {}
+  close(): void {}
+  loadURL(_url: string): Promise<void> {
+    return Promise.resolve()
+  }
+}
+
+export default {
+  app,
+  ipcMain,
+  dialog,
+  shell,
+  clipboard,
+  ClipboardItem,
+  nativeTheme,
+  net,
+  session,
+  safeStorage,
+  powerMonitor,
+  powerSaveBlocker,
+  BrowserWindow
+}
+

@@ -43,15 +43,46 @@
       "@shared/*": [
         "./src/shared/*"
       ],
-      "electron": [
-        "./src/platform/electron/index"
+      "@cherrystudio/agent-runtime": [
+        "./packages/agent-runtime/src/index.ts"
+      ],
+      "@cherrystudio/agent-behavior": [
+        "./packages/agent-behavior/src/index.ts"
+      ],
+      "@cherrystudio/agent-runtime-claude-code": [
+        "./packages/agent-runtime-claude-code/src/index.ts"
+      ],
+      "@cherrystudio/agent-runtime-pi": [
+        "./packages/agent-runtime-pi/src/index.ts"
+      ],
+      "@cherrystudio/agent-runtime-pi-durable": [
+        "./packages/agent-runtime-pi-durable/src/index.ts"
+      ],
+      "@cherrystudio/ai-core": [
+        "./vendor/ai-core/src/index.ts"
+      ],
+      "@cherrystudio/ai-core/provider": [
+        "./vendor/ai-core/src/core/providers"
+      ],
+      "@cherrystudio/ai-core/built-in/plugins": [
+        "./vendor/ai-core/src/core/plugins/built-in"
+      ],
+      "@cherrystudio/ai-core/*": [
+        "./vendor/ai-core/src/*"
+      ],
+      "@cherrystudio/ai-sdk-provider": [
+        "./vendor/ai-sdk-provider/src/index.ts"
+      ],
+      "@cherrystudio/ai-sdk-provider/*": [
+        "./vendor/ai-sdk-provider/src/*"
       ]
     }
   },
   "include": [
     "src/server/**/*",
     "src/platform/**/*",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "src/main/env.d.ts"
   ],
   "exclude": [
     "**/__tests__/**",

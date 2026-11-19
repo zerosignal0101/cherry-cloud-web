@@ -69,40 +69,38 @@ function formatPreview(text: string, maxLength: number): string {
   return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength)}...` : cleaned
 }
 
-if (!parentPort) {
-  throw new Error('Readable content worker requires a parent port')
+export function runReadableContentTask(input: ReadableContentWorkerInput): ReadableContentWorkerMessage {
+  try {
+    let title = ''
+    let content = input.source
+
+    if (input.inputKind === 'html') {
+      const dom = new JSDOM(input.source, { url: SAFE_JSDOM_URL })
+
+      try {
+        const article = new Readability(dom.window.document).parse()
+        title = article?.title || ''
+        content = article?.textContent || ''
+
+        if (article && input.format === 'markdown') {
+          content = new TurndownService().turndown(article.content || '').trim()
+        }
+      } finally {
+        dom.window.close()
+      }
+    }
+
+    if (input.format === 'preview') {
+      content = formatPreview(content, input.maxLength)
+    }
+
+    return { type: 'result', title, content }
+  } catch (error) {
+    return { type: 'error', message: error instanceof Error ? error.message : String(error) }
+  }
 }
 
-const input = workerData as ReadableContentWorkerInput
-
-try {
-  let title = ''
-  let content = input.source
-
-  if (input.inputKind === 'html') {
-    const dom = new JSDOM(input.source, { url: SAFE_JSDOM_URL })
-
-    try {
-      const article = new Readability(dom.window.document).parse()
-      title = article?.title || ''
-      content = article?.textContent || ''
-
-      if (article && input.format === 'markdown') {
-        content = new TurndownService().turndown(article.content || '').trim()
-      }
-    } finally {
-      dom.window.close()
-    }
-  }
-
-  if (input.format === 'preview') {
-    content = formatPreview(content, input.maxLength)
-  }
-
-  parentPort.postMessage({ type: 'result', title, content } satisfies ReadableContentWorkerMessage)
-} catch (error) {
-  parentPort.postMessage({
-    type: 'error',
-    message: error instanceof Error ? error.message : String(error)
-  } satisfies ReadableContentWorkerMessage)
+// Worker entry: only runs when `?nodeWorker` launched this file in a worker thread.
+if (parentPort) {
+  parentPort.postMessage(runReadableContentTask(workerData as ReadableContentWorkerInput))
 }

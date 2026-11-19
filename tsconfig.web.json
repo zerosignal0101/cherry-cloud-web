@@ -56,6 +56,15 @@
       ],
       "@cherrystudio/file-preview/react": [
         "./packages/file-preview/src/react.ts"
+      ],
+      "@cherrystudio/agent-runtime": [
+        "./packages/agent-runtime/src/index.ts"
+      ],
+      "@cherrystudio/ai-core": [
+        "./vendor/ai-core/src/index.ts"
+      ],
+      "@cherrystudio/ai-core/*": [
+        "./vendor/ai-core/src/*"
       ]
     }
   },
