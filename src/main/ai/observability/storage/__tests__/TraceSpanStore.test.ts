@@ -1,0 +1,210 @@
+import { describe, expect, it } from 'vitest'
+
+import type { SpanEntity } from '@shared/data/types/trace'
+
+import { TraceSpanStore } from '../TraceSpanStore'
+
+function span(overrides: Partial<SpanEntity>): SpanEntity {
+  return {
+    id: 'span',
+    name: 'span',
+    parentId: '',
+    traceId: 'trace',
+    status: 'OK',
+    kind: 'internal',
+    attributes: undefined,
+    isEnd: true,
+    events: undefined,
+    startTime: 1,
+    endTime: 2,
+    links: undefined,
+    ...overrides
+  }
+}
+
+describe('TraceSpanStore eviction', () => {
+  it('returns only spans changed after a live revision and requests a reset after deletion', () => {
+    const store = new TraceSpanStore()
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a', name: 'first' }))
+    const initial = store.getSpanChanges({ traceId: 'trace-a' })
+
+    expect(initial.reset).toBe(true)
+    expect(initial.spans.map((item) => item.id)).toEqual(['a'])
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a', name: 'updated' }))
+    const changed = store.getSpanChanges({ traceId: 'trace-a' }, initial.revision)
+
+    expect(changed.reset).toBe(false)
+    expect(changed.spans).toMatchObject([{ id: 'a', name: 'updated' }])
+
+    store.clearSpans(['a'])
+    const cleared = store.getSpanChanges({ traceId: 'trace-a' }, changed.revision)
+
+    expect(cleared.reset).toBe(true)
+    expect(cleared.spans).toEqual([])
+  })
+
+  it('keeps stale cursors resetting when clear drops the last deletion marker', () => {
+    const store = new TraceSpanStore()
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a' }))
+    const initial = store.getSpanChanges({ traceId: 'trace-a' })
+    store.clearSpans(['a'])
+
+    // With no spans or trace metadata left, the deletion marker is the only state that tells this
+    // cursor to discard its old snapshot. clear() must fold that marker into the global reset floor.
+    store.clear()
+
+    expect(store.getSpanChanges({ traceId: 'trace-a' }, initial.revision).reset).toBe(true)
+  })
+
+  // One deletion marker per trace id ever flushed would grow for the life of the process. Markers
+  // must stay bounded WITHOUT letting a stale cursor silently miss the deletion a dropped marker
+  // recorded — an evicted marker has to keep forcing a resync.
+  it('bounds deletion markers while still forcing a resync for cursors older than an evicted marker', () => {
+    const store = new TraceSpanStore()
+
+    store.setSpan(span({ id: 'old', traceId: 'trace-old' }))
+    const stale = store.getSpanChanges({ traceId: 'trace-old' })
+    store.clearSpans(['old'])
+
+    // Push trace-old's marker out of the bounded map.
+    for (let i = 0; i < 1_000; i++) {
+      store.setSpan(span({ id: `s${i}`, traceId: `t${i}` }))
+      store.clearSpans([`s${i}`])
+    }
+
+    expect(store.getSpanChanges({ traceId: 'trace-old' }, stale.revision).reset).toBe(true)
+
+    // The conservative floor must not force a resync on cursors newer than everything evicted.
+    store.setSpan(span({ id: 'fresh', traceId: 'trace-fresh' }))
+    const fresh = store.getSpanChanges({ traceId: 'trace-fresh' })
+    store.setSpan(span({ id: 'fresh', traceId: 'trace-fresh', name: 'updated' }))
+
+    expect(store.getSpanChanges({ traceId: 'trace-fresh' }, fresh.revision).reset).toBe(false)
+  })
+
+  it('evicts the oldest fully-ended trace when the span cap is exceeded', () => {
+    const store = new TraceSpanStore(2)
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a' }))
+    store.setSpan(span({ id: 'b', traceId: 'trace-b' }))
+    // Exceeding the cap evicts the oldest fully-ended trace (trace-a).
+    store.setSpan(span({ id: 'c', traceId: 'trace-c' }))
+
+    expect(store.getSpan('a')).toBeUndefined()
+    expect(store.getSpan('b')).toBeDefined()
+    expect(store.getSpan('c')).toBeDefined()
+    expect(store.getSpans({ traceId: 'trace-a' })).toEqual([])
+  })
+
+  // A count cap cannot bound a store whose spans carry captured request/response bodies — 50k spans
+  // at megabytes each is unbounded — so the byte budget evicts by the same oldest-fully-ended rule.
+  it('evicts the oldest fully-ended trace when the byte budget is exceeded', () => {
+    const store = new TraceSpanStore(1_000, 22_000)
+    const body = 'x'.repeat(3_000)
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a', attributes: { body } }))
+    expect(store.getSpan('a')).toBeDefined()
+
+    store.setSpan(span({ id: 'b', traceId: 'trace-b', attributes: { body } }))
+
+    // Far below the 1,000-span count cap, so only the byte budget can have evicted trace-a.
+    expect(store.getSpan('a')).toBeUndefined()
+    expect(store.getSpan('b')).toBeDefined()
+  })
+
+  // Claude Code log events grow a span that is already stored, so the budget has to follow in-place
+  // growth reported through touchSpan, not just what setSpan measured on insert.
+  it('keeps the byte total in step when a stored span grows in place', () => {
+    const store = new TraceSpanStore(1_000, 22_000)
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a', attributes: { body: 'x'.repeat(2_500) } }))
+    store.setSpan(span({ id: 'b', traceId: 'trace-b' }))
+    expect(store.getSpan('a')).toBeDefined()
+
+    // trace-b grows in place past the budget: the oldest fully-ended trace ages out and the span
+    // that grew survives. A span larger than the whole budget cannot arise — the per-span event cap
+    // is 2 MiB against a 64 MiB store.
+    store.touchSpan('b', 12_000)
+
+    expect(store.getSpan('a')).toBeUndefined()
+    expect(store.getSpan('b')).toBeDefined()
+  })
+
+  it('never evicts an in-flight trace, even if it is the oldest', () => {
+    const store = new TraceSpanStore(2)
+
+    // Oldest trace is still streaming (isEnd === false).
+    store.setSpan(span({ id: 'a', traceId: 'trace-a', isEnd: false }))
+    store.setSpan(span({ id: 'b', traceId: 'trace-b' }))
+    store.setSpan(span({ id: 'c', traceId: 'trace-c' }))
+
+    // trace-a is preserved; trace-b (oldest fully-ended) is evicted instead.
+    expect(store.getSpan('a')).toBeDefined()
+    expect(store.getSpan('b')).toBeUndefined()
+    expect(store.getSpan('c')).toBeDefined()
+  })
+
+  it('bounds active spans and resets stale viewer cursors when none have ended', () => {
+    const store = new TraceSpanStore(1)
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a', isEnd: false }))
+    const cursor = store.getSpanChanges({ traceId: 'trace-a' }).revision
+    store.setSpan(span({ id: 'b', traceId: 'trace-b', isEnd: false }))
+
+    expect(store.getSpanChanges({ traceId: 'trace-a' }, cursor).reset).toBe(true)
+    expect(store.getSpan('a')).toBeUndefined()
+    expect(store.getSpan('b')).toBeDefined()
+  })
+
+  it('untracks evicted traces so later queries and meta are clean', () => {
+    const store = new TraceSpanStore(1)
+
+    store.setSpan(span({ id: 'a', traceId: 'trace-a', topicId: 'topic-a' }))
+    store.setSpan(span({ id: 'b', traceId: 'trace-b', topicId: 'topic-b' }))
+
+    expect(store.getSpan('a')).toBeUndefined()
+    expect(store.getTraceMeta('trace-a')).toBeUndefined()
+    expect(store.getTraceIdsByTopic('topic-a')).toEqual([])
+  })
+})
+
+it('bounds a long active trace while preserving its live root', () => {
+  const store = new TraceSpanStore(10, 30_000)
+  store.setSpan(span({ id: 'root', isEnd: false }))
+  for (let i = 0; i < 100; i++) {
+    store.setSpan(span({ id: `request-${i}`, parentId: 'root', attributes: { body: '图'.repeat(2_000) } }))
+    expect(store.getSpans({ traceId: 'trace' }).length).toBeLessThanOrEqual(3)
+    expect(store.getSpan('root')?.isEnd).toBe(false)
+  }
+  expect(Number(store.getSpan('root')?.attributes?.['cs.trace.dropped_spans'])).toBeGreaterThan(0)
+})
+it('rejects an oversized active diagnostic span before whole-span serialization', () => {
+  const store = new TraceSpanStore(10, 10_000)
+  store.setSpan(span({ isEnd: false, attributes: { body: 'x'.repeat(100_000) } }))
+  expect(store.getSpans({ traceId: 'trace' })).toEqual([])
+})
+
+it('bounds metadata of evicted traces while preserving live and recently evicted attribution', () => {
+  const store = new TraceSpanStore(1)
+  store.setSpan(span({ id: 'first', traceId: 'first', topicId: 'topic', isEnd: false }))
+  store.setSpan(span({ id: 'second', traceId: 'second', topicId: 'topic', isEnd: false }))
+  expect(store.getTraceMeta('first')?.topicId).toBe('topic')
+  for (let i = 0; i < 1100; i++) {
+    store.setSpan(span({ id: `live-${i}`, traceId: `trace-${i}`, topicId: 'topic', isEnd: false }))
+  }
+  expect(store.getTraceIdsByTopic('topic').length).toBeLessThanOrEqual(1001)
+  expect(store.getTraceMeta('first')).toBeUndefined()
+  expect(store.getTraceMeta('trace-1099')?.topicId).toBe('topic')
+  expect(store.getTraceMeta('trace-1098')?.topicId).toBe('topic')
+  for (let i = 0; i < 1100; i++) store.registerTraceMeta(`pending-${i}`, { topicId: 'topic' })
+  expect(store.getTraceIdsByTopic('topic').length).toBeLessThanOrEqual(1001)
+  expect(store.getTraceMeta('trace-1099')?.topicId).toBe('topic')
+})
+it('bounds metadata registered before spans arrive', () => {
+  const store = new TraceSpanStore()
+  for (let i = 0; i < 1100; i++) store.registerTraceMeta(`trace-${i}`, { topicId: 'topic' })
+  expect(store.getTraceIdsByTopic('topic').length).toBeLessThanOrEqual(1000)
+})

@@ -1,0 +1,327 @@
+import type { FinishReason, UIMessageChunk } from 'ai'
+import { describe, expect, it } from 'vitest'
+
+import { GeminiSseFormatter } from '../formatters/GeminiSseFormatter'
+import { AiSdkToGeminiSse, type GeminiGenerateContentResponse } from '../stream/AiSdkToGeminiSse'
+
+const textDelta = (text: string, id = 'text_0'): UIMessageChunk => ({ type: 'text-delta', id, delta: text })
+const reasoningDelta = (text: string, id = 'r_0'): UIMessageChunk => ({ type: 'reasoning-delta', id, delta: text })
+const toolCall = (toolName: string, input: unknown): UIMessageChunk => ({
+  type: 'tool-input-available',
+  toolCallId: `${toolName}_0`,
+  toolName,
+  input
+})
+const finish = (finishReason: FinishReason = 'stop', usage?: Record<string, unknown>): UIMessageChunk => ({
+  type: 'finish',
+  finishReason,
+  ...(usage ? { messageMetadata: usage } : {})
+})
+
+/** Drive the push API used by `proxyStream` and collect every emitted frame. */
+function run(chunks: readonly UIMessageChunk[]): GeminiGenerateContentResponse[] {
+  const adapter = new AiSdkToGeminiSse({ model: 'deepseek:deepseek-chat' })
+  const frames: GeminiGenerateContentResponse[] = []
+  for (const chunk of chunks) frames.push(...adapter.transformChunk(chunk))
+  frames.push(...adapter.finalizeEvents())
+  return frames
+}
+
+describe('AiSdkToGeminiSse (streaming)', () => {
+  it('retains generated media separately from following text in the complete response', () => {
+    const adapter = new AiSdkToGeminiSse({ model: 'gemini' })
+    adapter.transformChunk({
+      type: 'file',
+      mediaType: 'image/png',
+      url: 'data:image/png;base64,AQID',
+      providerMetadata: { google: { thoughtSignature: 'signature' } }
+    })
+    adapter.transformChunk(textDelta('caption'))
+    expect(adapter.buildNonStreamingResponse().candidates[0].content.parts).toEqual([
+      { inlineData: { mimeType: 'image/png', data: 'AQID' }, thoughtSignature: 'signature' },
+      { text: 'caption' }
+    ])
+  })
+
+  it.each(['BLOCKLIST', 'MALFORMED_FUNCTION_CALL', 'CONTINUATION'])(
+    'retains native %s instead of reconstructing it from a unified finish reason',
+    (rawFinishReason) => {
+      const adapter = new AiSdkToGeminiSse({ model: 'gemini' })
+      adapter.transformChunk({
+        type: 'message-metadata',
+        messageMetadata: {
+          rawFinishReason,
+          providerMetadata: { vertex: { finishMessage: 'Native outcome', continuationToken: 'resume' } }
+        }
+      })
+      adapter.transformChunk(finish('other'))
+      expect(adapter.finalizeEvents().at(-1)?.candidates[0]).toMatchObject({
+        finishReason: rawFinishReason,
+        finishMessage: 'Native outcome',
+        continuationToken: 'resume'
+      })
+      expect(adapter.buildNonStreamingResponse().candidates[0].finishReason).toBe(rawFinishReason)
+    }
+  )
+
+  it.each([{ chunks: [] }, { chunks: [textDelta('Answer')] }])(
+    'retains the billing response identity in both final responses: %j',
+    ({ chunks }) => {
+      const adapter = new AiSdkToGeminiSse({ model: 'test-model', messageId: 'billing-response' })
+      for (const chunk of chunks) adapter.transformChunk(chunk)
+      expect(adapter.finalizeEvents().at(-1)?.responseId).toBe('billing-response')
+      expect(adapter.buildNonStreamingResponse().responseId).toBe('billing-response')
+    }
+  )
+
+  it('emits one delta frame per text-delta, then a terminal finishReason frame', () => {
+    const frames = run([textDelta('Hello'), textDelta(' world'), finish('stop')])
+    expect(frames.slice(0, 2)).toEqual([
+      { candidates: [{ content: { role: 'model', parts: [{ text: 'Hello' }] }, index: 0 }] },
+      { candidates: [{ content: { role: 'model', parts: [{ text: ' world' }] }, index: 0 }] }
+    ])
+    const last = frames[frames.length - 1]
+    expect(last.candidates[0].finishReason).toBe('STOP')
+    expect(last.candidates[0].content.parts).toEqual([])
+    expect(last.modelVersion).toBe('deepseek:deepseek-chat')
+  })
+
+  it('marks reasoning deltas with thought: true', () => {
+    const [frame] = run([reasoningDelta('thinking...')])
+    expect(frame).toEqual({
+      candidates: [{ content: { role: 'model', parts: [{ text: 'thinking...', thought: true }] }, index: 0 }]
+    })
+  })
+
+  it.each([
+    { type: 'text-delta', thought: false, late: false },
+    { type: 'reasoning-delta', thought: true, late: false },
+    { type: 'text-delta', thought: false, late: true },
+    { type: 'reasoning-delta', thought: true, late: true }
+  ] as const)('retains the $type signature in both responses (metadata-only: $late)', ({ type, thought, late }) => {
+    const adapter = new AiSdkToGeminiSse({ model: 'test:model' })
+    const providerMetadata = { google: { thoughtSignature: 'native-signature' } }
+    const chunks: UIMessageChunk[] = [
+      { type, id: 'part', delta: 'first', ...(!late && { providerMetadata }) },
+      { type, id: 'part', delta: ' second' },
+      ...(late ? [{ type, id: 'part', delta: '', providerMetadata }] : [])
+    ]
+    const frames = chunks.flatMap((chunk) => adapter.transformChunk(chunk))
+    frames.push(...adapter.finalizeEvents())
+    expect(frames.flatMap((frame) => frame.candidates[0].content.parts)).toContainEqual({
+      text: late ? '' : 'first',
+      ...(thought && { thought: true }),
+      thoughtSignature: 'native-signature'
+    })
+    expect(adapter.buildNonStreamingResponse().candidates[0].content.parts).toEqual([
+      { text: 'first second', ...(thought && { thought: true }), thoughtSignature: 'native-signature' }
+    ])
+  })
+
+  it('emits a functionCall part for a tool call', () => {
+    const [frame] = run([toolCall('get_weather', { city: 'SF' })])
+    expect(frame.candidates[0].content.parts).toEqual([{ functionCall: { name: 'get_weather', args: { city: 'SF' } } }])
+  })
+
+  it("emits the tool call's thoughtSignature from its provider metadata (Gemini 3 round-trip)", () => {
+    const [frame] = run([
+      {
+        type: 'tool-input-available',
+        toolCallId: 'search_0',
+        toolName: 'search',
+        input: { q: 'x' },
+        providerMetadata: { google: { thoughtSignature: 'sig-abc' } }
+      }
+    ])
+    expect(frame.candidates[0].content.parts).toEqual([
+      { functionCall: { name: 'search', args: { q: 'x' } }, thoughtSignature: 'sig-abc' }
+    ])
+  })
+
+  it('maps the AI SDK finish reason to the Gemini enum', () => {
+    const frames = run([textDelta('x'), finish('length')])
+    expect(frames[frames.length - 1].candidates[0].finishReason).toBe('MAX_TOKENS')
+  })
+
+  it('projects usage onto the terminal frame with candidatesTokenCount excluding thoughts', () => {
+    const frames = run([
+      textDelta('x'),
+      finish('stop', { stats: { inputTokens: 10, outputTokens: 20, outputTokenDetails: { reasoningTokens: 5 } } })
+    ])
+    expect(frames[frames.length - 1].usageMetadata).toEqual({
+      promptTokenCount: 10,
+      candidatesTokenCount: 15,
+      totalTokenCount: 30,
+      thoughtsTokenCount: 5
+    })
+  })
+
+  it('omits thoughtsTokenCount when the stats snapshot carries no reasoning tokens', () => {
+    const frames = run([textDelta('x'), finish('stop', { stats: { inputTokens: 10, outputTokens: 20 } })])
+    expect(frames[frames.length - 1].usageMetadata).toEqual({
+      promptTokenCount: 10,
+      candidatesTokenCount: 20,
+      totalTokenCount: 30
+    })
+  })
+
+  it('reports cached prompt tokens via cachedContentTokenCount without changing the totals', () => {
+    const frames = run([
+      textDelta('x'),
+      finish('stop', {
+        stats: {
+          inputTokens: 30,
+          outputTokens: 20,
+          inputTokenDetails: { cacheReadTokens: 10 },
+          outputTokenDetails: { reasoningTokens: 5 }
+        }
+      })
+    ])
+    expect(frames[frames.length - 1].usageMetadata).toEqual({
+      promptTokenCount: 30,
+      candidatesTokenCount: 15,
+      totalTokenCount: 50,
+      thoughtsTokenCount: 5,
+      cachedContentTokenCount: 10
+    })
+  })
+
+  it('omits cachedContentTokenCount when no cache reads are projected', () => {
+    const frames = run([
+      textDelta('x'),
+      finish('stop', { stats: { inputTokens: 10, outputTokens: 20, inputTokenDetails: { cacheReadTokens: 0 } } })
+    ])
+    expect(frames[frames.length - 1].usageMetadata).toEqual({
+      promptTokenCount: 10,
+      candidatesTokenCount: 20,
+      totalTokenCount: 30
+    })
+  })
+
+  it('throws on an error chunk so the stream surfaces a failure', () => {
+    const adapter = new AiSdkToGeminiSse({ model: 'deepseek:deepseek-chat' })
+    expect(() => adapter.transformChunk({ type: 'error', errorText: 'boom' })).toThrow('boom')
+  })
+})
+
+describe('AiSdkToGeminiSse.buildNonStreamingResponse', () => {
+  it('accumulates text (merged) and function calls into one candidate', () => {
+    const adapter = new AiSdkToGeminiSse({ model: 'deepseek:deepseek-chat' })
+    for (const chunk of [
+      textDelta('Hel'),
+      textDelta('lo'),
+      toolCall('search', { q: 'x' }),
+      finish('stop', { stats: { inputTokens: 3, outputTokens: 4 } })
+    ]) {
+      adapter.transformChunk(chunk)
+    }
+    adapter.finalizeEvents()
+
+    const response = adapter.buildNonStreamingResponse()
+    expect(response.candidates[0].content.parts).toEqual([
+      { text: 'Hello' },
+      { functionCall: { name: 'search', args: { q: 'x' } } }
+    ])
+    expect(response.candidates[0].finishReason).toBe('STOP')
+    expect(response.usageMetadata).toMatchObject({ promptTokenCount: 3, candidatesTokenCount: 4, totalTokenCount: 7 })
+  })
+
+  it('keeps the Gemini usage invariant in the non-streaming response (total = prompt + candidates + thoughts)', () => {
+    const adapter = new AiSdkToGeminiSse({ model: 'deepseek:deepseek-chat' })
+    for (const chunk of [
+      reasoningDelta('thinking...'),
+      textDelta('Hello'),
+      finish('stop', { stats: { inputTokens: 3, outputTokens: 4, outputTokenDetails: { reasoningTokens: 2 } } })
+    ]) {
+      adapter.transformChunk(chunk)
+    }
+    adapter.finalizeEvents()
+
+    expect(adapter.buildNonStreamingResponse().usageMetadata).toEqual({
+      promptTokenCount: 3,
+      candidatesTokenCount: 2,
+      totalTokenCount: 7,
+      thoughtsTokenCount: 2
+    })
+  })
+})
+
+describe('GeminiSseFormatter', () => {
+  it('formats a frame as a Gemini SSE data line and emits no [DONE] sentinel', () => {
+    const formatter = new GeminiSseFormatter()
+    const frame: GeminiGenerateContentResponse = {
+      candidates: [{ content: { role: 'model', parts: [{ text: 'hi' }] }, index: 0 }]
+    }
+    expect(formatter.formatEvent(frame)).toBe(`data: ${JSON.stringify(frame)}\n\n`)
+    expect(formatter.formatDone()).toBe('')
+  })
+})
+
+it.each([null, undefined, [], true, 42, 'invalid json'])(
+  'rejects non-object tool input without fabricating arguments: %j',
+  (input) => {
+    const adapter = new AiSdkToGeminiSse({ model: 'test-model' })
+    expect(() =>
+      adapter.transformChunk({
+        type: 'tool-input-error',
+        toolCallId: 'bad-input',
+        toolName: 'read_file',
+        input,
+        errorText: 'Invalid tool arguments'
+      })
+    ).toThrow('Invalid tool arguments')
+  }
+)
+
+it('completes an other finish reason as OTHER in streaming and non-streaming responses', async () => {
+  const adapter = new AiSdkToGeminiSse({ model: 'test:model' })
+  const stream = new ReadableStream<UIMessageChunk>({
+    start(controller) {
+      controller.enqueue({ type: 'finish', finishReason: 'other' })
+      controller.close()
+    }
+  })
+  const frames: GeminiGenerateContentResponse[] = []
+  for await (const frame of adapter.transform(stream)) frames.push(frame)
+  expect(frames.at(-1)?.candidates[0].finishReason).toBe('OTHER')
+  expect(adapter.buildNonStreamingResponse().candidates[0].finishReason).toBe('OTHER')
+})
+
+describe('terminal failure reasons', () => {
+  it.each(['error'] as const)('rejects %s while reading after a tool call', async (reason) => {
+    const adapter = new AiSdkToGeminiSse({ model: 'test:model' })
+    const stream = new ReadableStream<UIMessageChunk>({
+      start(controller) {
+        controller.enqueue({ type: 'tool-input-available', toolCallId: 'call', toolName: 'read', input: {} })
+        controller.enqueue({ type: 'finish', finishReason: reason })
+        controller.close()
+      }
+    })
+    const read = async () => {
+      const events: unknown[] = []
+      for await (const event of adapter.transform(stream)) events.push(event)
+      return events
+    }
+    await expect(read()).rejects.toMatchObject({ statusCode: 502 })
+  })
+
+  it.each(['error'] as const)('rejects %s with 502, including after a tool call', (reason) => {
+    for (const withTool of [false, true]) {
+      const adapter = new AiSdkToGeminiSse({ model: 'test:model' })
+      if (withTool)
+        adapter.transformChunk({ type: 'tool-input-available', toolCallId: 'call', toolName: 'read', input: {} })
+      expect(() => adapter.transformChunk({ type: 'finish', finishReason: reason })).toThrow(
+        expect.objectContaining({ statusCode: 502 })
+      )
+    }
+  })
+})
+
+it.each([
+  ['stop', 'STOP'],
+  ['tool-calls', 'STOP'],
+  ['length', 'MAX_TOKENS'],
+  ['content-filter', 'SAFETY']
+] as const)('maps %s to %s', (reason, expected) => {
+  expect(run([finish(reason)]).at(-1)?.candidates[0].finishReason).toBe(expected)
+})
