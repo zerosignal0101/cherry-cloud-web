@@ -1,5 +1,7 @@
 import { aiHandlers } from '@main/ipc/handlers/ai'
+import { fileHandlers } from '@main/ipc/handlers/file'
 import { aiRequestSchemas } from '@shared/ipc/schemas/ai'
+import { fileRequestSchemas } from '@shared/ipc/schemas/file'
 
 import type { RpcRegistry } from '../transport/registry'
 
@@ -13,4 +15,17 @@ import type { RpcRegistry } from '../transport/registry'
  */
 export function registerAiRoutes(registry: RpcRegistry): void {
   registry.register(aiRequestSchemas, aiHandlers)
+}
+
+/**
+ * File routes backed by `FileManager`, which the web runtime now registers.
+ *
+ * The renderer still calls some of these through `window.api.file` (metadata,
+ * physical-path lookup, rename, trash); the rest answer honestly with a
+ * service error until their desktop counterpart is replaced. Registering the
+ * whole schema keeps the route set identical to the type contract instead of a
+ * hand-maintained subset that drifts.
+ */
+export function registerFileIpcRoutes(registry: RpcRegistry): void {
+  registry.register(fileRequestSchemas, fileHandlers)
 }

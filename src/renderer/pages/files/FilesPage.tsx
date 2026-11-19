@@ -148,12 +148,16 @@ function toFileItem(
   const originFields = entry.origin === 'external' ? { origin: 'external' as const } : { origin: 'internal' as const }
 
   if (type === 'image') {
+    // Internal entries live behind `/media/:id`; the browser must never build a
+    // `file://` URL from the server's physical path.
     const imagePath = entry.origin === 'external' ? entry.externalPath : physicalPath
+    const previewUrl =
+      entry.origin === 'internal' ? `/media/${entry.id}` : imagePath ? toSafeFileUrl(imagePath, entry.ext) : undefined
     return {
       ...base,
       ...originFields,
       type,
-      previewUrl: imagePath ? toSafeFileUrl(imagePath, entry.ext) : undefined
+      previewUrl
     }
   }
 
@@ -405,7 +409,9 @@ function FilesPage({ entryId, onEntryIdChange }: FilesPageProps) {
           if (!filePath) throw new Error(`Physical path is unavailable for file ${file.id}`)
           const normalizedPath = normalizeFilePreviewPath(filePath)
           if (file.type === 'image') {
-            void ImagePreviewService.show(toSafeFileUrl(normalizedPath, file.format)).catch((error: unknown) => {
+            const previewUrl =
+              file.origin === 'internal' ? `/media/${file.id}` : toSafeFileUrl(normalizedPath, file.format)
+            void ImagePreviewService.show(previewUrl).catch((error: unknown) => {
               const normalized = error instanceof Error ? error : new Error(String(error))
               logger.error('Failed to open image preview', normalized)
               toast.error(t('files.preview.error'))

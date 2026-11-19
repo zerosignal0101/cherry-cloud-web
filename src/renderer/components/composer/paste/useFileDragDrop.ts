@@ -5,10 +5,13 @@ import { loggerService } from '@logger'
 import { useDrag } from '@renderer/hooks/useDrag'
 import { ipcApi } from '@renderer/ipc'
 import { toast } from '@renderer/services/toast'
-import type { FileMetadata } from '@renderer/types/file'
-import { filterSupportedFiles, isSupportedFile } from '@renderer/utils/file'
-import { getFilesFromDropEvent, getTextFromDropEvent } from '@renderer/utils/input'
-import { type ComposerAttachment, toComposerAttachments } from '@renderer/utils/message/composerAttachment'
+import { getFileExtension, isSupportedFile } from '@renderer/utils/file'
+import { getTextFromDropEvent } from '@renderer/utils/input'
+import {
+  type ComposerAttachment,
+  toComposerAttachmentFromFile,
+  toComposerAttachments
+} from '@renderer/utils/message/composerAttachment'
 import { isComposerFileTokenPathLike } from '@renderer/utils/message/composerFileTokenSource'
 import { AbsoluteFilePathSchema, type FileUrlString } from '@shared/types/file'
 import { createFilePathHandle, fileUrlToPath } from '@shared/utils/file'
@@ -62,15 +65,6 @@ async function getDroppedPathKind(path: string): Promise<'file' | 'directory' | 
   }
 }
 
-async function splitDroppedFilesByKind(files: FileMetadata[]) {
-  const items = await Promise.all(files.map(async (file) => ({ file, kind: await getDroppedPathKind(file.path) })))
-
-  return {
-    directories: items.filter((item) => item.kind === 'directory').map((item) => item.file),
-    files: items.filter((item) => item.kind !== 'directory').map((item) => item.file)
-  }
-}
-
 /**
  * Inputbar 文件拖拽上传 Hook
  *
@@ -107,26 +101,24 @@ export function useFileDragDrop(options: UseFileDragDropOptions) {
         return
       }
 
-      // 处理文件拖拽
-      const droppedFiles = await getFilesFromDropEvent(event).catch((err) => {
-        logger.error('handleDrop:', err)
-        return null
-      })
-
-      if (droppedFiles && droppedFiles.length > 0) {
-        const { directories, files } = await splitDroppedFilesByKind(droppedFiles)
-        directories.forEach((directory) => options.onFolderPathDropped?.(directory.path))
-
-        const supportedFiles = await filterSupportedFiles(files, options.supportedExts)
+      // 处理文件拖拽：浏览器直接给出 `File`,没有路径可解析。
+      const droppedFiles = Array.from(event.dataTransfer.files ?? [])
+      if (droppedFiles.length > 0) {
+        const supportedFiles = droppedFiles.filter((file) =>
+          options.supportedExts.includes(getFileExtension(file.name))
+        )
         if (supportedFiles.length > 0) {
-          options.setFiles((prevFiles) => [...prevFiles, ...toComposerAttachments(supportedFiles)])
+          options.setFiles((prevFiles) => [
+            ...prevFiles,
+            ...supportedFiles.map((file) => toComposerAttachmentFromFile(file))
+          ])
         }
 
         // 如果有不支持的文件，显示提示
-        if (files.length > 0 && supportedFiles.length !== files.length) {
+        if (supportedFiles.length !== droppedFiles.length) {
           toast.info(
             options.t('chat.input.file_not_supported_count', {
-              count: files.length - supportedFiles.length
+              count: droppedFiles.length - supportedFiles.length
             })
           )
         }

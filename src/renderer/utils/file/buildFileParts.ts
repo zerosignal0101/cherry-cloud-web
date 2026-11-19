@@ -13,10 +13,10 @@
  */
 
 import { ipcApi } from '@renderer/ipc'
+import { uploadFile } from '@renderer/ipc/webFile'
 import type { ComposerAttachment } from '@renderer/utils/message/composerAttachment'
 import type { FileUIPart } from '@shared/data/types/message'
 import { withCherryMeta } from '@shared/data/types/uiParts'
-import { createFilePathHandle, toFileUrl } from '@shared/utils/file'
 
 export function withComposerFilePartMeta(
   part: FileUIPart,
@@ -62,31 +62,41 @@ export async function buildFilePartsForAttachments(attachments: ComposerAttachme
   })
   return Promise.all(
     attachments.map(async (attachment, index) => {
-      const entry = attachment.blob
-        ? await window.api.file.createInternalEntry({
-            source: 'bytes',
-            data: new Uint8Array(await attachment.blob.arrayBuffer()),
-            name: attachment.origin_name || attachment.name,
-            ext: attachment.ext.replace(/^\./, '') || null,
-            cleanupPolicy: 'delete_when_unreferenced'
-          })
-        : await window.api.file.createInternalEntry({
-            source: 'path',
-            path: paths[index]!,
-            cleanupPolicy: 'delete_when_unreferenced'
-          })
-      const physicalPath = await window.api.file.getPhysicalPath({ id: entry.id })
-      const metadata = await ipcApi.request('file.get_metadata', createFilePathHandle(physicalPath))
+      if (attachment.blob) {
+        // Web-native: the bytes are already in the browser, so upload them and
+        // reference the resulting entry. The server reads the blob through
+        // `providerMetadata.cherry.fileEntryId`; the URL is only for previews.
+        const uploaded = await uploadFile(attachment.blob, attachment.origin_name || attachment.name)
+        return withComposerFilePartMeta(
+          {
+            type: 'file',
+            mediaType: uploaded.mime || 'application/octet-stream',
+            url: uploaded.url,
+            filename: attachment.origin_name || attachment.name
+          },
+          attachment,
+          uploaded.id
+        )
+      }
+
+      // Legacy path-backed descriptor (desktop flows). The entry id is still
+      // the canonical reference; never expose the server filesystem path.
+      const entry = await window.api.file.createInternalEntry({
+        source: 'path',
+        path: paths[index]!,
+        cleanupPolicy: 'delete_when_unreferenced'
+      })
+      const metadata = await ipcApi.request('file.get_metadata', { kind: 'entry', entryId: entry.id })
       if (metadata === null) {
-        // The physical file was just created by createInternalEntry above, so an
-        // unreadable (null) metadata means a broken internal invariant — surface
-        // it here rather than silently shipping an octet-stream part.
+        // The entry was just created above, so unreadable metadata means a
+        // broken internal invariant — surface it rather than silently shipping
+        // an octet-stream part.
         throw new Error(`Failed to read metadata for freshly created file entry ${entry.id}`)
       }
       const basePart: FileUIPart = {
         type: 'file',
         mediaType: metadata.kind === 'file' ? metadata.mime : 'application/octet-stream',
-        url: toFileUrl(physicalPath),
+        url: `/media/${entry.id}`,
         filename: attachment.origin_name || attachment.name
       }
       return withComposerFilePartMeta(basePart, attachment, entry.id)

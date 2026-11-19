@@ -4,6 +4,7 @@ import {
   getComposerFileTokenSourceId
 } from '@renderer/utils/message/composerFileTokenSource'
 import { type AbsoluteFilePath, AbsoluteFilePathSchema } from '@shared/types/file'
+import { getFileTypeByExt } from '@shared/utils/file'
 
 /**
  * Lean, composer-owned v2 attachment descriptor. Replaces legacy `FileMetadata`
@@ -56,15 +57,45 @@ export interface ComposerAttachment {
  * composer state. Reuses a valid existing `fileTokenSourceId`, otherwise mints one.
  */
 export function toComposerAttachment(meta: FileMetadata): ComposerAttachment {
+  // The browser file adapter uploads eagerly and keeps the picked `File`, so a
+  // legacy `select()` result can be sent without a second path round-trip.
+  const blob = (meta as FileMetadata & { blob?: Blob }).blob
   return {
     fileTokenSourceId: getComposerFileTokenSourceId(meta) ?? createComposerFileTokenSourceId(),
     path: AbsoluteFilePathSchema.parse(meta.path),
+    ...(blob && { blob }),
     name: meta.name,
     origin_name: meta.origin_name,
     ext: meta.ext,
     size: meta.size,
     type: meta.type,
     ...(meta.composerFileKind && { composerFileKind: meta.composerFileKind })
+  }
+}
+
+/**
+ * Build an attachment straight from a browser `File`/`Blob`.
+ *
+ * This is the web-native path: nothing is read from disk, so there is no path
+ * to resolve. `buildFilePartsForAttachments` uploads the blob at send time and
+ * references the resulting entry id.
+ */
+export function toComposerAttachmentFromFile(
+  file: File,
+  options?: { name?: string; composerFileKind?: ComposerFileKind }
+): ComposerAttachment {
+  const originName = options?.name ?? file.name ?? 'file'
+  const dot = originName.lastIndexOf('.')
+  const ext = dot > 0 ? originName.slice(dot).toLowerCase() : ''
+  return {
+    fileTokenSourceId: createComposerFileTokenSourceId(),
+    blob: file,
+    name: dot > 0 ? originName.slice(0, dot) : originName,
+    origin_name: originName,
+    ext,
+    size: file.size,
+    type: getFileTypeByExt(ext) as FileType,
+    ...(options?.composerFileKind && { composerFileKind: options.composerFileKind })
   }
 }
 

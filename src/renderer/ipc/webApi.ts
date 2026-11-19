@@ -2,6 +2,7 @@ import type { SerializedIpcError } from '@shared/ipc/errors/IpcError'
 import { IpcChannel } from '@shared/IpcChannel'
 
 import { ipcApi } from './ipcApi'
+import { fileApi } from './webFile'
 
 type Listener = (payload: unknown) => void
 
@@ -279,6 +280,7 @@ export function installWebApi(): void {
       request: dataRequest,
       onDataChanged: (callback: Listener) => on('data-api:data-changed', callback)
     },
-    preference
+    preference,
+    file: fileApi
   }
 }

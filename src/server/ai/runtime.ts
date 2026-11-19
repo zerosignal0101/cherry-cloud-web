@@ -11,6 +11,7 @@ import { JobManager } from '@main/core/job/JobManager'
 import { LifecycleManager, Phase, ServiceContainer, type ServiceConstructor } from '@main/core/lifecycle'
 import { PowerService } from '@main/core/power/PowerService'
 import { SchedulerService } from '@main/core/scheduler/SchedulerService'
+import { FileManager } from '@main/services/file/FileManager'
 import { loggerService } from '@logger'
 
 import { WebDbService } from '../data/dbService'
@@ -44,6 +45,7 @@ const webServices = [
   RuntimeActivityService,
   SchedulerService,
   JobManager,
+  FileManager,
   McpPackageService,
   McpRuntimeService,
   McpCatalogService,

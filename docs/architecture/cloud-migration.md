@@ -28,11 +28,13 @@
   - 设置菜单裁剪为 Web 子集：供应商、模型、MCP、提示词、联网搜索、文档处理、OCR、通用、外观、通知、数据、归档、用量、关于；Cherry 账号/订阅/网关、本地模型、划词助手/快捷助手/截图/快捷键、webview 浏览器、Agents/技能、通道与设备配对均不下发。
   - 移动端：设置导航收进抽屉，页头显示当前分区并可打开菜单；供应商设置改为列表/详情两级（返回按钮回到列表）；文件页固定分类栏在手机上换成页头筛选菜单；对话列表在手机上浮在聊天之上（点空白处关闭），不再挤压正文。
   - 登录：`/login` 由服务端返回 SPA shell，`entryPoint` 先查 `/api/auth/status`，未登录渲染独立 `LoginApp`（不触碰 preference/IPC，避免 401 回跳），登录成功整页跳转；已登录访问 `/login` 由服务端 302 到 `next`。设置页底部提供退出登录。原服务端渲染登录 HTML 已删除。
-  - 文件上传改为浏览器语义：文件页的按钮与拖放都走 `POST /api/files`，不再依赖桌面路径；其余约 240 处 `window.api.file` 调用仍待同名适配层逐页清理。
+  - 文件子系统接通：服务端生命周期注册 `FileManager`，并在 `/api/rpc` 注册 `file.*` 路由（元数据、物理路径、条目创建/回收等）；`window.api.file` 由 `src/renderer/ipc/webFile.ts` 实现，`select` 走浏览器选择器并上传，`save`/`saveImage` 触发下载，字节型 `createInternalEntry` 走 `POST /api/files`。
+  - 附件发送改为浏览器语义：composer 的附件持有所选 `File`（`ComposerAttachment.blob`），发送时上传为 internal `FileEntry`，消息部分带 `providerMetadata.cherry.fileEntryId` 与 `/media/:id` URL；服务端 `fileProcessor` 通过 `FileManager` 读取字节。粘贴、拖放、附件按钮都不再依赖桌面路径。
+  - 文件页上传改为浏览器语义：按钮与拖放都走 `POST /api/files`，不再依赖桌面路径；图片预览 URL 对 internal 条目使用 `/media/:id`。
   - 新库会种入一个无模型的默认助手与空话题（`WebDefaultAssistantSeeder`），避免首次打开是一片空白；模型由用户在供应商设置中选择。
-  - 待办：`window.api.file` 全量适配、删除残留桌面专属页面/组件、i18n 裁剪。
+  - 仍待清理：路径式预览（`FilePreview` 仍按物理路径调用 file IPC）、Markdown 图片导出/备份等依赖路径的导出流程，以及删除残留的桌面专属页面与组件（菜单与路由已不可达或不在菜单中）。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
-- 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；这些文件在 M5 删除。
+- 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；它们已不在导航/路由中，删除工作留到 M9 收口。
 - `pnpm lint` 目前只覆盖 `src/server`、`src/platform` 与脚本；`src/shared`、`src/renderer` 待 `window.api` 真实类型收敛后再纳入。
 
 ## 1. 目标

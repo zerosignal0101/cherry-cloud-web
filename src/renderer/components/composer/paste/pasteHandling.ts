@@ -1,9 +1,13 @@
 import { loggerService } from '@logger'
 import { ipcApi } from '@renderer/ipc'
 import { toast } from '@renderer/services/toast'
-import { COMPOSER_FILE_KIND, type PastedTextFileMetadata } from '@renderer/types/file'
+import { COMPOSER_FILE_KIND } from '@renderer/types/file'
 import { getFileExtension, isSupportedExtension, isSupportedFile } from '@renderer/utils/file'
-import { type ComposerAttachment, toComposerAttachment } from '@renderer/utils/message/composerAttachment'
+import {
+  type ComposerAttachment,
+  toComposerAttachment,
+  toComposerAttachmentFromFile
+} from '@renderer/utils/message/composerAttachment'
 import { AbsoluteFilePathSchema } from '@shared/types/file'
 import { createFilePathHandle } from '@shared/utils/file'
 
@@ -84,20 +88,16 @@ export const handlePaste = async (
         // 长文本直接转文件，阻止默认粘贴
         event.preventDefault()
 
-        const tempFilePath = await window.api.file.createTempFile('pasted_text.txt')
-        await window.api.file.write(tempFilePath, clipboardText)
-        const selectedFile = await window.api.file.get(tempFilePath)
-        if (selectedFile) {
-          const pastedTextFile: PastedTextFileMetadata = {
-            ...selectedFile,
-            origin_name: t?.('chat.input.pasted_text_file_name') ?? selectedFile.origin_name,
+        // The web build has no temp files: the pasted text *is* the attachment.
+        const pastedTextFile = toComposerAttachmentFromFile(
+          new File([clipboardText], 'pasted_text.txt', { type: 'text/plain' }),
+          {
+            name: t?.('chat.input.pasted_text_file_name') ?? 'pasted_text.txt',
             composerFileKind: COMPOSER_FILE_KIND.PASTED_TEXT
           }
-          setFiles((prevFiles) => [...prevFiles, toComposerAttachment(pastedTextFile)])
-          if (resizeTextArea) setTimeout(() => resizeTextArea(), 50)
-        } else if (t) {
-          toast.info(t('chat.input.file_not_supported'))
-        }
+        )
+        setFiles((prevFiles) => [...prevFiles, pastedTextFile])
+        if (resizeTextArea) setTimeout(() => resizeTextArea(), 50)
         return true
       }
       // 短文本走默认粘贴行为，直接返回
@@ -152,22 +152,7 @@ export const handlePaste = async (
           try {
             if (!filePath) {
               if (isSupportedExtension(getFileExtension(file.name), supportExts)) {
-                const tempFilePath = await window.api.file.createTempFile(file.name)
-                const arrayBuffer = await file.arrayBuffer()
-                const uint8Array = new Uint8Array(arrayBuffer)
-                await window.api.file.write(tempFilePath, uint8Array)
-                const selectedFile = await window.api.file.get(tempFilePath)
-                if (selectedFile) {
-                  setFiles((prevFiles) => [
-                    ...prevFiles,
-                    toComposerAttachment({
-                      ...selectedFile,
-                      origin_name: file.name
-                    })
-                  ])
-                } else if (t) {
-                  toast.info(t('chat.input.file_not_supported'))
-                }
+                setFiles((prevFiles) => [...prevFiles, toComposerAttachmentFromFile(file)])
               } else {
                 if (t) {
                   toast.info(t('chat.input.file_not_supported'))

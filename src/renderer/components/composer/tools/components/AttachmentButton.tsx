@@ -5,9 +5,13 @@ import { useTranslation } from 'react-i18next'
 import { getQuickPanelSearchAliases } from '@renderer/components/composer/quickPanel'
 import { ATTACHMENT_TOOLBAR_MANIFEST } from '@renderer/components/composer/tools/toolbarManifests'
 import type { ToolLauncherApi } from '@renderer/components/composer/tools/types'
+import { pickBrowserFiles } from '@renderer/ipc/webFile'
 import { toast } from '@renderer/services/toast'
-import { filterSupportedFiles } from '@renderer/utils/file'
-import { type ComposerAttachment, toComposerAttachments } from '@renderer/utils/message/composerAttachment'
+import { getFileExtension } from '@renderer/utils/file'
+import {
+  type ComposerAttachment,
+  toComposerAttachmentFromFile
+} from '@renderer/utils/message/composerAttachment'
 
 interface Props {
   launcher: ToolLauncherApi
@@ -31,26 +35,21 @@ const useAttachmentToolController = ({ launcher, couldAddImageFile, extensions, 
       const useAllFiles = extensions.length > 20
 
       setSelecting(true)
-      const _files = await window.api.file.select({
-        properties: ['openFile', 'multiSelections'],
-        filters: [
-          {
-            name: 'Files',
-            extensions: useAllFiles ? ['*'] : extensions.map((i) => i.replace('.', ''))
-          }
-        ]
+      const _files = await pickBrowserFiles({
+        multiple: true,
+        accept: useAllFiles ? undefined : extensions.join(',')
       })
       setSelecting(false)
       window.requestAnimationFrame(() => restoreFocus?.())
 
-      if (_files) {
-        if (!useAllFiles) {
-          setFiles((currentFiles) => [...currentFiles, ...toComposerAttachments(_files)])
+      if (_files.length > 0) {
+        if (useAllFiles) {
+          setFiles((currentFiles) => [...currentFiles, ..._files.map((file) => toComposerAttachmentFromFile(file))])
           return
         }
-        const supportedFiles = await filterSupportedFiles(_files, extensions)
+        const supportedFiles = _files.filter((file) => extensions.includes(getFileExtension(file.name)))
         if (supportedFiles.length > 0) {
-          setFiles((currentFiles) => [...currentFiles, ...toComposerAttachments(supportedFiles)])
+          setFiles((currentFiles) => [...currentFiles, ...supportedFiles.map((file) => toComposerAttachmentFromFile(file))])
         }
 
         if (supportedFiles.length !== _files.length) {
