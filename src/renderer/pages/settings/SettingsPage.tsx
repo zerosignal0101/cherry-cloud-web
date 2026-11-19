@@ -1,11 +1,21 @@
 import { Outlet, useLocation, useNavigate } from '@tanstack/react-router'
-import { Search, Wrench } from 'lucide-react'
+import { LogOut, Menu, Search, Wrench } from 'lucide-react'
 import type { CSSProperties, FC, MouseEvent } from 'react'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { MenuDivider, MenuItem, MenuList, PageHeader, ScrollArea } from '@cherrystudio/ui'
-import { BUILTIN_TOOLS_GROUP_KEY, settingsMenu } from '@renderer/components/settingsMenu'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  MenuDivider,
+  MenuItem,
+  MenuList,
+  PageHeader,
+  ScrollArea
+} from '@cherrystudio/ui'
+import { BUILTIN_TOOLS_GROUP_KEY, getSettingsSectionTitleKey, settingsMenu } from '@renderer/components/settingsMenu'
 import useMacTransparentWindow from '@renderer/hooks/useMacTransparentWindow'
 import SettingsFocusScroll from '@renderer/pages/settings/settingsSearch/SettingsFocusScroll'
 import SettingsFocusUrl from '@renderer/pages/settings/settingsSearch/SettingsFocusUrl'
@@ -35,13 +45,32 @@ const SettingsPage: FC = () => {
   // The full-width search field mounts only while a search session is active;
   // the quiet header icon opens it, leaving the search page collapses it back
   const [searchOpen, setSearchOpen] = useState(pathname === '/settings/search')
+  // Phones have no room for a permanent 210px section column; the same menu
+  // lives in a drawer opened from the content header instead.
+  const [navOpen, setNavOpen] = useState(false)
   useEffect(() => {
     setSearchOpen(pathname === '/settings/search')
   }, [pathname])
 
   const isActive = (path: string) => pathname === path || pathname.startsWith(`${path}/`)
   const activeBuiltinTool = builtinTools.some((item) => isActive(item.route))
-  const go = (path: string) => navigate({ to: path })
+  const activeSectionTitle = t(getSettingsSectionTitleKey(pathname) ?? 'title.settings')
+  const go = (path: string) => {
+    navigate({ to: path })
+    setNavOpen(false)
+  }
+
+  /**
+   * Single-password sessions are stateless, so signing out means clearing the
+   * cookie server-side and booting the SPA again at the login gate.
+   */
+  const signOut = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    } finally {
+      window.location.assign('/login')
+    }
+  }
 
   const openExternalLink = (event: MouseEvent<HTMLDivElement>) => {
     if (event.type === 'auxclick' && event.button !== 1) return
@@ -66,7 +95,7 @@ const SettingsPage: FC = () => {
         <div className="flex min-h-0 flex-1 flex-row">
           <div
             data-ui="settings.navigation"
-            className="flex min-h-0 w-(--settings-width) min-w-(--settings-width) flex-col border-r-[0.5px] border-border">
+            className="hidden min-h-0 w-(--settings-width) min-w-(--settings-width) flex-col border-r-[0.5px] border-border md:flex">
             {searchOpen ? (
               // Expanded: the field covers the whole header row at the standing
               // box's width; mt-2.5 top-aligns it with the provider column's
@@ -130,40 +159,105 @@ const SettingsPage: FC = () => {
                 })}
               </MenuList>
             </ScrollArea>
+            <div className="shrink-0 border-t-[0.5px] border-border p-2.5">
+              <MenuItem
+                className={settingsSubmenuItemClassName}
+                labelClassName={settingsSubmenuItemLabelClassName}
+                icon={<LogOut />}
+                label={t('auth.logout')}
+                onClick={() => void signOut()}
+              />
+            </div>
           </div>
-          <div className="flex h-full min-h-0 min-w-0 flex-1">
-            {activeBuiltinTool && (
-              <nav
-                aria-label={t(BUILTIN_TOOLS_GROUP_KEY)}
-                className={cn('flex flex-col', settingsSubmenuScrollClassName)}>
-                <PageHeader title={t(BUILTIN_TOOLS_GROUP_KEY)} />
-                <ScrollArea className="min-h-0 flex-1">
-                  <MenuList className={settingsSubmenuListClassName}>
-                    {builtinTools.map((tool) => (
-                      <MenuItem
-                        key={tool.route}
-                        className={settingsSubmenuItemClassName}
-                        labelClassName={settingsSubmenuItemLabelClassName}
-                        icon={tool.icon}
-                        label={t(tool.titleKey)}
-                        active={isActive(tool.route)}
-                        onClick={() => go(tool.route)}
-                      />
-                    ))}
-                  </MenuList>
-                </ScrollArea>
-              </nav>
-            )}
-            <div
-              ref={contentRef}
-              data-ui="settings.content"
-              className="flex min-h-0 min-w-0 flex-1 overflow-hidden text-foreground">
-              <Outlet />
-              <SettingsFocusUrl />
-              <SettingsFocusScroll scopeRef={contentRef} />
+          <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+            <div className="flex h-12 shrink-0 items-center gap-1 border-b-[0.5px] border-border px-2 md:hidden">
+              <button
+                type="button"
+                aria-label={t('title.settings')}
+                onClick={() => setNavOpen(true)}
+                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground">
+                <Menu className="size-5" />
+              </button>
+              <span className="truncate font-medium text-sm">{activeSectionTitle}</span>
+            </div>
+            <div className="flex min-h-0 min-w-0 flex-1">
+              {activeBuiltinTool && (
+                <nav
+                  aria-label={t(BUILTIN_TOOLS_GROUP_KEY)}
+                  className={cn('hidden flex-col md:flex', settingsSubmenuScrollClassName)}>
+                  <PageHeader title={t(BUILTIN_TOOLS_GROUP_KEY)} />
+                  <ScrollArea className="min-h-0 flex-1">
+                    <MenuList className={settingsSubmenuListClassName}>
+                      {builtinTools.map((tool) => (
+                        <MenuItem
+                          key={tool.route}
+                          className={settingsSubmenuItemClassName}
+                          labelClassName={settingsSubmenuItemLabelClassName}
+                          icon={tool.icon}
+                          label={t(tool.titleKey)}
+                          active={isActive(tool.route)}
+                          onClick={() => go(tool.route)}
+                        />
+                      ))}
+                    </MenuList>
+                  </ScrollArea>
+                </nav>
+              )}
+              <div
+                ref={contentRef}
+                data-ui="settings.content"
+                className="flex min-h-0 min-w-0 flex-1 overflow-hidden text-foreground">
+                <Outlet />
+                <SettingsFocusUrl />
+                <SettingsFocusScroll scopeRef={contentRef} />
+              </div>
             </div>
           </div>
         </div>
+        <Drawer open={navOpen} onOpenChange={setNavOpen}>
+          <DrawerContent className="md:hidden">
+            <DrawerHeader>
+              <DrawerTitle>{t('title.settings')}</DrawerTitle>
+            </DrawerHeader>
+            <ScrollArea className="min-h-0 flex-1">
+              <MenuList className={settingsSubmenuListClassName}>
+                {settingsMenu.map((item, index) => {
+                  const startsNewGroup = index > 0 && item.groupKey !== settingsMenu[index - 1].groupKey
+                  return (
+                    <Fragment key={item.route}>
+                      {startsNewGroup && (
+                        <>
+                          <MenuDivider className={settingsSubmenuDividerClassName} />
+                          {item.groupKey && (
+                            <div className={settingsSubmenuSectionTitleClassName}>{t(item.groupKey)}</div>
+                          )}
+                        </>
+                      )}
+                      <MenuItem
+                        className={settingsSubmenuItemClassName}
+                        labelClassName={settingsSubmenuItemLabelClassName}
+                        icon={item.icon}
+                        label={t(item.titleKey)}
+                        active={isActive(item.route)}
+                        onClick={() => go(item.route)}
+                      />
+                    </Fragment>
+                  )
+                })}
+              </MenuList>
+            </ScrollArea>
+            <div className="shrink-0 border-t-[0.5px] border-border p-2.5">
+              <MenuItem
+                className={settingsSubmenuItemClassName}
+                labelClassName={settingsSubmenuItemLabelClassName}
+                icon={<LogOut />}
+                label={t('auth.logout')}
+                onClick={() => void signOut()}
+              />
+            </div>
+            <div className="h-[env(safe-area-inset-bottom)] shrink-0" />
+          </DrawerContent>
+        </Drawer>
       </div>
     </SettingsSearchDomIdsProvider>
   )

@@ -9,7 +9,7 @@ export type SidebarFilter =
   | { kind: 'library'; value: 'all' }
   | { kind: 'type'; value: 'image' | 'video' | 'audio' | 'text' | 'document' | 'other' }
 
-type SidebarEntry = {
+export type SidebarEntry = {
   kind: string
   value: string
   label: (t: TFunction) => string
@@ -29,6 +29,17 @@ const TYPE_ENTRIES: SidebarEntry[] = [
 const LIBRARY_ENTRIES: SidebarEntry[] = [
   { kind: 'library', value: 'all', label: (t) => t('files.all'), icon: Files, countKey: 'all' }
 ]
+
+/**
+ * The same destinations the permanent column shows, flattened for the phone
+ * filter menu. Declared from the two source lists so the two surfaces cannot
+ * drift apart.
+ */
+export const FILE_FILTER_ENTRIES: SidebarEntry[] = [...LIBRARY_ENTRIES, ...TYPE_ENTRIES]
+
+export function toSidebarFilter(entry: SidebarEntry): SidebarFilter {
+  return { kind: entry.kind, value: entry.value } as SidebarFilter
+}
 
 export function FileSidebar({
   filter,
@@ -65,7 +76,7 @@ export function FileSidebar({
   return (
     <aside
       data-ui="files.navigation"
-      className="flex w-(--settings-width) min-w-(--settings-width) shrink-0 flex-col border-r-[0.5px] border-border select-none">
+      className="hidden w-(--settings-width) min-w-(--settings-width) shrink-0 flex-col border-r-[0.5px] border-border select-none md:flex">
       <PageHeader title={t('files.title')} />
       <ScrollArea className="min-h-0 flex-1">
         <MenuList className="gap-0.5 px-2.5 pb-2.5">

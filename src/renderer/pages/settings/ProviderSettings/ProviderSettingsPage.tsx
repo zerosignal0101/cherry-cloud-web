@@ -1,5 +1,6 @@
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { omit } from 'es-toolkit/compat'
+import { ArrowLeft } from 'lucide-react'
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -8,6 +9,7 @@ import { usePersistCache } from '@data/hooks/useCache'
 import { useProviders } from '@renderer/hooks/useProvider'
 import type { AppRouter } from '@renderer/types/router'
 import { isProviderSettingsListVisibleProvider } from '@renderer/utils/providerSettings'
+import { cn } from '@renderer/utils/style'
 import type { Provider } from '@shared/data/types/provider'
 
 import type { ProviderApiSetupInitialStep } from './ConnectionSettings/ProviderApiSetupDialog'
@@ -25,8 +27,11 @@ interface ProviderSettingsContentProps {
 }
 
 function ProviderSettingsContent({ rawProviders }: ProviderSettingsContentProps) {
+  const { t } = useTranslation()
   const search = useSearch<AppRouter, undefined, false>({ strict: false })
   const navigate = useNavigate()
+  // Phones show either the provider list or the selected provider, never both.
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const [lastSelectedProviderId, setLastSelectedProviderId] = usePersistCache(
     'settings.provider.last_selected_provider_id'
   )
@@ -56,6 +61,20 @@ function ProviderSettingsContent({ rawProviders }: ProviderSettingsContentProps)
     setLastSelectedProviderIdRef.current(providerId ?? null)
     startTransition(() => setSelectedProviderIdState(providerId))
   }, [])
+
+  /** A tap on the phone list is also a navigation into that provider's page. */
+  const handleSelectProvider = useCallback(
+    (providerId: string | undefined) => {
+      setSelectedProviderId(providerId)
+      if (providerId) setMobileDetailOpen(true)
+    },
+    [setSelectedProviderId]
+  )
+
+  // Deep links (`?id=`) are an explicit request for one provider's page.
+  useEffect(() => {
+    if (search.id) setMobileDetailOpen(true)
+  }, [search.id])
 
   const handleCustomProviderCreated = useCallback((providerId: string, hasApiKey: boolean) => {
     setPendingApiSetup({ providerId, initialStep: hasApiKey ? 'models' : 'api-key' })
@@ -117,21 +136,40 @@ function ProviderSettingsContent({ rawProviders }: ProviderSettingsContentProps)
 
   return (
     <div className="relative flex h-full min-h-0 w-full min-w-0 overflow-hidden">
-      <ProviderList
-        selectedProviderId={selectedProviderId}
-        filterModeHint={filterModeHint}
-        onSelectProvider={setSelectedProviderId}
-        onCustomProviderCreated={handleCustomProviderCreated}
-      />
-      {selectedProvider && (
-        <ProviderSetting
-          providerId={selectedProvider.id}
-          key={selectedProvider.id}
-          initialApiSetupStep={
-            pendingApiSetup?.providerId === selectedProvider.id ? pendingApiSetup.initialStep : undefined
-          }
-          onApiSetupClosed={() => handleApiSetupClosed(selectedProvider.id)}
+      <div
+        className={cn(
+          'min-h-0 w-full [&>aside]:w-full [&>aside]:min-w-0',
+          'md:flex md:w-auto md:shrink-0 md:[&>aside]:w-[248px]',
+          mobileDetailOpen && 'hidden md:flex'
+        )}>
+        <ProviderList
+          selectedProviderId={selectedProviderId}
+          filterModeHint={filterModeHint}
+          onSelectProvider={handleSelectProvider}
+          onCustomProviderCreated={handleCustomProviderCreated}
         />
+      </div>
+      {selectedProvider && (
+        <div className={cn('flex min-h-0 min-w-0 flex-1 flex-col', !mobileDetailOpen && 'hidden md:flex')}>
+          <div className="flex h-10 shrink-0 items-center gap-1 border-b-[0.5px] border-border px-2 md:hidden">
+            <button
+              type="button"
+              aria-label={t('common.back')}
+              onClick={() => setMobileDetailOpen(false)}
+              className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground">
+              <ArrowLeft className="size-5" />
+            </button>
+            <span className="truncate font-medium text-sm">{selectedProvider.name}</span>
+          </div>
+          <ProviderSetting
+            providerId={selectedProvider.id}
+            key={selectedProvider.id}
+            initialApiSetupStep={
+              pendingApiSetup?.providerId === selectedProvider.id ? pendingApiSetup.initialStep : undefined
+            }
+            onApiSetupClosed={() => handleApiSetupClosed(selectedProvider.id)}
+          />
+        </div>
       )}
     </div>
   )

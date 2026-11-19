@@ -15,13 +15,22 @@
   - 单密码：`ADMIN_PASSWORD` 首次启动写入 `DATA_DIR/auth.json`（scrypt 哈希，0600），之后忽略该变量；重置需删除文件。
   - 会话：HMAC-SHA256 签名的无状态 Cookie（HttpOnly、SameSite=Lax、Path=/、按请求协议决定 Secure），有效期 `SESSION_TTL_DAYS`。
   - 保护面：`/api/rpc`、`/api/files`、`/media/:id`、SPA 页面均需会话；未登录页面请求 302 到 `/login?next=`，API 返回 401。
-  - 登录页为服务端渲染的独立 HTML（M5 由 React 登录页替换），登录接口限速 10 次 / 5 分钟并带失败延迟。
+  - 登录页为服务端渲染的独立 HTML（M5 已由 SPA 登录视图替换，见下）。登录接口限速 10 次 / 5 分钟并带失败延迟。
   - 跨站防护：POST 与 WebSocket 升级校验 `Origin`（同源或 `ALLOWED_ORIGINS`），WebSocket 复用会话 Cookie，不再使用查询串 ticket。
 - M4 进行中（对话核心，传输层已完成）：
   - DataApi 走 HTTP：`POST /api/data` 复用上游 `ApiServer.handleRequest` 与完整 `apiHandlers`（主题、消息、助手、供应商、文件、标签等），请求/响应信封不变；浏览器 `window.api.dataApi.request` 已对接。
   - 数据变更通知：上游 `notifyDataApiDataChange` 仍调用 `WindowManager.broadcast`，服务端用 `src/server/data/windowManager.ts` 适配到 WebSocket 连接（事件 `data-api:data-changed`），写操作提交后各标签页自行收敛。
   - 连接身份：每个标签页在 `sessionStorage` 生成稳定 client id，RPC 带 `x-client-id`、WebSocket 升级带 `?client=`；`IpcContext.senderId` 即该 id，`ai.stream.*` 的定向推送据此路由（等价于桌面端的 WindowId）。
-  - 待决：上游 `AiService`/`AiStreamManager` 静态依赖整个桌面 AI 栈（Agents、Claude Code、Pi runtime、浏览器、通道、`import.meta.env`、Vite `?raw`/`?nodeWorker`），无法在 Node 进程内直接装载。需要在“服务端精简对话引擎”与“整体引入上游依赖”之间选定，详见 §6。
+  - 前端已能打开对话页并渲染上游 composer；流式调用仍待真实供应商密钥联调。
+- M5 完成（双 Shell 与页面裁剪）：
+  - URL 即页面：`/` 重定向到 `/app/chat`，`/app/*` 由 `WebShell` 包裹，`/settings/*` 共用同一 Shell；`UrlTabsProvider` 仍实现 `TabsContext`，使上游约 37 处 `useTabs()` 调用无需改写。
+  - 双 Shell：`md:` 以上是 56px 图标导航栏；以下为底部导航（对话 / 文件 / 设置）。导航项即首版范围，知识库、Agents、绘画、代码、笔记、翻译、定时任务、小应用等分期入口不再出现。
+  - 设置菜单裁剪为 Web 子集：供应商、模型、MCP、提示词、联网搜索、文档处理、OCR、通用、外观、通知、数据、归档、用量、关于；Cherry 账号/订阅/网关、本地模型、划词助手/快捷助手/截图/快捷键、webview 浏览器、Agents/技能、通道与设备配对均不下发。
+  - 移动端：设置导航收进抽屉，页头显示当前分区并可打开菜单；供应商设置改为列表/详情两级（返回按钮回到列表）；文件页固定分类栏在手机上换成页头筛选菜单。
+  - 登录：`/login` 由服务端返回 SPA shell，`entryPoint` 先查 `/api/auth/status`，未登录渲染独立 `LoginApp`（不触碰 preference/IPC，避免 401 回跳），登录成功整页跳转；已登录访问 `/login` 由服务端 302 到 `next`。设置页底部提供退出登录。原服务端渲染登录 HTML 已删除。
+  - 文件上传改为浏览器语义：文件页的按钮与拖放都走 `POST /api/files`，不再依赖桌面路径；其余约 240 处 `window.api.file` 调用仍待同名适配层逐页清理。
+  - 新库会种入一个无模型的默认助手与空话题（`WebDefaultAssistantSeeder`），避免首次打开是一片空白；模型由用户在供应商设置中选择。
+  - 待办：`window.api.file` 全量适配、删除残留桌面专属页面/组件、i18n 裁剪。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
 - 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；这些文件在 M5 删除。
 - `pnpm lint` 目前只覆盖 `src/server`、`src/platform` 与脚本；`src/shared`、`src/renderer` 待 `window.api` 真实类型收敛后再纳入。
@@ -48,7 +57,7 @@ WS   /api/ws           事件推送与 AI 流式（event + payload；会话 Cook
 POST /api/auth/login   密码登录，写入会话 Cookie
 POST /api/auth/logout  清除会话 Cookie
 GET  /api/auth/status  当前会话状态
-GET  /login            服务端渲染登录页（M5 由 SPA 页面替换）
+GET  /login            返回 SPA shell；未登录由前端渲染登录页，已登录 302 到 next
 POST /api/files        附件上传（multipart，单文件）-> FileEntry 描述 + /media/:id
 GET  /media/:id        文件读取（Range / ETag）
 ```

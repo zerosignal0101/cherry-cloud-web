@@ -5,6 +5,7 @@ import { PreferenceSeeder } from '@data/db/seeding/seeders/preferenceSeeder'
 import { PresetProviderSeeder } from '@data/db/seeding/seeders/presetProviderSeeder'
 import { TranslateLanguageSeeder } from '@data/db/seeding/seeders/translateLanguageSeeder'
 
+import { WebDefaultAssistantSeeder } from './seeders/webDefaultAssistantSeeder'
 import { WebDefaultsSeeder } from './seeders/webDefaultsSeeder'
 
 /**
@@ -23,12 +24,15 @@ import { WebDefaultsSeeder } from './seeders/webDefaultsSeeder'
  * - `WebDefaultsSeeder`         — first-run defaults this build overrides
  *                                 (no onboarding, no data collection); must run
  *                                 before `PreferenceSeeder`, which skips existing rows.
+ * - `DefaultAssistantSeeder`    — one assistant + one empty topic so a fresh
+ *                                 deployment opens on a usable conversation
+ *                                 instead of an empty chat surface. The Web
+ *                                 variant drops CherryIN's model id, which has
+ *                                 no user_model row here.
  * - `PreferenceSeeder`          — default preferences every page reads on first load.
  * - `TranslateLanguageSeeder`   — built-in language pairs for the translate API.
  *
  * Deliberately not seeded yet:
- * - `DefaultAssistantSeeder` pulls the agent/session service graph, which arrives
- *   with the agents milestone.
  * - `CherryAiDefaultModelSeeder` and the Cherry-branded assistants belong to the
  *   cloud features this build removes.
  */
@@ -37,6 +41,7 @@ export const webSeeders: ISeeder[] = [
   new PresetProviderSeeder(),
   new ConversationListSortSeeder(),
   new WebDefaultsSeeder(),
+  new WebDefaultAssistantSeeder(),
   new PreferenceSeeder(),
   new TranslateLanguageSeeder()
 ]

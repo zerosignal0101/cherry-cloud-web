@@ -1,4 +1,4 @@
-import { ArrowLeft, MoreHorizontal, Upload } from 'lucide-react'
+import { ArrowLeft, ListFilter, MoreHorizontal, Upload } from 'lucide-react'
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -30,7 +30,6 @@ import { createSidebarShortcutTarget, SIDEBAR_SHORTCUT_PROVIDER_IDS } from '@ren
 import type { FileEntry, FileEntryId } from '@shared/data/types/file'
 import type { OutputFor } from '@shared/ipc/types'
 import type { AbsoluteFilePath, FileType } from '@shared/types/file'
-import { AbsoluteFilePathSchema } from '@shared/types/file'
 import { createFileEntryHandle, getFileTypeByExt, toSafeFileUrl } from '@shared/utils/file'
 
 import type { FileContextMenuActions } from './FileContextMenu'
@@ -39,7 +38,7 @@ import { FileGrid } from './FileGrid'
 import type { SortDir, SortKey } from './FileList'
 import { FileList, FileListHeader } from './FileList'
 import type { SidebarFilter } from './FileSidebar'
-import { FileSidebar } from './FileSidebar'
+import { FILE_FILTER_ENTRIES, FileSidebar, toSidebarFilter } from './FileSidebar'
 import { useFileHydration } from './useFileHydration'
 
 const logger = loggerService.withContext('FilesPage')
@@ -49,7 +48,6 @@ type ServerSortKey = 'name' | 'size' | 'updatedAt' | 'ext'
 type FileMetadataById = OutputFor<'file.batch_get_metadata'>
 type PhysicalPathById = OutputFor<'file.batch_get_physical_paths'>
 type DanglingStateById = OutputFor<'file.batch_get_dangling_states'>
-type BatchCreateInternalEntriesResult = OutputFor<'file.batch_create_internal_entries'>
 
 interface EmbeddedFilePreview {
   fileName: string
@@ -57,8 +55,6 @@ interface EmbeddedFilePreview {
   refreshKey: number
 }
 
-// Keep at or below `FILE_IPC_MAX_BATCH_CREATE_ITEMS` from the IPC schema.
-const FILE_IPC_CREATE_BATCH_SIZE = 100
 const FILE_DETAIL_LOOKUP_CONCURRENCY = 8
 
 async function inspectFailedFileIds(
@@ -82,33 +78,6 @@ async function inspectFailedFileIds(
     )
   }
   return { activeInternalIds, trashedInternalIds }
-}
-
-async function requestBatchedInternalEntryCreates(
-  paths: readonly AbsoluteFilePath[]
-): Promise<BatchCreateInternalEntriesResult> {
-  const chunks: AbsoluteFilePath[][] = []
-  for (let i = 0; i < paths.length; i += FILE_IPC_CREATE_BATCH_SIZE) {
-    chunks.push(paths.slice(i, i + FILE_IPC_CREATE_BATCH_SIZE))
-  }
-
-  const results = await Promise.all(
-    chunks.map((chunk) =>
-      ipcApi.request('file.batch_create_internal_entries', {
-        items: chunk.map((path) => ({
-          source: 'path' as const,
-          path,
-          // Files-page upload = add-to-library: 'manual' keeps zero-ref uploads out of GC (spec §4.1)
-          cleanupPolicy: 'manual' as const
-        }))
-      })
-    )
-  )
-
-  return {
-    succeeded: results.flatMap((result) => result.succeeded),
-    failed: results.flatMap((result) => result.failed)
-  }
 }
 
 function formatDateTime(timestamp: number): string {
@@ -199,13 +168,6 @@ function warnMutationFailures(
 
   logger.warn(`${action} partially failed`, { failed: result.failed })
   return true
-}
-
-function reportImportFailures(result: { failed: Array<{ sourceRef: string; error: string }> }, message: string): void {
-  if (result.failed.length > 0) {
-    logger.warn('file import partially failed', { failed: result.failed })
-    toast.error(message)
-  }
 }
 
 function shouldIgnoreFileShortcut(event: KeyboardEvent): boolean {
@@ -390,6 +352,12 @@ function FilesPage({ entryId, onEntryIdChange }: FilesPageProps) {
   const isLoadingMoreActiveFiles = isActiveFilesRefreshing && activeFilePages.length > 0
   const isLoadingMoreCurrentFiles = isLoadingMoreActiveFiles
 
+  const handleFilterChange = useCallback((next: SidebarFilter) => {
+    setFilter(next)
+    setSelectedIds(new Set())
+    setRenamingId(null)
+  }, [])
+
   useEffect(() => {
     pendingLoadMoreRef.current = false
   }, [hasMoreCurrentFiles, isLoadingMoreCurrentFiles, entries.length])
@@ -506,39 +474,47 @@ function FilesPage({ entryId, onEntryIdChange }: FilesPageProps) {
     })
   }, [])
 
-  const handleImportPaths = useCallback(
-    async (paths: AbsoluteFilePath[]) => {
-      if (paths.length === 0) return
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-      try {
-        const result = await requestBatchedInternalEntryCreates(paths)
-        reportImportFailures(result, t('files.error.import_partial_failed'))
-        await refetchFiles()
-      } catch (error) {
-        logger.error('Failed to import files', error as Error)
-        toast.error(t('files.error.import_failed'))
+  /**
+   * Browser uploads replace the desktop path flow: the picker hands us `File`
+   * objects, each one goes to `POST /api/files`, and the server owns the bytes
+   * under `DATA_DIR/files`. The returned entry is already in the library, so a
+   * refetch is all that is left to do.
+   */
+  const uploadBrowserFiles = useCallback(
+    async (fileList: FileList | readonly File[] | null) => {
+      const selected = Array.from(fileList ?? [])
+      if (selected.length === 0) return
+
+      let failed = 0
+      for (const file of selected) {
+        const body = new FormData()
+        body.append('file', file, file.name)
+        try {
+          const response = await fetch('/api/files', {
+            method: 'POST',
+            body,
+            credentials: 'same-origin'
+          })
+          if (!response.ok) throw new Error(`Upload failed (HTTP ${response.status})`)
+        } catch (error) {
+          failed += 1
+          logger.error('Failed to upload file', error as Error)
+        }
       }
+
+      if (failed > 0) {
+        toast.error(t(failed === selected.length ? 'files.error.import_failed' : 'files.error.import_partial_failed'))
+      }
+      await refetchFiles()
     },
     [refetchFiles, t]
   )
 
-  const handleUploadClick = useCallback(async () => {
-    try {
-      const selected = await window.api.file.select({
-        properties: ['openFile', 'multiSelections'],
-        filters: [{ name: t('files.all'), extensions: ['*'] }]
-      })
-      if (!selected || selected.length === 0) return
-
-      const paths = selected
-        .map((file) => AbsoluteFilePathSchema.safeParse(file.path).data)
-        .filter((path): path is AbsoluteFilePath => Boolean(path))
-      await handleImportPaths(paths)
-    } catch (error) {
-      logger.error('Failed to select files for import', error as Error)
-      toast.error(t('files.error.import_failed'))
-    }
-  }, [handleImportPaths, t])
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
 
   const filteredFiles = useMemo(() => {
     let result = files
@@ -871,15 +847,7 @@ function FilesPage({ entryId, onEntryIdChange }: FilesPageProps) {
   return (
     <div data-ui="files.view" className="relative flex min-h-0 flex-1 overflow-hidden">
       <div className={`flex min-h-0 min-w-0 flex-1 overflow-hidden ${embeddedPreview ? 'invisible' : ''}`}>
-        <FileSidebar
-          filter={filter}
-          onFilterChange={(f) => {
-            setFilter(f)
-            setSelectedIds(new Set())
-            setRenamingId(null)
-          }}
-          fileCounts={fileCounts}
-        />
+        <FileSidebar filter={filter} onFilterChange={handleFilterChange} fileCounts={fileCounts} />
 
         <div
           data-ui="files.content"
@@ -892,16 +860,46 @@ function FilesPage({ entryId, onEntryIdChange }: FilesPageProps) {
           onDrop={(e) => {
             e.preventDefault()
             setDragOver(false)
-            const paths = Array.from(e.dataTransfer.files)
-              .map((file) => AbsoluteFilePathSchema.safeParse(window.api.file.getPathForFile(file)).data)
-              .filter((path): path is AbsoluteFilePath => Boolean(path))
-            void handleImportPaths(paths)
+            void uploadBrowserFiles(e.dataTransfer.files)
           }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              void uploadBrowserFiles(event.target.files)
+              // Reset so picking the same file twice still fires `change`.
+              event.target.value = ''
+            }}
+          />
           <PageHeader
             title={activeFilterLabel}
             className="relative mb-0 h-9 pb-1 after:pointer-events-none after:absolute after:right-3 after:bottom-0 after:left-3 after:border-b after:border-border after:content-['']"
             action={
               <div className="flex shrink-0 items-center gap-2">
+                <div className="md:hidden">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={activeFilterLabel}
+                        className="h-7 gap-1.5 rounded-md px-2.5 text-xs text-muted-foreground hover:text-foreground">
+                        <ListFilter className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="min-w-40">
+                      {FILE_FILTER_ENTRIES.map((entry) => (
+                        <DropdownMenuItem
+                          key={`${entry.kind}:${entry.value}`}
+                          onSelect={() => handleFilterChange(toSidebarFilter(entry))}>
+                          {entry.label(t)}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 {!isImageGrid && selectedIds.size > 0 && (
                   <FileToolbar
                     selectedCount={selectedIds.size}
@@ -913,7 +911,7 @@ function FilesPage({ entryId, onEntryIdChange }: FilesPageProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => void handleUploadClick()}
+                  onClick={handleUploadClick}
                   className="h-7 -translate-y-px gap-1.5 rounded-md px-2.5 text-xs text-muted-foreground hover:text-foreground">
                   <Upload className="size-3.5 translate-y-px" />
                   <span>{t('files.upload')}</span>

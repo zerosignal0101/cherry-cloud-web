@@ -1,35 +1,21 @@
 import {
   Activity,
   Archive,
-  AudioLines,
   Bell,
   Cloud,
-  Command,
-  Crop,
-  FileBox,
   FileCode,
-  Globe,
   HardDrive,
   Info,
-  MonitorSmartphone,
-  MousePointer2,
   Package,
   Palette,
-  PictureInPicture2,
-  Radio,
   ScanText,
   Search,
   Settings2,
-  Terminal,
-  TextCursorInput,
-  ToolCase,
-  UserRound,
   Zap
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { createElement } from 'react'
 
-import { GatewayIcon } from '@renderer/components/icons/GatewayIcon'
 import { McpLogo } from '@renderer/components/icons/SvgIcon'
 import { parseAppRouteUrl } from '@renderer/utils/appRouteUrl'
 import { isSettingsPath } from '@shared/data/types/settingsPath'
@@ -61,17 +47,16 @@ export const BUILTIN_TOOLS_GROUP_KEY = 'settings.menuGroups.builtinTools'
  * Array order = menu render order = search tie-break order.
  * Adding a settings section requires registering it here, which also makes its
  * title searchable — the settings search baseline is structural, not manual.
+ *
+ * This is the Web deployment's subset: Cherry cloud (account, subscription,
+ * gateway), local runtimes, desktop assistants (selection / quick assistant /
+ * screenshot / shortcuts), webview browser, agents/skills, channels and device
+ * pairing are not part of the first version, so neither the menu nor the
+ * settings search should offer them.
  */
 export const settingsMenu: readonly SettingsMenuEntry[] = [
-  { route: '/settings/profile', titleKey: 'settings.profile.title', icon: createElement(UserRound) },
   { route: '/settings/provider', titleKey: 'settings.provider.title', icon: createElement(Cloud) },
   { route: '/settings/model', titleKey: 'settings.model', icon: createElement(Package) },
-  {
-    route: '/settings/local-models',
-    titleKey: 'settings.dependencies.localModels.title',
-    icon: createElement(FileBox)
-  },
-  { route: '/settings/api-gateway', titleKey: 'apiGateway.title', icon: createElement(GatewayIcon) },
   {
     route: '/settings/mcp',
     titleKey: 'agent.settings.toolsMcp.mcp.tab',
@@ -79,27 +64,9 @@ export const settingsMenu: readonly SettingsMenuEntry[] = [
     groupKey: 'settings.menuGroups.capabilities'
   },
   {
-    route: '/settings/skills',
-    titleKey: 'settings.skills.title',
-    icon: createElement(ToolCase),
-    groupKey: 'settings.menuGroups.capabilities'
-  },
-  {
     route: '/settings/prompts',
     titleKey: 'settings.prompts.title',
     icon: createElement(Zap),
-    groupKey: BUILTIN_TOOLS_GROUP_KEY
-  },
-  {
-    route: '/settings/computer-use',
-    titleKey: 'settings.computerUse.title',
-    icon: createElement(MousePointer2),
-    groupKey: BUILTIN_TOOLS_GROUP_KEY
-  },
-  {
-    route: '/settings/browser',
-    titleKey: 'settings.browser.title',
-    icon: createElement(Globe),
     groupKey: BUILTIN_TOOLS_GROUP_KEY
   },
   {
@@ -139,12 +106,6 @@ export const settingsMenu: readonly SettingsMenuEntry[] = [
     groupKey: 'settings.menuGroups.personal'
   },
   {
-    route: '/settings/voice',
-    titleKey: 'settings.voice.title',
-    icon: createElement(AudioLines),
-    groupKey: 'settings.menuGroups.personal'
-  },
-  {
     route: '/settings/data',
     titleKey: 'settings.data.title',
     icon: createElement(HardDrive),
@@ -161,48 +122,6 @@ export const settingsMenu: readonly SettingsMenuEntry[] = [
     titleKey: 'settings.usage.title',
     icon: createElement(Activity),
     groupKey: 'settings.menuGroups.personal'
-  },
-  {
-    route: '/settings/channels',
-    titleKey: 'settings.channels.title',
-    icon: createElement(Radio),
-    groupKey: 'settings.menuGroups.automation'
-  },
-  {
-    route: '/settings/device-connections',
-    titleKey: 'deviceConnections.title',
-    icon: createElement(MonitorSmartphone),
-    groupKey: 'settings.menuGroups.automation'
-  },
-  {
-    route: '/settings/shortcut',
-    titleKey: 'settings.shortcuts.title',
-    icon: createElement(Command),
-    groupKey: 'settings.menuGroups.automation'
-  },
-  {
-    route: '/settings/quick-assistant',
-    titleKey: 'settings.quickAssistant.title',
-    icon: createElement(PictureInPicture2),
-    groupKey: 'settings.menuGroups.automation'
-  },
-  {
-    route: '/settings/selection-assistant',
-    titleKey: 'selection.name',
-    icon: createElement(TextCursorInput),
-    groupKey: 'settings.menuGroups.automation'
-  },
-  {
-    route: '/settings/screenshot',
-    titleKey: 'settings.screenshot.title',
-    icon: createElement(Crop),
-    groupKey: 'settings.menuGroups.automation'
-  },
-  {
-    route: '/settings/dependencies',
-    titleKey: 'settings.dependencies.title',
-    icon: createElement(Terminal),
-    groupKey: 'settings.menuGroups.system'
   },
   {
     route: '/settings/about',
