@@ -19,7 +19,7 @@ import type { ConnectionRegistry, WebContentsLike } from '../transport/connectio
 export interface WindowManagerBridge {
   broadcast(channel: string, ...args: unknown[]): void
   broadcastToType(_type: string, channel: string, ...args: unknown[]): void
-  getWindow(windowId: string): { id: string; webContents: WebContentsLike; isFocused(): boolean } | undefined
+  getWindow(windowId: string): { id: string; webContents: WebContentsLike; isFocused(): boolean; isDestroyed(): boolean } | undefined
   getWindowIdByWebContents(webContents: WebContentsLike): string | undefined
 }
 
@@ -40,7 +40,8 @@ export function createWindowManagerBridge(connections: ConnectionRegistry): Wind
       return {
         id: windowId,
         webContents: connections.webContents(windowId),
-        isFocused: () => true
+        isFocused: () => true,
+        isDestroyed: () => !connections.resolve(windowId)
       }
     },
     getWindowIdByWebContents: (webContents) => (webContents.isDestroyed() ? undefined : webContents.id)

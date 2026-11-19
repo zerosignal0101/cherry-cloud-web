@@ -14,7 +14,13 @@ import { SchedulerService } from '@main/core/scheduler/SchedulerService'
 import { loggerService } from '@logger'
 
 import { WebDbService } from '../data/dbService'
-import { WebAnalyticsService, WebAutomationReplService, WebBrowserSessionService, WebWindowManager } from './webServices'
+import {
+  WebAnalyticsService,
+  WebAutomationReplService,
+  WebBrowserSessionService,
+  WebIpcApiService,
+  WebWindowManager
+} from './webServices'
 
 const logger = loggerService.withContext('AiRuntime')
 
@@ -31,6 +37,7 @@ const webServices = [
   CacheService,
   PreferenceService,
   WebWindowManager,
+  WebIpcApiService,
   WebBrowserSessionService,
   WebAutomationReplService,
   PowerService,

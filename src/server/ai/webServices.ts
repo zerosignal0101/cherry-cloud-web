@@ -1,4 +1,5 @@
 import { BaseService, type Disposable, Injectable, Phase, ServicePhase, toDisposable } from '@main/core/lifecycle'
+import { IpcChannel } from '@shared/IpcChannel'
 
 import type { WindowManagerBridge } from '../data/windowManager'
 
@@ -60,6 +61,31 @@ export class WebWindowManager extends BaseService {
   }
 
   pushInitDataToType(_type: string, _data: unknown): void {}
+}
+
+/**
+ * Upstream's `IpcApiService` owns the Electron `IpcApi_Request` channel plus the
+ * event senders. The channel belongs to `src/server/transport` here, so only the
+ * senders are kept: `send` targets one tab, the broadcasts fan out to every open
+ * tab, and both ride the connection registry's `IpcApi_Event` translation.
+ */
+@Injectable('IpcApiService')
+@ServicePhase(Phase.WhenReady)
+export class WebIpcApiService extends BaseService {
+  send(windowId: string, event: string, payload: unknown): void {
+    const window = requireBridge().getWindow(windowId)
+    if (window && !window.isDestroyed()) {
+      window.webContents.send(IpcChannel.IpcApi_Event, event, payload)
+    }
+  }
+
+  broadcast(event: string, payload: unknown): void {
+    requireBridge().broadcast(IpcChannel.IpcApi_Event, event, payload)
+  }
+
+  broadcastToType(windowType: string, event: string, payload: unknown): void {
+    requireBridge().broadcastToType(windowType, IpcChannel.IpcApi_Event, event, payload)
+  }
 }
 
 /**
