@@ -13,6 +13,7 @@
  * a silently-created instance.
  */
 import { mkdirSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 
 import type { DbOrTx, DbType } from '@data/db/types'
@@ -162,9 +163,28 @@ export class WebApplication {
       'sys.home': process.cwd(),
       'feature.files.data': this.dataPaths.files,
       'feature.files.trash': path.join(this.dataPaths.files, '.trash'),
+      // The catalog ships inside the npm package; the desktop build points at the
+      // workspace copy instead.
+      'feature.provider_registry.data': resolveProviderRegistryData(),
       'feature.provider_registry.override': this.dataPaths.providerRegistry
     }
     return known[key] ?? path.join(this.dataPaths.root, key)
+  }
+}
+
+/**
+ * Directory holding `providers.json`, `models.json` and `provider-models.json`.
+ *
+ * Resolved through the package entry so a hoisted or nested install works; the
+ * fallback keeps a missing install from turning into a confusing ENOENT deep
+ * inside the registry loader.
+ */
+function resolveProviderRegistryData(): string {
+  try {
+    const entry = createRequire(import.meta.url).resolve('@cherrystudio/provider-registry')
+    return path.resolve(path.dirname(entry), '..', 'data')
+  } catch {
+    return path.resolve(process.cwd(), 'node_modules/@cherrystudio/provider-registry/data')
   }
 }
 
