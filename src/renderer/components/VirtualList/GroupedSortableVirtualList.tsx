@@ -1,0 +1,1324 @@
+import {
+  type DragEndEvent,
+  type DragMoveEvent,
+  DragOverlay,
+  type DragStartEvent,
+  useDragDropManager,
+  useDroppable
+} from '@dnd-kit/react'
+import { useComputed } from '@dnd-kit/react/hooks'
+import { useSortable } from '@dnd-kit/react/sortable'
+import type React from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+
+import { DragDropRoot } from '@cherrystudio/ui'
+import { getInsertionSide, ROW_STEP_SORTABLE_PLUGINS } from '@renderer/utils/dragDrop'
+
+import DynamicVirtualList, { type DynamicVirtualListProps } from './DynamicVirtualList'
+import { buildGroupedVirtualRows, type GroupedVirtualListGroup, type GroupedVirtualListRow } from './GroupedVirtualList'
+
+type UniqueIdentifier = string | number
+
+type DragOperation = DragMoveEvent['operation']
+
+type GroupedSortableVirtualListRow<TGroup, TItem, THeader, TFooter> = GroupedVirtualListRow<
+  TGroup,
+  TItem,
+  THeader,
+  TFooter
+>
+
+type BaseDynamicVirtualListProps<TGroup, TItem, THeader, TFooter> = Omit<
+  DynamicVirtualListProps<GroupedSortableVirtualListRow<TGroup, TItem, THeader, TFooter>>,
+  'children' | 'estimateSize' | 'list'
+>
+
+type DragDataBase<TGroup> = {
+  group: TGroup
+  groupId: UniqueIdentifier
+  groupIndex: number
+}
+
+type ItemDragData<TGroup, TItem> = DragDataBase<TGroup> & {
+  item: TItem
+  itemId: UniqueIdentifier
+  itemIndex: number
+  itemIndexInGroup: number
+  rowType: 'item'
+}
+
+type GroupDragData<TGroup> = DragDataBase<TGroup> & {
+  rowType: 'group'
+}
+
+type RowDragData<TGroup, TItem> = GroupDragData<TGroup> | ItemDragData<TGroup, TItem>
+
+type ActiveDragState<TGroup, TItem> = {
+  active: RowDragData<TGroup, TItem>
+  blockedGroupIds: Set<UniqueIdentifier>
+  overlaySize?: {
+    height: number
+    width: number
+  }
+}
+
+type OverDropState = {
+  position: 'before' | 'after'
+  rowType: 'group' | 'item'
+  targetId: UniqueIdentifier
+  targetGroupId: UniqueIdentifier
+}
+
+type DropIndicatorPosition = 'before' | 'after'
+
+type DropIndicatorTarget<TGroup, TItem, THeader, TFooter> = {
+  position: DropIndicatorPosition
+  row: GroupedSortableVirtualListRow<TGroup, TItem, THeader, TFooter>
+}
+
+type GroupBoundaryIndicatorTargets<TGroup, TItem, THeader, TFooter> = {
+  after: DropIndicatorTarget<TGroup, TItem, THeader, TFooter>
+  before: DropIndicatorTarget<TGroup, TItem, THeader, TFooter>
+}
+
+export type GroupedSortableVirtualListItemDragPayload<TGroup, TItem> = {
+  type: 'item'
+  activeId: UniqueIdentifier
+  activeItem: TItem
+  overId: UniqueIdentifier
+  overItem?: TItem
+  overType: 'group' | 'item'
+  position: 'before' | 'after'
+  sourceGroup: TGroup
+  sourceGroupId: UniqueIdentifier
+  sourceIndex: number
+  targetGroup: TGroup
+  targetGroupId: UniqueIdentifier
+  targetIndex: number
+}
+
+export type GroupedSortableVirtualListGroupDragPayload<TGroup, TItem = unknown> = {
+  type: 'group'
+  activeGroup: TGroup
+  activeGroupId: UniqueIdentifier
+  overGroup: TGroup
+  overGroupId: UniqueIdentifier
+  overItem?: TItem
+  overType: 'group' | 'item'
+  sourceIndex: number
+  targetIndex: number
+}
+
+export type GroupedSortableVirtualListDragPayload<TGroup, TItem> =
+  | GroupedSortableVirtualListGroupDragPayload<TGroup, TItem>
+  | GroupedSortableVirtualListItemDragPayload<TGroup, TItem>
+
+export type GroupedSortableVirtualListDragStartPayload<TGroup, TItem> =
+  | {
+      type: 'group'
+      activeGroup: TGroup
+      activeGroupId: UniqueIdentifier
+      sourceIndex: number
+    }
+  | {
+      type: 'item'
+      activeId: UniqueIdentifier
+      activeItem: TItem
+      sourceGroup: TGroup
+      sourceGroupId: UniqueIdentifier
+      sourceIndex: number
+    }
+
+type CanDropGroupArgs<TGroup, TItem> = {
+  activeGroup: TGroup
+  activeGroupId: UniqueIdentifier
+  overGroup: TGroup
+  overGroupId: UniqueIdentifier
+  overItem?: TItem
+  overType: 'group' | 'item'
+  sourceIndex: number
+  targetIndex: number
+}
+
+type CanDropItemArgs<TGroup, TItem> = {
+  activeId: UniqueIdentifier
+  activeItem: TItem
+  overGroup: TGroup
+  overGroupId: UniqueIdentifier
+  overId: UniqueIdentifier
+  overItem?: TItem
+  overType: 'group' | 'item'
+  sourceGroup: TGroup
+  sourceGroupId: UniqueIdentifier
+  sourceIndex: number
+  targetIndex: number
+}
+
+export type GroupedSortableVirtualListDragCapabilities = {
+  groups?: boolean
+  items?: boolean
+  itemSameGroup?: boolean
+  itemCrossGroup?: boolean
+}
+
+export interface GroupedSortableVirtualListProps<
+  TGroup,
+  TItem,
+  THeader = TGroup,
+  TFooter = unknown
+> extends BaseDynamicVirtualListProps<TGroup, TItem, THeader, TFooter> {
+  groups: readonly GroupedVirtualListGroup<TGroup, TItem, THeader, TFooter>[]
+  getGroupId: (group: TGroup, groupIndex: number) => UniqueIdentifier
+  getGroupBoundaryId?: (group: TGroup, groupIndex: number) => UniqueIdentifier
+  getItemId: (
+    item: TItem,
+    itemIndex: number,
+    group: TGroup,
+    groupIndex: number,
+    itemIndexInGroup: number
+  ) => UniqueIdentifier
+  renderGroupHeader?: (header: THeader, group: TGroup, groupIndex: number) => React.ReactNode
+  renderItem: (
+    item: TItem,
+    itemIndex: number,
+    group: TGroup,
+    groupIndex: number,
+    itemIndexInGroup: number
+  ) => React.ReactNode
+  renderGroupFooter?: (footer: TFooter, group: TGroup, groupIndex: number) => React.ReactNode
+  estimateGroupHeaderSize?: (header: THeader, group: TGroup, groupIndex: number) => number
+  estimateItemSize: (
+    item: TItem,
+    itemIndex: number,
+    group: TGroup,
+    groupIndex: number,
+    itemIndexInGroup: number
+  ) => number
+  estimateGroupFooterSize?: (footer: TFooter, group: TGroup, groupIndex: number) => number
+  disabled?: boolean
+  dragCapabilities?: GroupedSortableVirtualListDragCapabilities
+  canDragGroup?: (group: TGroup, groupIndex: number) => boolean
+  canDragItem?: (item: TItem, itemIndex: number, group: TGroup, groupIndex: number, itemIndexInGroup: number) => boolean
+  canDropGroup?: (args: CanDropGroupArgs<TGroup, TItem>) => boolean
+  canDropItem?: (args: CanDropItemArgs<TGroup, TItem>) => boolean
+  onDragStart?: (payload: GroupedSortableVirtualListDragStartPayload<TGroup, TItem>) => void
+  onDragEnd?: (payload: GroupedSortableVirtualListDragPayload<TGroup, TItem>) => void
+}
+
+const DEFAULT_GROUP_HEADER_SIZE = 32
+const DEFAULT_GROUP_FOOTER_SIZE = 32
+const DEFAULT_DRAG_CAPABILITIES: Required<GroupedSortableVirtualListDragCapabilities> = {
+  groups: false,
+  items: true,
+  itemSameGroup: true,
+  itemCrossGroup: true
+}
+
+function toItemSortableId(id: UniqueIdentifier) {
+  return `item:${String(id)}`
+}
+
+function toGroupSortableId(id: UniqueIdentifier) {
+  return `group:${String(id)}`
+}
+
+function toGroupFooterDroppableId(id: UniqueIdentifier) {
+  return `group-footer:${String(id)}`
+}
+
+function getEventData<TGroup, TItem>(data: unknown): RowDragData<TGroup, TItem> | null {
+  if (!data || typeof data !== 'object') return null
+  const rowData = data as Partial<RowDragData<TGroup, TItem>>
+  return rowData.rowType === 'group' || rowData.rowType === 'item' ? (rowData as RowDragData<TGroup, TItem>) : null
+}
+
+function isItemDragData<TGroup, TItem>(data: RowDragData<TGroup, TItem>): data is ItemDragData<TGroup, TItem> {
+  return data.rowType === 'item'
+}
+
+function joinClassNames(...classNames: Array<false | null | string | undefined>) {
+  const next = classNames.filter(Boolean).join(' ')
+  return next || undefined
+}
+
+function DropIndicator({ position }: { position: DropIndicatorPosition }) {
+  return (
+    <div
+      aria-hidden="true"
+      className={joinClassNames(
+        'pointer-events-none absolute right-2 left-2 z-10 h-0.5 rounded-full bg-sidebar-ring',
+        position === 'before' ? 'top-0' : 'bottom-0'
+      )}
+      data-drop-indicator={position}
+    />
+  )
+}
+
+function buildDragStartPayload<TGroup, TItem>(
+  active: RowDragData<TGroup, TItem>
+): GroupedSortableVirtualListDragStartPayload<TGroup, TItem> {
+  if (isItemDragData(active)) {
+    return {
+      type: 'item',
+      activeId: active.itemId,
+      activeItem: active.item,
+      sourceGroup: active.group,
+      sourceGroupId: active.groupId,
+      sourceIndex: active.itemIndexInGroup
+    }
+  }
+
+  return {
+    type: 'group',
+    activeGroup: active.group,
+    activeGroupId: active.groupId,
+    sourceIndex: active.groupIndex
+  }
+}
+
+function buildGroupDragData<TGroup>(
+  group: TGroup,
+  groupId: UniqueIdentifier,
+  groupIndex: number
+): GroupDragData<TGroup> {
+  return {
+    rowType: 'group',
+    group,
+    groupId,
+    groupIndex
+  }
+}
+
+function buildItemDragData<TGroup, TItem>({
+  group,
+  groupId,
+  groupIndex,
+  item,
+  itemId,
+  itemIndex,
+  itemIndexInGroup
+}: {
+  group: TGroup
+  groupId: UniqueIdentifier
+  groupIndex: number
+  item: TItem
+  itemId: UniqueIdentifier
+  itemIndex: number
+  itemIndexInGroup: number
+}): ItemDragData<TGroup, TItem> {
+  return {
+    rowType: 'item',
+    group,
+    groupId,
+    groupIndex,
+    item,
+    itemId,
+    itemIndex,
+    itemIndexInGroup
+  }
+}
+
+function buildDragEndPayload<TGroup, TItem>(
+  active: RowDragData<TGroup, TItem>,
+  over: RowDragData<TGroup, TItem>,
+  position: 'before' | 'after'
+): GroupedSortableVirtualListDragPayload<TGroup, TItem> | null {
+  if (isItemDragData(active)) {
+    const overItem = isItemDragData(over) ? over.item : undefined
+    return {
+      type: 'item',
+      activeId: active.itemId,
+      activeItem: active.item,
+      overId: isItemDragData(over) ? over.itemId : over.groupId,
+      overItem,
+      overType: over.rowType,
+      position,
+      sourceGroup: active.group,
+      sourceGroupId: active.groupId,
+      sourceIndex: active.itemIndexInGroup,
+      targetGroup: over.group,
+      targetGroupId: over.groupId,
+      targetIndex: isItemDragData(over) ? over.itemIndexInGroup : 0
+    }
+  }
+
+  if (active.groupId === over.groupId) return null
+
+  return {
+    type: 'group',
+    activeGroup: active.group,
+    activeGroupId: active.groupId,
+    overGroup: over.group,
+    overGroupId: over.groupId,
+    overItem: isItemDragData(over) ? over.item : undefined,
+    overType: over.rowType,
+    sourceIndex: active.groupIndex,
+    targetIndex: over.groupIndex
+  }
+}
+
+function getItemDropPosition<TGroup, TItem>(
+  operation: DragOperation,
+  active: RowDragData<TGroup, TItem>,
+  over: RowDragData<TGroup, TItem>
+): 'before' | 'after' {
+  if (!isItemDragData(over)) return 'before'
+
+  const side = getInsertionSide(operation)
+  if (side) return side
+
+  if (isItemDragData(active) && active.groupId === over.groupId && active.itemIndexInGroup > over.itemIndexInGroup) {
+    return 'before'
+  }
+
+  return 'after'
+}
+
+function getDropPosition<TGroup, TItem>(
+  operation: DragOperation,
+  active: RowDragData<TGroup, TItem>,
+  over: RowDragData<TGroup, TItem>
+): 'before' | 'after' {
+  if (!isItemDragData(active)) {
+    return active.groupIndex < over.groupIndex ? 'after' : 'before'
+  }
+
+  return getItemDropPosition(operation, active, over)
+}
+
+function buildDropPayloadFromOperation<TGroup, TItem>(
+  operation: DragOperation,
+  activeDragData: RowDragData<TGroup, TItem> | null
+) {
+  const active = getEventData<TGroup, TItem>(operation.source?.data) ?? activeDragData
+  const over = getEventData<TGroup, TItem>(operation.target?.data)
+  if (!active || !over) return null
+
+  const position = getDropPosition(operation, active, over)
+  const payload = buildDragEndPayload(active, over, position)
+  if (!payload) return null
+
+  return { active, over, payload, position }
+}
+
+function getDropPositionFromState<TGroup, TItem>(over: RowDragData<TGroup, TItem>, dropState: OverDropState | null) {
+  if (!dropState) return null
+
+  const overTargetId = isItemDragData(over) ? over.itemId : over.groupId
+  if (dropState.rowType !== over.rowType) return null
+  if (dropState.targetId !== overTargetId) return null
+  if (dropState.targetGroupId !== over.groupId) return null
+
+  return dropState.position
+}
+
+function buildDropPayloadFromStateOrOperation<TGroup, TItem>(
+  operation: DragOperation,
+  activeDragData: RowDragData<TGroup, TItem> | null,
+  dropState: OverDropState | null,
+  groupAppendDropTargets?: Map<UniqueIdentifier, ItemDragData<TGroup, TItem>>
+) {
+  const active = getEventData<TGroup, TItem>(operation.source?.data) ?? activeDragData
+  const over = getEventData<TGroup, TItem>(operation.target?.data)
+  if (!active || !over) return null
+
+  const statePosition = getDropPositionFromState(over, dropState)
+  const appendDropTarget =
+    statePosition !== null && isItemDragData(active) && !isItemDragData(over)
+      ? groupAppendDropTargets?.get(over.groupId)
+      : undefined
+  const payloadOver = appendDropTarget ?? over
+  const position = appendDropTarget ? 'after' : (statePosition ?? getDropPosition(operation, active, over))
+  const payload = buildDragEndPayload(active, payloadOver, position)
+  if (!payload) return null
+
+  return { active, over: payloadOver, payload, position }
+}
+
+function getOverDropState<TGroup, TItem>(
+  over: RowDragData<TGroup, TItem>,
+  position: 'before' | 'after'
+): OverDropState {
+  return {
+    position,
+    rowType: over.rowType,
+    targetId: isItemDragData(over) ? over.itemId : over.groupId,
+    targetGroupId: over.groupId
+  }
+}
+
+function isSameOverDropState(current: OverDropState | null, next: OverDropState | null) {
+  return (
+    current?.position === next?.position &&
+    current?.rowType === next?.rowType &&
+    current?.targetId === next?.targetId &&
+    current?.targetGroupId === next?.targetGroupId
+  )
+}
+
+function getDropTargetRowState<TGroup, TItem>({
+  activeDragState,
+  groupId,
+  overDropState,
+  rowId,
+  rowType
+}: {
+  activeDragState: ActiveDragState<TGroup, TItem> | null
+  groupId: UniqueIdentifier
+  overDropState: OverDropState | null
+  rowId?: UniqueIdentifier
+  rowType?: 'group' | 'item'
+}) {
+  const isBlocked = activeDragState?.blockedGroupIds.has(groupId) ?? false
+  const isAllowed =
+    !isBlocked &&
+    rowType !== undefined &&
+    rowId !== undefined &&
+    overDropState?.rowType === rowType &&
+    overDropState.targetId === rowId
+
+  return {
+    isBlocked,
+    props: {
+      className: isBlocked ? 'cursor-not-allowed opacity-50 [&_*]:pointer-events-none' : undefined,
+      'data-drop-allowed': isAllowed || undefined,
+      'data-drop-blocked': isBlocked || undefined,
+      'data-drop-invalid': isBlocked || undefined,
+      'data-drop-target': isAllowed || undefined
+    }
+  }
+}
+
+function shouldDropPayload<TGroup, TItem>(
+  payload: GroupedSortableVirtualListDragPayload<TGroup, TItem>,
+  dragCapabilities: Required<GroupedSortableVirtualListDragCapabilities>,
+  canDropGroup?: (args: CanDropGroupArgs<TGroup, TItem>) => boolean,
+  canDropItem?: (args: CanDropItemArgs<TGroup, TItem>) => boolean
+) {
+  if (payload.type === 'group') {
+    if (!dragCapabilities.groups) return false
+    return (
+      canDropGroup?.({
+        activeGroup: payload.activeGroup,
+        activeGroupId: payload.activeGroupId,
+        overGroup: payload.overGroup,
+        overGroupId: payload.overGroupId,
+        overItem: payload.overItem,
+        overType: payload.overType,
+        sourceIndex: payload.sourceIndex,
+        targetIndex: payload.targetIndex
+      }) ?? true
+    )
+  }
+
+  if (!dragCapabilities.items) return false
+  const isSameGroup = payload.sourceGroupId === payload.targetGroupId
+  if (isSameGroup && !dragCapabilities.itemSameGroup) return false
+  if (!isSameGroup && !dragCapabilities.itemCrossGroup) return false
+
+  return (
+    canDropItem?.({
+      activeId: payload.activeId,
+      activeItem: payload.activeItem,
+      overGroup: payload.targetGroup,
+      overGroupId: payload.targetGroupId,
+      overId: payload.overId,
+      overItem: payload.overItem,
+      overType: payload.overType,
+      sourceGroup: payload.sourceGroup,
+      sourceGroupId: payload.sourceGroupId,
+      sourceIndex: payload.sourceIndex,
+      targetIndex: payload.targetIndex
+    }) ?? true
+  )
+}
+
+type RowShellProps = {
+  children: React.ReactNode
+  dropIndicatorPosition?: DropIndicatorPosition | null
+  dropTargetProps: ReturnType<typeof getDropTargetRowState>['props']
+  isDragging?: boolean
+  ref: React.Ref<HTMLDivElement>
+  sourcePlaceholder?: boolean
+}
+
+function RowShell({
+  children,
+  dropIndicatorPosition,
+  dropTargetProps,
+  isDragging = false,
+  ref,
+  sourcePlaceholder = false
+}: RowShellProps) {
+  return (
+    <div
+      ref={ref}
+      data-dragging={isDragging || undefined}
+      {...dropTargetProps}
+      className={joinClassNames(dropTargetProps.className, dropIndicatorPosition ? 'relative' : undefined)}
+      style={{ opacity: isDragging || sourcePlaceholder ? 0.5 : undefined }}>
+      {dropIndicatorPosition ? <DropIndicator position={dropIndicatorPosition} /> : null}
+      {children}
+    </div>
+  )
+}
+
+type RowRegistrationProps<TGroup, TItem> = {
+  data: RowDragData<TGroup, TItem>
+  element: React.RefObject<HTMLDivElement | null>
+  id: string
+}
+
+// The library sets these on the row and never removes them when the draggable unregisters.
+const DRAG_ATTRIBUTES = [
+  'role',
+  'tabindex',
+  'aria-roledescription',
+  'aria-describedby',
+  'aria-pressed',
+  'aria-grabbed',
+  'aria-disabled'
+]
+
+function RowSortable<TGroup, TItem>({
+  element,
+  ...input
+}: RowRegistrationProps<TGroup, TItem> & {
+  disabled: boolean | { draggable: boolean; droppable: boolean }
+  index: number
+}) {
+  useSortable({ ...input, element, plugins: ROW_STEP_SORTABLE_PLUGINS, transition: null })
+
+  useEffect(() => {
+    const node = element.current
+    return () => DRAG_ATTRIBUTES.forEach((name) => node?.removeAttribute(name))
+  }, [element])
+
+  return null
+}
+
+function RowDroppable<TGroup, TItem>(props: RowRegistrationProps<TGroup, TItem> & { disabled: boolean }) {
+  useDroppable(props)
+  return null
+}
+
+type ItemRowProps<TGroup, TItem> = {
+  activeDragState: ActiveDragState<TGroup, TItem> | null
+  children: React.ReactNode
+  data: ItemDragData<TGroup, TItem>
+  disabled: boolean
+  dropIndicatorPosition?: DropIndicatorPosition | null
+  draggableDisabled: boolean
+  index: number
+  overDropState: OverDropState | null
+  sourcePlaceholder?: boolean
+}
+
+// The row element stays put when dragging turns on or off, so its content keeps its state and focus;
+// only the registration swaps. A row that cannot be dragged carries no drag role or aria-disabled.
+function ItemRow<TGroup, TItem>({
+  activeDragState,
+  children,
+  data,
+  disabled,
+  dropIndicatorPosition,
+  draggableDisabled,
+  index,
+  overDropState,
+  sourcePlaceholder
+}: ItemRowProps<TGroup, TItem>) {
+  const element = useRef<HTMLDivElement>(null)
+  const dropTargetRowState = getDropTargetRowState({
+    activeDragState,
+    groupId: data.groupId,
+    overDropState,
+    rowId: data.itemId,
+    rowType: 'item'
+  })
+  const isActiveItem =
+    activeDragState?.active !== undefined &&
+    isItemDragData(activeDragState.active) &&
+    activeDragState.active.itemId === data.itemId
+  const id = toItemSortableId(data.itemId)
+  const droppableDisabled = disabled || (dropTargetRowState.isBlocked && !isActiveItem)
+
+  return (
+    <>
+      <RowShell
+        ref={element}
+        isDragging={isActiveItem}
+        dropTargetProps={dropTargetRowState.props}
+        dropIndicatorPosition={dropIndicatorPosition}
+        sourcePlaceholder={sourcePlaceholder}>
+        {children}
+      </RowShell>
+      {draggableDisabled ? (
+        <RowDroppable id={id} data={data} element={element} disabled={droppableDisabled} />
+      ) : (
+        <RowSortable
+          id={id}
+          index={index}
+          data={data}
+          element={element}
+          disabled={{ draggable: disabled, droppable: droppableDisabled }}
+        />
+      )}
+    </>
+  )
+}
+
+type GroupHeaderRowProps<TGroup, TItem> = {
+  activeDragState: ActiveDragState<TGroup, TItem> | null
+  children: React.ReactNode
+  data: GroupDragData<TGroup>
+  draggable: boolean
+  disabled: boolean
+  dropIndicatorPosition?: DropIndicatorPosition | null
+  index: number
+  overDropState: OverDropState | null
+  sourcePlaceholder?: boolean
+}
+
+function GroupHeaderRow<TGroup, TItem>({
+  activeDragState,
+  children,
+  data,
+  draggable,
+  disabled,
+  dropIndicatorPosition,
+  index,
+  overDropState,
+  sourcePlaceholder = false
+}: GroupHeaderRowProps<TGroup, TItem>) {
+  const element = useRef<HTMLDivElement>(null)
+  const dropTargetRowState = getDropTargetRowState({
+    activeDragState,
+    groupId: data.groupId,
+    overDropState,
+    rowId: data.groupId,
+    rowType: 'group'
+  })
+  const id = toGroupSortableId(data.groupId)
+  const rowDisabled = disabled || dropTargetRowState.isBlocked
+
+  return (
+    <>
+      <RowShell
+        ref={element}
+        isDragging={sourcePlaceholder}
+        dropTargetProps={dropTargetRowState.props}
+        dropIndicatorPosition={dropIndicatorPosition}
+        sourcePlaceholder={sourcePlaceholder}>
+        {children}
+      </RowShell>
+      {draggable ? (
+        <RowSortable id={id} index={index} data={data} element={element} disabled={rowDisabled} />
+      ) : (
+        <RowDroppable id={id} data={data} element={element} disabled={rowDisabled} />
+      )}
+    </>
+  )
+}
+
+type GroupFooterRowProps<TGroup, TItem> = {
+  activeDragState: ActiveDragState<TGroup, TItem> | null
+  children: React.ReactNode
+  data: GroupDragData<TGroup>
+  disabled: boolean
+  dropIndicatorPosition?: DropIndicatorPosition | null
+  sourcePlaceholder?: boolean
+}
+
+function GroupFooterRow<TGroup, TItem>({
+  activeDragState,
+  children,
+  data,
+  disabled,
+  dropIndicatorPosition,
+  sourcePlaceholder
+}: GroupFooterRowProps<TGroup, TItem>) {
+  const dropTargetRowState = getDropTargetRowState({
+    activeDragState,
+    groupId: data.groupId,
+    overDropState: null
+  })
+  const { ref } = useDroppable({
+    id: toGroupFooterDroppableId(data.groupId),
+    data,
+    disabled: disabled || dropTargetRowState.isBlocked
+  })
+
+  return (
+    <RowShell
+      ref={ref}
+      dropTargetProps={dropTargetRowState.props}
+      dropIndicatorPosition={dropIndicatorPosition}
+      sourcePlaceholder={sourcePlaceholder}>
+      {children}
+    </RowShell>
+  )
+}
+
+/** Recomputes the drop state from the live operation; drag events fire before a move is applied. */
+function DropStateObserver({
+  resolve,
+  onChange
+}: {
+  resolve: (operation: DragOperation) => OverDropState | null
+  onChange: (state: OverDropState | null) => void
+}) {
+  const manager = useDragDropManager()
+  const state = useComputed(() => {
+    const operation = manager?.dragOperation
+    return operation?.status.dragging ? resolve(operation) : null
+  }, [manager, resolve]).value
+
+  useEffect(() => onChange(state), [onChange, state])
+
+  return null
+}
+
+function GroupedSortableVirtualList<TGroup, TItem, THeader = TGroup, TFooter = unknown>(
+  props: GroupedSortableVirtualListProps<TGroup, TItem, THeader, TFooter>
+) {
+  const {
+    groups,
+    getGroupId,
+    getGroupBoundaryId,
+    getItemId,
+    renderGroupHeader,
+    renderItem,
+    renderGroupFooter,
+    estimateGroupHeaderSize,
+    estimateItemSize,
+    estimateGroupFooterSize,
+    disabled = false,
+    dragCapabilities,
+    canDragGroup,
+    canDragItem,
+    canDropGroup,
+    canDropItem,
+    onDragStart,
+    onDragEnd,
+    ...virtualListProps
+  } = props
+
+  const effectiveDragCapabilities = useMemo(
+    () => ({ ...DEFAULT_DRAG_CAPABILITIES, ...dragCapabilities }),
+    [dragCapabilities]
+  )
+  const [activeDragState, setActiveDragState] = useState<ActiveDragState<TGroup, TItem> | null>(null)
+  const [overDropState, setOverDropState] = useState<OverDropState | null>(null)
+  const activeDragDataRef = useRef<RowDragData<TGroup, TItem> | null>(null)
+  const overDropStateRef = useRef<OverDropState | null>(null)
+
+  const rows = useMemo(
+    () => buildGroupedVirtualRows(groups, Boolean(renderGroupHeader), Boolean(renderGroupFooter)),
+    [groups, renderGroupFooter, renderGroupHeader]
+  )
+  const getEffectiveGroupBoundaryId = useCallback(
+    (group: TGroup, groupIndex: number) => getGroupBoundaryId?.(group, groupIndex) ?? getGroupId(group, groupIndex),
+    [getGroupBoundaryId, getGroupId]
+  )
+
+  const groupAppendIndicatorTargets = useMemo(() => {
+    const targets = new Map<UniqueIdentifier, DropIndicatorTarget<TGroup, TItem, THeader, TFooter>>()
+
+    for (const row of rows) {
+      const groupId = getGroupId(row.group, row.groupIndex)
+
+      if (row.type === 'group-header') {
+        targets.set(groupId, { position: 'after', row })
+        continue
+      }
+
+      if (row.type === 'item') {
+        targets.set(groupId, { position: 'after', row })
+        continue
+      }
+
+      targets.set(groupId, { position: 'before', row })
+    }
+
+    return targets
+  }, [getGroupId, rows])
+
+  const groupAppendDropTargets = useMemo(() => {
+    const targets = new Map<UniqueIdentifier, ItemDragData<TGroup, TItem>>()
+
+    for (const row of rows) {
+      if (row.type !== 'item') continue
+
+      const groupId = getGroupId(row.group, row.groupIndex)
+      const itemId = getItemId(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup)
+      targets.set(
+        groupId,
+        buildItemDragData({
+          group: row.group,
+          groupId,
+          groupIndex: row.groupIndex,
+          item: row.item,
+          itemId,
+          itemIndex: row.itemIndex,
+          itemIndexInGroup: row.itemIndexInGroup
+        })
+      )
+    }
+
+    return targets
+  }, [getGroupId, getItemId, rows])
+
+  const groupIndicatorTargets = useMemo(() => {
+    const targets = new Map<UniqueIdentifier, GroupBoundaryIndicatorTargets<TGroup, TItem, THeader, TFooter>>()
+
+    for (const row of rows) {
+      const groupId = getGroupId(row.group, row.groupIndex)
+
+      if (row.type === 'group-header') {
+        targets.set(groupId, {
+          before: { position: 'before', row },
+          after: { position: 'after', row }
+        })
+        continue
+      }
+
+      const groupTargets = targets.get(groupId)
+      if (!groupTargets) continue
+
+      groupTargets.after = { position: 'after', row }
+    }
+
+    return targets
+  }, [getGroupId, rows])
+
+  const groupBoundaryIndicatorTargets = useMemo(() => {
+    const targets = new Map<UniqueIdentifier, GroupBoundaryIndicatorTargets<TGroup, TItem, THeader, TFooter>>()
+
+    for (const row of rows) {
+      const groupId = getEffectiveGroupBoundaryId(row.group, row.groupIndex)
+
+      if (row.type === 'group-header') {
+        targets.set(groupId, {
+          before: targets.get(groupId)?.before ?? { position: 'before', row },
+          after: { position: 'after', row }
+        })
+        continue
+      }
+
+      const groupTargets = targets.get(groupId)
+      if (!groupTargets) continue
+
+      if (row.type === 'item') {
+        groupTargets.after = { position: 'after', row }
+        continue
+      }
+
+      groupTargets.after = { position: 'after', row }
+    }
+
+    return targets
+  }, [getEffectiveGroupBoundaryId, rows])
+
+  const estimateRowSize = useCallback(
+    (index: number) => {
+      const row = rows[index]
+      if (!row) return 0
+
+      if (row.type === 'group-header') {
+        return estimateGroupHeaderSize?.(row.header, row.group, row.groupIndex) ?? DEFAULT_GROUP_HEADER_SIZE
+      }
+
+      if (row.type === 'group-footer') {
+        return estimateGroupFooterSize?.(row.footer, row.group, row.groupIndex) ?? DEFAULT_GROUP_FOOTER_SIZE
+      }
+
+      return estimateItemSize(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup)
+    },
+    [estimateGroupFooterSize, estimateGroupHeaderSize, estimateItemSize, rows]
+  )
+
+  const buildRowDragData = useCallback(
+    (row: GroupedSortableVirtualListRow<TGroup, TItem, THeader, TFooter>): RowDragData<TGroup, TItem> | null => {
+      const groupId = getGroupId(row.group, row.groupIndex)
+      if (row.type === 'group-header') {
+        return buildGroupDragData(row.group, groupId, row.groupIndex)
+      }
+
+      if (row.type === 'group-footer') {
+        return buildGroupDragData(row.group, groupId, row.groupIndex)
+      }
+
+      if (row.type === 'item') {
+        return buildItemDragData({
+          group: row.group,
+          groupId,
+          groupIndex: row.groupIndex,
+          item: row.item,
+          itemId: getItemId(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup),
+          itemIndex: row.itemIndex,
+          itemIndexInGroup: row.itemIndexInGroup
+        })
+      }
+
+      return null
+    },
+    [getGroupId, getItemId]
+  )
+
+  const canDragActive = useCallback(
+    (active: RowDragData<TGroup, TItem>) => {
+      if (isItemDragData(active)) {
+        return (
+          canDragItem?.(active.item, active.itemIndex, active.group, active.groupIndex, active.itemIndexInGroup) ?? true
+        )
+      }
+
+      return canDragGroup?.(active.group, active.groupIndex) ?? true
+    },
+    [canDragGroup, canDragItem]
+  )
+
+  const buildBlockedGroupIds = useCallback(
+    (active: RowDragData<TGroup, TItem>) => {
+      const groupIds: UniqueIdentifier[] = []
+      const candidateDataByGroupId = new Map<UniqueIdentifier, RowDragData<TGroup, TItem>[]>()
+
+      for (const row of rows) {
+        const groupId = getGroupId(row.group, row.groupIndex)
+        if (!candidateDataByGroupId.has(groupId)) {
+          candidateDataByGroupId.set(groupId, [])
+          groupIds.push(groupId)
+        }
+
+        const rowDragData = buildRowDragData(row)
+        if (rowDragData) {
+          candidateDataByGroupId.get(groupId)?.push(rowDragData)
+        }
+      }
+
+      const blockedGroupIds = new Set<UniqueIdentifier>()
+      for (const groupId of groupIds) {
+        if (!isItemDragData(active) && groupId === active.groupId) continue
+
+        const isAllowed = (candidateDataByGroupId.get(groupId) ?? []).some((over) => {
+          const payload = buildDragEndPayload(active, over, 'before')
+          if (!payload) return false
+          if (payload.type === 'item' && payload.overType === 'item' && payload.activeId === payload.overId)
+            return false
+          return shouldDropPayload(payload, effectiveDragCapabilities, canDropGroup, canDropItem)
+        })
+
+        if (!isAllowed) {
+          blockedGroupIds.add(groupId)
+        }
+      }
+
+      return blockedGroupIds
+    },
+    [buildRowDragData, canDropGroup, canDropItem, effectiveDragCapabilities, getGroupId, rows]
+  )
+
+  const clearOverDropState = useCallback(() => {
+    overDropStateRef.current = null
+    setOverDropState((current) => (current === null ? current : null))
+  }, [])
+
+  const clearDragState = useCallback(() => {
+    activeDragDataRef.current = null
+    setActiveDragState((current) => (current === null ? current : null))
+    overDropStateRef.current = null
+    setOverDropState((current) => (current === null ? current : null))
+  }, [])
+
+  const updateOverDropState = useCallback((nextOverDropState: OverDropState) => {
+    overDropStateRef.current = nextOverDropState
+    setOverDropState((current) => (isSameOverDropState(current, nextOverDropState) ? current : nextOverDropState))
+  }, [])
+
+  const handleDragStart = useCallback(
+    ({ operation }: DragStartEvent) => {
+      clearDragState()
+      const active = getEventData<TGroup, TItem>(operation.source?.data)
+      if (active && canDragActive(active)) {
+        activeDragDataRef.current = active
+        const initialRect = operation.source?.element?.getBoundingClientRect()
+        setActiveDragState({
+          active,
+          blockedGroupIds: buildBlockedGroupIds(active),
+          overlaySize: initialRect ? { height: initialRect.height, width: initialRect.width } : undefined
+        })
+      }
+      if (active) onDragStart?.(buildDragStartPayload(active))
+    },
+    [buildBlockedGroupIds, canDragActive, clearDragState, onDragStart]
+  )
+
+  const resolveOverDropState = useCallback(
+    (operation: DragOperation): OverDropState | null => {
+      const result = buildDropPayloadFromOperation<TGroup, TItem>(operation, activeDragDataRef.current)
+      if (!result || !canDragActive(result.active)) return null
+
+      if (
+        result.payload.type === 'item' &&
+        result.payload.overType === 'item' &&
+        result.payload.activeId === result.payload.overId
+      ) {
+        return null
+      }
+
+      if (!shouldDropPayload(result.payload, effectiveDragCapabilities, canDropGroup, canDropItem)) return null
+
+      return getOverDropState(result.over, result.position)
+    },
+    [canDragActive, canDropGroup, canDropItem, effectiveDragCapabilities]
+  )
+
+  const handleOverDropStateChange = useCallback(
+    (nextOverDropState: OverDropState | null) => {
+      if (nextOverDropState) updateOverDropState(nextOverDropState)
+      else clearOverDropState()
+    },
+    [clearOverDropState, updateOverDropState]
+  )
+
+  const activeGroupPlaceholderId =
+    activeDragState?.active !== undefined && !isItemDragData(activeDragState.active)
+      ? activeDragState.active.groupId
+      : null
+
+  const getDropIndicatorPosition = useCallback(
+    (row: GroupedSortableVirtualListRow<TGroup, TItem, THeader, TFooter>): DropIndicatorPosition | null => {
+      if (!overDropState) return null
+
+      const groupId = getGroupId(row.group, row.groupIndex)
+      const isGroupDrag = activeDragState?.active !== undefined && !isItemDragData(activeDragState.active)
+
+      if (isGroupDrag) {
+        const targetGroupId = overDropState.targetGroupId
+        const localExtent = groupIndicatorTargets.get(targetGroupId)
+        if (!localExtent) return null
+
+        const headerRow = localExtent.before.row
+        const boundaryId = getEffectiveGroupBoundaryId(headerRow.group, headerRow.groupIndex)
+        const target =
+          boundaryId === targetGroupId
+            ? groupBoundaryIndicatorTargets.get(boundaryId)?.[overDropState.position]
+            : localExtent[overDropState.position]
+        return target?.row === row ? target.position : null
+      }
+
+      if (overDropState.rowType === 'item') {
+        if (row.type !== 'item') return null
+
+        const itemId = getItemId(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup)
+        return itemId === overDropState.targetId ? overDropState.position : null
+      }
+
+      if (overDropState.targetGroupId !== groupId) return null
+
+      const target = groupAppendIndicatorTargets.get(groupId)
+      return target?.row === row ? target.position : null
+    },
+    [
+      activeDragState,
+      getEffectiveGroupBoundaryId,
+      getGroupId,
+      getItemId,
+      groupAppendIndicatorTargets,
+      groupBoundaryIndicatorTargets,
+      groupIndicatorTargets,
+      overDropState
+    ]
+  )
+
+  const handleDragEnd = useCallback(
+    ({ canceled, operation }: DragEndEvent) => {
+      const result = canceled
+        ? null
+        : buildDropPayloadFromStateOrOperation<TGroup, TItem>(
+            operation,
+            activeDragDataRef.current,
+            overDropStateRef.current,
+            groupAppendDropTargets
+          )
+      clearDragState()
+      if (!result || !canDragActive(result.active)) return
+
+      const { payload } = result
+      if (payload.type === 'item' && payload.overType === 'item' && payload.activeId === payload.overId) return
+      if (!shouldDropPayload(payload, effectiveDragCapabilities, canDropGroup, canDropItem)) return
+
+      onDragEnd?.(payload)
+    },
+    [
+      canDragActive,
+      canDropGroup,
+      canDropItem,
+      clearDragState,
+      effectiveDragCapabilities,
+      groupAppendDropTargets,
+      onDragEnd
+    ]
+  )
+
+  const renderRow = useCallback(
+    (row: GroupedSortableVirtualListRow<TGroup, TItem, THeader, TFooter>, index: number) => {
+      const groupId = getGroupId(row.group, row.groupIndex)
+      const sourcePlaceholder = activeGroupPlaceholderId === groupId
+
+      if (row.type === 'group-header') {
+        const data = buildGroupDragData(row.group, groupId, row.groupIndex)
+
+        return (
+          <GroupHeaderRow
+            activeDragState={activeDragState}
+            data={data}
+            disabled={disabled}
+            dropIndicatorPosition={getDropIndicatorPosition(row)}
+            index={index}
+            overDropState={overDropState}
+            sourcePlaceholder={sourcePlaceholder}
+            draggable={
+              !disabled && effectiveDragCapabilities.groups && (canDragGroup?.(row.group, row.groupIndex) ?? true)
+            }>
+            {renderGroupHeader?.(row.header, row.group, row.groupIndex) ?? null}
+          </GroupHeaderRow>
+        )
+      }
+
+      if (row.type === 'group-footer') {
+        const data = buildGroupDragData(row.group, groupId, row.groupIndex)
+
+        return (
+          <GroupFooterRow
+            activeDragState={activeDragState}
+            data={data}
+            disabled={disabled}
+            dropIndicatorPosition={getDropIndicatorPosition(row)}
+            sourcePlaceholder={sourcePlaceholder}>
+            {renderGroupFooter?.(row.footer, row.group, row.groupIndex) ?? null}
+          </GroupFooterRow>
+        )
+      }
+
+      const itemId = getItemId(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup)
+      const itemDisabled =
+        disabled ||
+        !effectiveDragCapabilities.items ||
+        !(canDragItem?.(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup) ?? true)
+      const data = buildItemDragData({
+        group: row.group,
+        groupId,
+        groupIndex: row.groupIndex,
+        item: row.item,
+        itemId,
+        itemIndex: row.itemIndex,
+        itemIndexInGroup: row.itemIndexInGroup
+      })
+
+      return (
+        <ItemRow
+          activeDragState={activeDragState}
+          data={data}
+          disabled={disabled}
+          dropIndicatorPosition={getDropIndicatorPosition(row)}
+          draggableDisabled={itemDisabled}
+          index={index}
+          overDropState={overDropState}
+          sourcePlaceholder={sourcePlaceholder}>
+          {renderItem(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup)}
+        </ItemRow>
+      )
+    },
+    [
+      activeDragState,
+      activeGroupPlaceholderId,
+      canDragGroup,
+      canDragItem,
+      disabled,
+      effectiveDragCapabilities.groups,
+      effectiveDragCapabilities.items,
+      getDropIndicatorPosition,
+      getGroupId,
+      getItemId,
+      overDropState,
+      renderGroupFooter,
+      renderGroupHeader,
+      renderItem
+    ]
+  )
+
+  const dragOverlayContent = useMemo(() => {
+    const active = activeDragState?.active
+    if (!active) return null
+
+    if (isItemDragData(active)) {
+      return renderItem(active.item, active.itemIndex, active.group, active.groupIndex, active.itemIndexInGroup)
+    }
+
+    const headerRow = rows.find(
+      (row) => row.type === 'group-header' && getGroupId(row.group, row.groupIndex) === active.groupId
+    )
+    if (!headerRow || headerRow.type !== 'group-header') return null
+
+    return renderGroupHeader?.(headerRow.header, headerRow.group, headerRow.groupIndex) ?? null
+  }, [activeDragState, getGroupId, renderGroupHeader, renderItem, rows])
+
+  const dragOverlay = (
+    <DragOverlay dropAnimation={null}>
+      {dragOverlayContent ? (
+        <div
+          className="pointer-events-none rounded-lg bg-background"
+          style={{
+            height: activeDragState?.overlaySize?.height,
+            width: activeDragState?.overlaySize?.width
+          }}>
+          {dragOverlayContent}
+        </div>
+      ) : null}
+    </DragOverlay>
+  )
+
+  // Auto-scroll would otherwise unmount the dragged row and leave its drop target a row behind.
+  const activeRowIndex = useMemo(() => {
+    const active = activeDragState?.active
+    if (!active) return -1
+    return rows.findIndex((row) =>
+      isItemDragData(active)
+        ? row.type === 'item' &&
+          getItemId(row.item, row.itemIndex, row.group, row.groupIndex, row.itemIndexInGroup) === active.itemId
+        : row.type === 'group-header' && getGroupId(row.group, row.groupIndex) === active.groupId
+    )
+  }, [activeDragState, getGroupId, getItemId, rows])
+  const { keepMountedIndexes: consumerKeepMountedIndexes } = virtualListProps
+  const keepMountedIndexes = useMemo(
+    () => (activeRowIndex < 0 ? consumerKeepMountedIndexes : [...(consumerKeepMountedIndexes ?? []), activeRowIndex]),
+    [activeRowIndex, consumerKeepMountedIndexes]
+  )
+
+  return (
+    <DragDropRoot onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DropStateObserver resolve={resolveOverDropState} onChange={handleOverDropStateChange} />
+      <DynamicVirtualList
+        {...virtualListProps}
+        keepMountedIndexes={keepMountedIndexes}
+        list={rows}
+        estimateSize={estimateRowSize}
+        children={renderRow}
+      />
+      {createPortal(dragOverlay, document.body)}
+    </DragDropRoot>
+  )
+}
+
+const MemoizedGroupedSortableVirtualList = memo(GroupedSortableVirtualList) as <
+  TGroup,
+  TItem,
+  THeader = TGroup,
+  TFooter = unknown
+>(
+  props: GroupedSortableVirtualListProps<TGroup, TItem, THeader, TFooter>
+) => React.ReactElement
+
+export default MemoizedGroupedSortableVirtualList

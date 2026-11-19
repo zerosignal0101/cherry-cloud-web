@@ -1,0 +1,401 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { TOPIC_MESSAGE_FLOW_NODE_TYPE, TopicMessageFlowCanvas, type TopicMessageFlowLayout } from '../index'
+import type { TopicMessageFlowNodeModel } from '../types'
+
+const { setViewportMock } = vi.hoisted(() => ({
+  setViewportMock: vi.fn()
+}))
+
+vi.mock('@xyflow/react', async () => {
+  const React = await import('react')
+
+  return {
+    Controls: (props: Record<string, unknown>) =>
+      React.createElement('div', { 'data-position': props.position, 'data-testid': 'flow-controls' }),
+    Handle: () => React.createElement('span', { 'data-testid': 'flow-handle' }),
+    MiniMap: (props: Record<string, unknown>) =>
+      React.createElement('div', {
+        className: props.className as string,
+        'data-bg-color': props.bgColor,
+        'data-position': props.position,
+        'data-testid': 'flow-minimap'
+      }),
+    PanOnScrollMode: { Free: 'free' },
+    Position: {
+      Bottom: 'bottom',
+      Top: 'top'
+    },
+    ReactFlow: ({
+      children,
+      defaultViewport,
+      edges,
+      fitView,
+      fitViewOptions,
+      maxZoom,
+      minZoom,
+      nodeTypes,
+      nodes,
+      nodesConnectable,
+      nodesDraggable,
+      onInit,
+      onNodeClick,
+      onNodeContextMenu,
+      onlyRenderVisibleElements,
+      proOptions,
+      panOnScroll,
+      panOnScrollMode,
+      zoomOnScroll,
+      zoomOnPinch,
+      panOnDrag
+    }: {
+      children: ReactNode
+      defaultViewport?: { x: number; y: number; zoom: number }
+      edges: unknown[]
+      fitView?: boolean
+      fitViewOptions?: { maxZoom?: number; padding?: number }
+      maxZoom?: number
+      minZoom?: number
+      nodeTypes: Record<string, React.ComponentType<any>>
+      nodes: TopicMessageFlowNodeModel[]
+      nodesConnectable?: boolean
+      nodesDraggable?: boolean
+      onInit?: (instance: { setViewport: typeof setViewportMock }) => void
+      onNodeClick?: (event: React.MouseEvent, node: TopicMessageFlowNodeModel) => void
+      onNodeContextMenu?: (event: React.MouseEvent, node: TopicMessageFlowNodeModel) => void
+      onlyRenderVisibleElements?: boolean
+      proOptions?: { hideAttribution?: boolean }
+      panOnScroll?: boolean
+      panOnScrollMode?: string
+      zoomOnScroll?: boolean
+      zoomOnPinch?: boolean
+      panOnDrag?: boolean
+    }) => {
+      React.useEffect(() => {
+        onInit?.({ setViewport: setViewportMock })
+      }, [onInit])
+
+      return React.createElement(
+        'div',
+        {
+          'data-edges': edges.length,
+          'data-default-x': defaultViewport?.x,
+          'data-default-y': defaultViewport?.y,
+          'data-default-zoom': defaultViewport?.zoom,
+          'data-fit-view': fitView ? 'true' : 'false',
+          'data-fit-view-max-zoom': fitViewOptions?.maxZoom,
+          'data-fit-view-padding': fitViewOptions?.padding,
+          'data-hide-attribution': proOptions?.hideAttribution ? 'true' : 'false',
+          'data-max-zoom': maxZoom,
+          'data-min-zoom': minZoom,
+          'data-nodes-connectable': nodesConnectable ? 'true' : 'false',
+          'data-nodes-draggable': nodesDraggable ? 'true' : 'false',
+          'data-only-render-visible-elements': onlyRenderVisibleElements ? 'true' : 'false',
+          'data-pan-on-scroll': String(panOnScroll),
+          'data-pan-on-scroll-mode': panOnScrollMode,
+          'data-zoom-on-scroll': String(zoomOnScroll),
+          'data-zoom-on-pinch': String(zoomOnPinch),
+          'data-pan-on-drag': String(panOnDrag),
+          'data-testid': 'react-flow'
+        },
+        nodes.map((node) => {
+          const NodeComponent = nodeTypes[node.type ?? TOPIC_MESSAGE_FLOW_NODE_TYPE]
+
+          return React.createElement(
+            'div',
+            {
+              'data-testid': `flow-node-${node.data.messageId}`,
+              key: node.id,
+              onClick: (event: React.MouseEvent) => onNodeClick?.(event, node),
+              onContextMenu: (event: React.MouseEvent) => onNodeContextMenu?.(event, node)
+            },
+            React.createElement(NodeComponent, {
+              data: node.data,
+              id: node.id,
+              selected: node.selected ?? false
+            })
+          )
+        }),
+        children
+      )
+    }
+  }
+})
+
+const graph: TopicMessageFlowLayout = {
+  activeNodeId: 'assistant-1',
+  edges: [
+    {
+      id: 'user-1-assistant-1',
+      source: 'user-1',
+      target: 'assistant-1',
+      data: {
+        isActivePath: true,
+        isInactiveBranch: false,
+        isSiblingBranch: false
+      }
+    }
+  ],
+  nodes: [
+    {
+      id: 'user-1',
+      type: TOPIC_MESSAGE_FLOW_NODE_TYPE,
+      position: { x: 0, y: 0 },
+      data: {
+        createdAt: '2026-01-01T00:00:00.000Z',
+        isActive: false,
+        isInactiveBranch: false,
+        isOnActivePath: true,
+        messageId: 'user-1',
+        preview: 'Plan the topic branch',
+        role: 'user',
+        status: 'success'
+      }
+    },
+    {
+      id: 'assistant-1',
+      type: TOPIC_MESSAGE_FLOW_NODE_TYPE,
+      position: { x: 260, y: 120 },
+      data: {
+        createdAt: '2026-01-01T00:01:00.000Z',
+        isActive: true,
+        isInactiveBranch: false,
+        isOnActivePath: true,
+        messageId: 'assistant-1',
+        modelId: 'openai/gpt-5-codex',
+        preview: 'Here is the branch overview.',
+        role: 'assistant',
+        status: 'pending',
+        siblingsGroupId: 2
+      }
+    }
+  ],
+  stats: {
+    activePathLength: 2,
+    branchCount: 1,
+    nodeCount: 2
+  }
+}
+
+describe('TopicMessageFlowCanvas', () => {
+  let clientWidthSpy: ReturnType<typeof vi.spyOn>
+  let clientHeightSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    setViewportMock.mockClear()
+    clientWidthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800)
+    clientHeightSpy = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(600)
+  })
+
+  afterEach(() => {
+    clientWidthSpy.mockRestore()
+    clientHeightSpy.mockRestore()
+  })
+
+  it('centers a distant active node instead of the root', async () => {
+    render(
+      <TopicMessageFlowCanvas
+        graph={{
+          ...graph,
+          nodes: graph.nodes.map((node) =>
+            node.id === graph.activeNodeId ? { ...node, position: { x: 4000, y: 8000 } } : node
+          )
+        }}
+        onNodeSelect={vi.fn()}
+      />
+    )
+    await waitFor(() => {
+      expect(setViewportMock).toHaveBeenCalledWith(
+        { x: -3093.5, y: expect.closeTo(-6547.6, 8), zoom: 0.85 },
+        { duration: 0 }
+      )
+    })
+  })
+
+  it('centers an active root even when another node retains an active marker', async () => {
+    render(<TopicMessageFlowCanvas graph={{ ...graph, activeNodeId: 'user-1' }} onNodeSelect={vi.fn()} />)
+    await waitFor(() => {
+      expect(setViewportMock).toHaveBeenCalledWith({ x: 306.5, y: 252.4, zoom: 0.85 }, { duration: 0 })
+    })
+  })
+
+  it.each([null, 'missing-node'])('keeps the root top offset for invalid active id %s', async (activeNodeId) => {
+    render(<TopicMessageFlowCanvas graph={{ ...graph, activeNodeId }} onNodeSelect={vi.fn()} />)
+    await waitFor(() => {
+      expect(setViewportMock).toHaveBeenCalledWith({ x: 306.5, y: 64, zoom: 0.85 }, { duration: 0 })
+    })
+  })
+
+  it('uses free scroll panning while retaining pinch zoom and drag panning', async () => {
+    render(<TopicMessageFlowCanvas graph={graph} onNodeSelect={vi.fn()} />)
+    const flow = await screen.findByTestId('react-flow')
+    expect(flow).toHaveAttribute('data-pan-on-scroll', 'true')
+    expect(flow).toHaveAttribute('data-pan-on-scroll-mode', 'free')
+    expect(flow).toHaveAttribute('data-zoom-on-scroll', 'false')
+    expect(flow).toHaveAttribute('data-zoom-on-pinch', 'true')
+    expect(flow).toHaveAttribute('data-pan-on-drag', 'true')
+  })
+
+  it.each(['width', 'height'] as const)(
+    'waits across frames for a positive %s before consuming focus',
+    async (dimension) => {
+      const dimensionSpy = dimension === 'width' ? clientWidthSpy : clientHeightSpy
+      dimensionSpy.mockReturnValue(0)
+      render(<TopicMessageFlowCanvas graph={graph} onNodeSelect={vi.fn()} />)
+
+      await act(async () => {
+        await new Promise((resolve) => window.requestAnimationFrame(resolve))
+        await new Promise((resolve) => window.requestAnimationFrame(resolve))
+      })
+      expect(screen.queryByTestId('react-flow')).not.toBeInTheDocument()
+      expect(setViewportMock).not.toHaveBeenCalled()
+
+      dimensionSpy.mockReturnValue(dimension === 'width' ? 800 : 600)
+      await waitFor(() => {
+        expect(setViewportMock).toHaveBeenCalledWith({ x: 85.5, y: 150.4, zoom: 0.85 }, { duration: 0 })
+      })
+      expect(screen.getByTestId('react-flow')).toHaveAttribute('data-default-y', '150.4')
+    }
+  )
+
+  it('does not refocus the canvas when only node preview changes', async () => {
+    const { rerender } = render(<TopicMessageFlowCanvas graph={graph} onNodeSelect={vi.fn()} />)
+
+    await waitFor(() => expect(setViewportMock).toHaveBeenCalledTimes(1))
+    setViewportMock.mockClear()
+
+    rerender(
+      <TopicMessageFlowCanvas
+        graph={{
+          ...graph,
+          nodes: graph.nodes.map((node) =>
+            node.id === 'assistant-1'
+              ? { ...node, data: { ...node.data, preview: 'Streaming preview changed.' } }
+              : node
+          )
+        }}
+        onNodeSelect={vi.fn()}
+      />
+    )
+
+    await screen.findByText('Streaming preview changed.')
+    await new Promise((resolve) => window.requestAnimationFrame(resolve))
+
+    expect(setViewportMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps the current viewport when the graph changes with the same active node and pane focus key', async () => {
+    const { rerender } = render(<TopicMessageFlowCanvas graph={graph} onNodeSelect={vi.fn()} focusKey="docked:0" />)
+
+    await waitFor(() => expect(setViewportMock).toHaveBeenCalledTimes(1))
+    setViewportMock.mockClear()
+
+    rerender(
+      <TopicMessageFlowCanvas
+        graph={{
+          ...graph,
+          edges: [
+            ...graph.edges,
+            {
+              id: 'assistant-1-user-2',
+              source: 'assistant-1',
+              target: 'user-2',
+              data: {
+                isActivePath: true,
+                isInactiveBranch: false,
+                isSiblingBranch: false
+              }
+            }
+          ],
+          nodes: [
+            {
+              ...graph.nodes[0],
+              position: { x: 96, y: 0 }
+            },
+            ...graph.nodes.slice(1),
+            {
+              id: 'user-2',
+              type: TOPIC_MESSAGE_FLOW_NODE_TYPE,
+              position: { x: 96, y: 240 },
+              data: {
+                createdAt: '2026-01-01T00:02:00.000Z',
+                isActive: true,
+                isInactiveBranch: false,
+                isOnActivePath: true,
+                messageId: 'user-2',
+                preview: 'Continue from here.',
+                role: 'user',
+                status: 'success'
+              }
+            }
+          ],
+          activeNodeId: graph.activeNodeId,
+          stats: {
+            activePathLength: 3,
+            branchCount: 1,
+            nodeCount: 3
+          }
+        }}
+        onNodeSelect={vi.fn()}
+        focusKey="docked:0"
+      />
+    )
+
+    await screen.findByText('Continue from here.')
+    await new Promise((resolve) => window.requestAnimationFrame(resolve))
+
+    expect(setViewportMock).not.toHaveBeenCalled()
+  })
+
+  it('waits for the pane layout before mounting React Flow', async () => {
+    const { rerender } = render(<TopicMessageFlowCanvas graph={graph} onNodeSelect={vi.fn()} layoutReady={false} />)
+
+    expect(screen.queryByTestId('react-flow')).not.toBeInTheDocument()
+
+    rerender(<TopicMessageFlowCanvas graph={graph} onNodeSelect={vi.fn()} layoutReady />)
+
+    expect(await screen.findByTestId('react-flow')).toBeInTheDocument()
+  })
+
+  it('refocuses when the pane layout focus key changes', async () => {
+    const { rerender } = render(
+      <TopicMessageFlowCanvas graph={{ ...graph, activeNodeId: 'user-1' }} onNodeSelect={vi.fn()} focusKey="docked:0" />
+    )
+
+    await waitFor(() => expect(setViewportMock).toHaveBeenCalledTimes(1))
+    setViewportMock.mockClear()
+
+    const updatedGraph = { ...graph, activeNodeId: 'user-1' }
+    rerender(<TopicMessageFlowCanvas graph={updatedGraph} onNodeSelect={vi.fn()} focusKey="docked:0" />)
+    await act(() => new Promise((resolve) => window.requestAnimationFrame(resolve)))
+    expect(setViewportMock).not.toHaveBeenCalled()
+
+    rerender(<TopicMessageFlowCanvas graph={updatedGraph} onNodeSelect={vi.fn()} focusKey="docked:1" />)
+
+    await waitFor(() => {
+      expect(setViewportMock).toHaveBeenCalledWith({ x: 306.5, y: 252.4, zoom: 0.85 }, { duration: 0 })
+    })
+  })
+
+  it('calls onNodeSelect with the clicked message id', async () => {
+    const onNodeSelect = vi.fn()
+
+    render(<TopicMessageFlowCanvas graph={graph} onNodeSelect={onNodeSelect} />)
+
+    fireEvent.click(await screen.findByTestId('flow-node-assistant-1'))
+
+    expect(onNodeSelect).toHaveBeenCalledWith('assistant-1')
+  })
+
+  it('calls onNodeContextMenu with the right-clicked message id', async () => {
+    const onNodeContextMenu = vi.fn()
+
+    render(<TopicMessageFlowCanvas graph={graph} onNodeSelect={vi.fn()} onNodeContextMenu={onNodeContextMenu} />)
+
+    fireEvent.contextMenu(await screen.findByTestId('flow-node-user-1'))
+
+    expect(onNodeContextMenu).toHaveBeenCalledWith('user-1')
+  })
+})

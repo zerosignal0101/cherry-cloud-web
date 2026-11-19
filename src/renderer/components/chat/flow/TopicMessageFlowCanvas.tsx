@@ -1,0 +1,295 @@
+import '@renderer/assets/styles/vendor/xyflow.css'
+import {
+  Controls,
+  MiniMap,
+  PanOnScrollMode,
+  type NodeMouseHandler,
+  type NodeTypes,
+  ReactFlow,
+  type ReactFlowInstance,
+  type ReactFlowProps,
+  type Viewport
+} from '@xyflow/react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+
+import { cn } from '@renderer/utils/style'
+
+import { TOPIC_MESSAGE_FLOW_INACTIVE_EDGE_COLOR, TOPIC_MESSAGE_FLOW_NODE_SIZE } from './topicMessageFlowLayout'
+import TopicMessageFlowLegend from './TopicMessageFlowLegend'
+import TopicMessageFlowNode from './TopicMessageFlowNode'
+import type { TopicMessageFlowEdgeModel, TopicMessageFlowLayout, TopicMessageFlowNodeModel } from './types'
+import { TOPIC_MESSAGE_FLOW_NODE_TYPE } from './types'
+
+interface TopicMessageFlowCanvasProps {
+  graph: TopicMessageFlowLayout
+  onNodeSelect: (messageId: string) => void
+  onNodeContextMenu?: (messageId: string) => void
+  className?: string
+  focusKey?: string | number
+  focusReady?: boolean
+  layoutReady?: boolean
+}
+
+const nodeTypes = {
+  [TOPIC_MESSAGE_FLOW_NODE_TYPE]: TopicMessageFlowNode
+} satisfies NodeTypes
+
+const rootFocusViewport: Viewport = { x: 0, y: 0, zoom: 0.85 }
+const ROOT_TOP_OFFSET = 64
+
+const rootFocusOptions = {
+  duration: 0
+} satisfies Parameters<ReactFlowInstance<TopicMessageFlowNodeModel, TopicMessageFlowEdgeModel>['setViewport']>[1]
+
+const proOptions: ReactFlowProps<TopicMessageFlowNodeModel, TopicMessageFlowEdgeModel>['proOptions'] = {
+  hideAttribution: true
+}
+
+function getMiniMapNodeColor(node: TopicMessageFlowNodeModel) {
+  const data = node.data
+
+  if (data.isContextBoundary) return 'var(--muted)'
+  if (data.role === 'user') return 'var(--success)'
+  if (data.role === 'assistant') return 'var(--info)'
+  return 'var(--muted)'
+}
+
+function getEdgeStyle(edge: TopicMessageFlowEdgeModel): TopicMessageFlowEdgeModel['style'] {
+  const data = edge.data
+
+  return {
+    stroke: data?.isActivePath
+      ? 'var(--success)'
+      : data?.isInactiveBranch
+        ? TOPIC_MESSAGE_FLOW_INACTIVE_EDGE_COLOR
+        : 'var(--border)',
+    strokeWidth: data?.isActivePath ? 2.25 : 1.5,
+    strokeDasharray: data?.isActivePath || data?.isSiblingBranch || data?.isInactiveBranch ? '4 4' : undefined,
+    ...edge.style
+  }
+}
+
+function getRootFocusNode(nodes: TopicMessageFlowNodeModel[]) {
+  return nodes.reduce<TopicMessageFlowNodeModel | null>((rootNode, node) => {
+    if (!rootNode) return node
+    if (node.position.y !== rootNode.position.y) return node.position.y < rootNode.position.y ? node : rootNode
+    if (node.data.isOnActivePath !== rootNode.data.isOnActivePath) return node.data.isOnActivePath ? node : rootNode
+    return node.position.x < rootNode.position.x ? node : rootNode
+  }, null)
+}
+
+function getNodeCenter(node: TopicMessageFlowNodeModel) {
+  const width = node.width ?? node.measured?.width ?? TOPIC_MESSAGE_FLOW_NODE_SIZE.width
+  const height = node.height ?? node.measured?.height ?? TOPIC_MESSAGE_FLOW_NODE_SIZE.height
+
+  return {
+    x: node.position.x + width / 2,
+    y: node.position.y + height / 2
+  }
+}
+
+function getRootFocusViewport(containerWidth: number, centerX: number, positionY: number): Viewport {
+  const zoom = rootFocusViewport.zoom
+  return {
+    x: containerWidth / 2 - centerX * zoom,
+    y: ROOT_TOP_OFFSET - positionY * zoom,
+    zoom
+  }
+}
+
+const TopicMessageFlowCanvas = ({
+  className,
+  graph,
+  onNodeContextMenu,
+  onNodeSelect,
+  focusKey,
+  focusReady = true,
+  layoutReady = true
+}: TopicMessageFlowCanvasProps) => {
+  const { t } = useTranslation()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const hasNodes = graph.nodes.length > 0
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance<
+    TopicMessageFlowNodeModel,
+    TopicMessageFlowEdgeModel
+  > | null>(null)
+
+  const nodes = useMemo(
+    (): TopicMessageFlowNodeModel[] =>
+      graph.nodes.map((node) => ({
+        ...node,
+        type: TOPIC_MESSAGE_FLOW_NODE_TYPE,
+        data: {
+          ...node.data,
+          isActive: node.data.isActive || node.data.messageId === graph.activeNodeId
+        }
+      })),
+    [graph.activeNodeId, graph.nodes]
+  )
+
+  const edges = useMemo(
+    () =>
+      graph.edges.map((edge) => ({
+        ...edge,
+        type: edge.type ?? 'smoothstep',
+        animated: edge.animated ?? edge.data?.isActivePath ?? false,
+        style: getEdgeStyle(edge)
+      })),
+    [graph.edges]
+  )
+
+  const handleNodeClick = useCallback<NodeMouseHandler<TopicMessageFlowNodeModel>>(
+    (_event, node) => {
+      onNodeSelect(node.data.messageId)
+    },
+    [onNodeSelect]
+  )
+
+  const handleNodeContextMenu = useCallback<NodeMouseHandler<TopicMessageFlowNodeModel>>(
+    (_event, node) => {
+      onNodeContextMenu?.(node.data.messageId)
+    },
+    [onNodeContextMenu]
+  )
+
+  const rootFocusTarget = useMemo(() => {
+    const activeNode = graph.activeNodeId ? nodes.find((node) => node.id === graph.activeNodeId) : undefined
+    const rootNode = activeNode ?? getRootFocusNode(nodes)
+    if (!rootNode) return null
+
+    const center = getNodeCenter(rootNode)
+    return {
+      key: `${rootNode.id}:${rootNode.position.x}:${rootNode.position.y}`,
+      centerX: center.x,
+      centerY: center.y,
+      isActive: !!activeNode,
+      positionY: rootNode.position.y
+    }
+  }, [graph.activeNodeId, nodes])
+  const rootFocusKey = rootFocusTarget?.key
+  const rootFocusCenterX = rootFocusTarget?.centerX
+  const rootFocusPositionY = rootFocusTarget?.positionY
+  const rootFocusCenterY = rootFocusTarget?.centerY
+  const focusActive = rootFocusTarget?.isActive
+  const focusSignature =
+    focusReady === true && rootFocusKey ? `${focusKey ?? 'initial'}:${graph.activeNodeId ?? 'root'}` : null
+  const [readyViewport, setReadyViewport] = useState<Viewport | null>(null)
+  const initialViewportSignatureRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (
+      focusReady !== true ||
+      !layoutReady ||
+      !focusSignature ||
+      rootFocusCenterX === undefined ||
+      rootFocusCenterY === undefined ||
+      rootFocusPositionY === undefined
+    )
+      return
+    if (initialViewportSignatureRef.current === focusSignature) return
+
+    let frame = 0
+    let cancelled = false
+
+    const measure = () => {
+      if (cancelled) return
+      const containerWidth = containerRef.current?.clientWidth ?? 0
+      const containerHeight = containerRef.current?.clientHeight ?? 0
+      if (containerWidth <= 0 || containerHeight <= 0) {
+        frame = window.requestAnimationFrame(measure)
+        return
+      }
+
+      initialViewportSignatureRef.current = focusSignature
+      setReadyViewport(
+        focusActive
+          ? {
+              x: containerWidth / 2 - rootFocusCenterX * rootFocusViewport.zoom,
+              y: containerHeight / 2 - rootFocusCenterY * rootFocusViewport.zoom,
+              zoom: rootFocusViewport.zoom
+            }
+          : getRootFocusViewport(containerWidth, rootFocusCenterX, rootFocusPositionY)
+      )
+    }
+
+    frame = window.requestAnimationFrame(measure)
+
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(frame)
+    }
+  }, [focusSignature, focusReady, layoutReady, rootFocusCenterX, rootFocusCenterY, rootFocusPositionY, focusActive])
+
+  useEffect(() => {
+    if (!reactFlowInstance || !readyViewport) return
+
+    void reactFlowInstance.setViewport(readyViewport, rootFocusOptions)
+  }, [reactFlowInstance, readyViewport])
+
+  if (!hasNodes) {
+    return (
+      <div
+        className={cn(
+          'relative flex h-full min-h-[320px] items-center justify-center rounded-md border border-border bg-muted/20 text-sm text-foreground-tertiary',
+          className
+        )}
+        data-testid="topic-message-flow-empty">
+        {t('common.no_results')}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        'relative h-full min-h-[320px] overflow-hidden rounded-md border border-border bg-background',
+        className
+      )}>
+      {layoutReady && readyViewport && (
+        <ReactFlow<TopicMessageFlowNodeModel, TopicMessageFlowEdgeModel>
+          colorMode="system"
+          defaultViewport={readyViewport}
+          deleteKeyCode={null}
+          edges={edges}
+          edgesFocusable={false}
+          elementsSelectable
+          maxZoom={1.4}
+          minZoom={0.08}
+          multiSelectionKeyCode={null}
+          nodes={nodes}
+          nodesConnectable={false}
+          nodesDraggable={false}
+          nodesFocusable
+          nodeTypes={nodeTypes}
+          onInit={setReactFlowInstance}
+          onNodeClick={handleNodeClick}
+          onNodeContextMenu={handleNodeContextMenu}
+          onlyRenderVisibleElements
+          panOnDrag
+          panOnScroll={true}
+          panOnScrollMode={PanOnScrollMode.Free}
+          proOptions={proOptions}
+          selectionKeyCode={null}
+          zoomOnDoubleClick={false}
+          zoomOnScroll={false}
+          zoomOnPinch={true}>
+          <TopicMessageFlowLegend />
+          <MiniMap
+            bgColor="var(--card)"
+            className="overflow-hidden rounded-md border border-border shadow-sm"
+            maskColor="color-mix(in srgb, var(--background) 72%, transparent)"
+            nodeColor={getMiniMapNodeColor}
+            pannable
+            position="bottom-right"
+            zoomable
+          />
+          <Controls position="bottom-left" showInteractive={false} />
+        </ReactFlow>
+      )}
+    </div>
+  )
+}
+
+export default TopicMessageFlowCanvas

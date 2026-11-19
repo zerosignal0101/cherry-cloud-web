@@ -1,0 +1,181 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import i18n from '@renderer/i18n/resolver'
+import type { Model } from '@shared/data/types/model'
+import { MODEL_CAPABILITY } from '@shared/data/types/model'
+import type { ApiKeyEntry } from '@shared/data/types/provider'
+
+import {
+  checkModelWithMultipleKeys,
+  getModelCheckCredentialPolicy,
+  getModelHealthCheckSkipReason,
+  resolveModelCheckCredentials
+} from '../../utils/healthCheck'
+
+const { ipcRequestMock } = vi.hoisted(() => ({ ipcRequestMock: vi.fn() }))
+
+vi.mock('@renderer/ipc', () => ({
+  ipcApi: { request: ipcRequestMock }
+}))
+
+let previousLanguage: string
+
+beforeAll(async () => {
+  previousLanguage = i18n.language
+  await i18n.changeLanguage('en-US')
+})
+
+afterAll(async () => {
+  await i18n.changeLanguage(previousLanguage)
+})
+
+const entries: ApiKeyEntry[] = [
+  { id: 'key-1', key: 'sk-primary', label: 'Primary', isEnabled: true },
+  { id: 'key-2', key: 'sk-disabled', label: 'Disabled', isEnabled: false },
+  { id: 'key-3', key: 'sk-backup', label: 'Backup', isEnabled: true }
+]
+
+function createModel(id: string, capabilities: Model['capabilities']): Model {
+  return {
+    id: `openai::${id}`,
+    providerId: 'openai',
+    name: id,
+    capabilities,
+    supportsStreaming: true,
+    isEnabled: true,
+    isHidden: false
+  }
+}
+
+describe('checkModelWithMultipleKeys', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('uses provider authentication with an explicit empty API-key override', async () => {
+    ipcRequestMock.mockResolvedValueOnce({ latency: 12 })
+    const credential = { kind: 'provider-auth', id: 'provider-auth', key: '' } as const
+
+    const results = await checkModelWithMultipleKeys(createModel('chat', []), [credential], 9000)
+
+    expect(ipcRequestMock).toHaveBeenCalledWith('ai.provider.model.check', {
+      apiKeyOverride: '',
+      uniqueModelId: 'openai::chat',
+      timeout: 9000
+    })
+    expect(results).toEqual([expect.objectContaining({ kind: 'ok', credential, latency: 12 })])
+  })
+})
+
+describe('getModelCheckCredentialPolicy', () => {
+  it('disables API-key selection and requirements for login-based providers', () => {
+    expect(getModelCheckCredentialPolicy({ authMethods: ['oauth'] }, true)).toEqual({
+      canSelectApiKey: false,
+      requiresApiKey: false
+    })
+  })
+
+  it('allows API-key selection without requiring it for auth-optional providers', () => {
+    expect(getModelCheckCredentialPolicy({ authMethods: ['api-key'], authOptional: true }, true)).toEqual({
+      canSelectApiKey: true,
+      requiresApiKey: false
+    })
+  })
+
+  it('allows and requires API-key selection for required-key providers', () => {
+    expect(getModelCheckCredentialPolicy({ authMethods: ['api-key'] }, true)).toEqual({
+      canSelectApiKey: true,
+      requiresApiKey: true
+    })
+  })
+})
+
+describe('resolveModelCheckCredentials', () => {
+  it('keeps stable identity while selecting all enabled API keys', () => {
+    expect(
+      resolveModelCheckCredentials(entries, { mode: 'all' }, { canSelectApiKey: true, requiresApiKey: true })
+    ).toEqual([
+      { kind: 'api-key', entry: entries[0] },
+      { kind: 'api-key', entry: entries[2] }
+    ])
+  })
+
+  it('selects one enabled API key by stable id', () => {
+    expect(
+      resolveModelCheckCredentials(
+        entries,
+        { mode: 'single', keyId: 'key-3' },
+        { canSelectApiKey: true, requiresApiKey: true }
+      )
+    ).toEqual([{ kind: 'api-key', entry: entries[2] }])
+  })
+
+  it('rejects missing or disabled selected keys with a mappable error code', () => {
+    try {
+      resolveModelCheckCredentials(
+        entries,
+        { mode: 'single', keyId: 'key-2' },
+        { canSelectApiKey: true, requiresApiKey: true }
+      )
+      expect.unreachable('expected unavailable API key to be rejected')
+    } catch (error) {
+      expect(error).toMatchObject({ code: 'api_key_unavailable' })
+    }
+  })
+
+  it('rejects providers that require a key when none are enabled', () => {
+    try {
+      resolveModelCheckCredentials([], { mode: 'all' }, { canSelectApiKey: true, requiresApiKey: true })
+      expect.unreachable('expected a required API key error')
+    } catch (error) {
+      expect(error).toMatchObject({ code: 'api_key_required' })
+    }
+  })
+
+  it('uses all enabled API keys when they are available for an auth-optional provider', () => {
+    expect(
+      resolveModelCheckCredentials(entries, { mode: 'all' }, { canSelectApiKey: true, requiresApiKey: false })
+    ).toEqual([
+      { kind: 'api-key', entry: entries[0] },
+      { kind: 'api-key', entry: entries[2] }
+    ])
+  })
+
+  it('uses provider authentication when an auth-optional provider has no enabled API key', () => {
+    expect(resolveModelCheckCredentials([], { mode: 'all' }, { canSelectApiKey: true, requiresApiKey: false })).toEqual(
+      [{ kind: 'provider-auth', id: 'provider-auth', key: '' }]
+    )
+  })
+
+  it('uses provider authentication when API keys cannot be selected', () => {
+    expect(
+      resolveModelCheckCredentials(entries, { mode: 'all' }, { canSelectApiKey: false, requiresApiKey: false })
+    ).toEqual([{ kind: 'provider-auth', id: 'provider-auth', key: '' }])
+  })
+})
+
+describe('getModelHealthCheckSkipReason', () => {
+  it('skips generation and speech models with an explicit reason', () => {
+    expect(getModelHealthCheckSkipReason(createModel('image', [MODEL_CAPABILITY.IMAGE_GENERATION]))).toEqual({
+      kind: 'generation_cost',
+      output: 'image'
+    })
+    expect(getModelHealthCheckSkipReason(createModel('video', [MODEL_CAPABILITY.VIDEO_GENERATION]))).toEqual({
+      kind: 'generation_cost',
+      output: 'video'
+    })
+    expect(getModelHealthCheckSkipReason(createModel('audio', [MODEL_CAPABILITY.AUDIO_GENERATION]))).toEqual({
+      kind: 'generation_cost',
+      output: 'audio'
+    })
+    expect(getModelHealthCheckSkipReason(createModel('speech-to-text', [MODEL_CAPABILITY.AUDIO_TRANSCRIPT]))).toEqual({
+      kind: 'unsupported_probe'
+    })
+  })
+
+  it('keeps text, embedding, and rerank models available for checks', () => {
+    expect(getModelHealthCheckSkipReason(createModel('chat', []))).toBeNull()
+    expect(getModelHealthCheckSkipReason(createModel('embedding', [MODEL_CAPABILITY.EMBEDDING]))).toBeNull()
+    expect(getModelHealthCheckSkipReason(createModel('rerank', [MODEL_CAPABILITY.RERANK]))).toBeNull()
+  })
+})

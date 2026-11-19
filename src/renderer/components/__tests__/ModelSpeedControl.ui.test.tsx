@@ -1,0 +1,485 @@
+import { createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { type ButtonHTMLAttributes, type MouseEvent, type ReactNode, useState } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+
+import type { ThinkingOption } from '@renderer/types/reasoning'
+import { type Model, MODEL_CAPABILITY, type ServiceTierSelection } from '@shared/data/types/model'
+
+import { ModelSpeedControl, resolveSupportedReasoningEffort, resolveSupportedServiceTier } from '../ModelSpeedControl'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key })
+}))
+
+vi.mock('@cherrystudio/ui', () => ({
+  Button: (props: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => {
+    const buttonProps = { ...props }
+    delete buttonProps.variant
+    delete buttonProps.size
+    return <button type="button" {...buttonProps} />
+  },
+  Popover: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  RadioGroup: ({
+    children,
+    value,
+    onValueChange,
+    ...props
+  }: {
+    children: ReactNode
+    value?: string
+    onValueChange: (value: string) => void
+    'aria-label'?: string
+  }) => (
+    <div
+      role="radiogroup"
+      aria-label={props['aria-label']}
+      data-testid="reasoning-menu"
+      data-value={value}
+      onClick={(event: MouseEvent<HTMLDivElement>) => {
+        const item = (event.target as HTMLElement).closest<HTMLElement>('[data-reasoning-value]')
+        const nextValue = item?.dataset.reasoningValue
+        if (nextValue) onValueChange(nextValue)
+      }}>
+      {children}
+    </div>
+  ),
+  RadioGroupItem: ({
+    value,
+    disabled,
+    ...props
+  }: {
+    value: string
+    size?: string
+    disabled?: boolean
+    'aria-label'?: string
+  }) => (
+    <button
+      type="button"
+      role="radio"
+      aria-label={props['aria-label']}
+      aria-disabled={disabled === true || undefined}
+      data-reasoning-value={disabled === true ? undefined : value}
+    />
+  ),
+  Slider: ({
+    max,
+    value,
+    className,
+    getThumbAriaLabel,
+    getThumbAriaValueText,
+    onValueChange
+  }: {
+    max: number
+    value: number[]
+    className?: string
+    getThumbAriaLabel?: (index: number) => string
+    getThumbAriaValueText?: (value: number, index: number) => string
+    onValueChange: (value: number[]) => void
+  }) => (
+    <div
+      role="slider"
+      aria-label={getThumbAriaLabel?.(0)}
+      aria-valuetext={getThumbAriaValueText?.(value[0], 0)}
+      data-testid="reasoning-slider"
+      className={className}
+      data-max={max}
+      data-value={value[0]}>
+      <button type="button" data-testid="select-slider-min" onClick={() => onValueChange([0])}>
+        select minimum
+      </button>
+      <button type="button" data-testid="select-slider-max" onClick={() => onValueChange([max])}>
+        select maximum
+      </button>
+    </div>
+  )
+}))
+
+const codexModel = {
+  id: 'openai-codex::gpt-5.6-sol',
+  providerId: 'openai-codex',
+  apiModelId: 'gpt-5.6-sol',
+  supportsFastMode: true,
+  name: 'GPT-5.6 Sol',
+  capabilities: [MODEL_CAPABILITY.REASONING],
+  supportsStreaming: true,
+  isEnabled: true,
+  isHidden: false,
+  reasoning: {
+    controls: [{ kind: 'effort', values: ['none', 'low', 'medium', 'high', 'xhigh', 'max'], default: 'max' }],
+    defaultEffort: 'max',
+    selectableEfforts: ['max', 'none', 'high', 'medium', 'low', 'xhigh']
+  }
+} satisfies Model
+
+function ControlledSpeedControl({ model, initialEffort }: { model: Model; initialEffort: ThinkingOption }) {
+  const [reasoningEffort, setReasoningEffort] = useState<ThinkingOption>(initialEffort)
+  const [fastMode, setFastMode] = useState(false)
+
+  return (
+    <ModelSpeedControl
+      model={model}
+      reasoningEffort={reasoningEffort}
+      fastMode={fastMode}
+      onReasoningEffortChange={setReasoningEffort}
+      onFastModeChange={setFastMode}
+    />
+  )
+}
+
+function ControlledServiceTier({ model, initialTier }: { model: Model; initialTier: ServiceTierSelection }) {
+  const [serviceTier, setServiceTier] = useState<ServiceTierSelection>(initialTier)
+  return (
+    <ModelSpeedControl
+      model={model}
+      reasoningEffort="default"
+      serviceTier={serviceTier}
+      fastMode={false}
+      onReasoningEffortChange={vi.fn()}
+      onServiceTierChange={setServiceTier}
+      onFastModeChange={vi.fn()}
+    />
+  )
+}
+
+describe('ModelSpeedControl UI', () => {
+  it('preserves a stored Default for a multi-tier slider model', () => {
+    expect(resolveSupportedReasoningEffort(codexModel, 'default')).toBe('default')
+  })
+
+  it('preserves Default for a menu-only reasoning model', () => {
+    expect(
+      resolveSupportedReasoningEffort(
+        {
+          ...codexModel,
+          reasoning: {
+            controls: [{ kind: 'toggle' }],
+            selectableEfforts: ['none', 'auto']
+          }
+        },
+        'default'
+      )
+    ).toBe('default')
+  })
+
+  it('offers an explicit Off shortcut when the model can disable thinking', () => {
+    render(<ControlledSpeedControl model={codexModel} initialEffort="high" />)
+
+    const offButton = screen.getByRole('button', { name: 'assistants.settings.reasoning_effort.off' })
+    expect(offButton).toHaveAttribute('aria-pressed', 'false')
+
+    fireEvent.click(offButton)
+
+    expect(screen.getByTestId('model-speed-effort-label')).toHaveTextContent('assistants.settings.reasoning_effort.off')
+  })
+
+  it('offers Ultra as the highest reasoning level for GPT-6 Astra', async () => {
+    render(
+      <ControlledSpeedControl
+        model={{
+          ...codexModel,
+          id: 'openai-codex::gpt-6-astra',
+          apiModelId: 'gpt-6-astra',
+          name: 'GPT-6 Astra',
+          reasoning: {
+            controls: [
+              {
+                default: 'low',
+                kind: 'effort',
+                values: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+              }
+            ],
+            defaultEffort: 'low',
+            selectableEfforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+          }
+        }}
+        initialEffort="max"
+      />
+    )
+
+    expect(screen.getByTestId('reasoning-slider')).toHaveAttribute('data-max', '5')
+    await userEvent.click(screen.getByTestId('select-slider-max'))
+    expect(screen.getByTestId('model-speed-effort-label')).toHaveTextContent(
+      'assistants.settings.reasoning_effort.ultra'
+    )
+  })
+
+  it("displays a stored Default at the model's declared default without changing its submitted value", () => {
+    render(<ControlledSpeedControl model={codexModel} initialEffort="default" />)
+
+    expect(screen.getByRole('slider', { name: 'agent.speed.effort' })).toHaveAttribute(
+      'aria-valuetext',
+      'assistants.settings.reasoning_effort.default'
+    )
+  })
+
+  it('uses a regular option menu for a toggle-only model', async () => {
+    render(
+      <ControlledSpeedControl
+        model={{
+          ...codexModel,
+          id: 'longcat::longcat-2-0',
+          providerId: 'longcat',
+          apiModelId: 'LongCat-2.0',
+          supportsFastMode: false,
+          reasoning: {
+            controls: [{ kind: 'toggle' }],
+            selectableEfforts: ['none', 'auto']
+          }
+        }}
+        initialEffort="default"
+      />
+    )
+
+    expect(screen.queryByTestId('reasoning-slider')).not.toBeInTheDocument()
+    expect(screen.getByTestId('reasoning-menu')).toHaveAttribute('data-value', 'default')
+    expect(screen.getByRole('radio', { name: 'assistants.settings.reasoning_effort.default' })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: 'assistants.settings.reasoning_effort.off' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: 'assistants.settings.reasoning_effort.auto' }))
+
+    expect(screen.getByTestId('reasoning-menu')).toHaveAttribute('data-value', 'auto')
+    expect(screen.queryByRole('button', { name: 'common.reset' })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByTestId('model-speed-effort-label')).toHaveTextContent(
+        'assistants.settings.reasoning_effort.auto'
+      )
+    )
+  })
+
+  it('restores provider Default after selecting an explicit slider tier', async () => {
+    const user = userEvent.setup()
+    render(<ControlledSpeedControl model={codexModel} initialEffort="default" />)
+
+    expect(screen.getByRole('button', { name: 'agent.speed.title' })).toHaveTextContent(
+      'assistants.settings.reasoning_effort.default'
+    )
+    await user.click(screen.getByTestId('select-slider-max'))
+
+    expect(screen.getByRole('button', { name: 'agent.speed.title' })).toHaveTextContent(
+      'assistants.settings.reasoning_effort.max'
+    )
+    expect(screen.getByTestId('reasoning-slider')).toHaveAttribute('data-value', '5')
+
+    await user.click(screen.getByRole('button', { name: 'assistants.settings.reasoning_effort.default' }))
+
+    expect(screen.getByRole('button', { name: 'agent.speed.title' })).toHaveTextContent(
+      'assistants.settings.reasoning_effort.default'
+    )
+    expect(screen.getByTestId('reasoning-slider')).toHaveAttribute('data-value', '5')
+    expect(screen.getByTestId('model-speed-effort-label')).toHaveTextContent(
+      'assistants.settings.reasoning_effort.default'
+    )
+  })
+
+  it('changes one effort level per wheel step without scrolling the page', () => {
+    const outerWheel = vi.fn()
+    render(
+      <div onWheel={outerWheel}>
+        <ControlledSpeedControl model={codexModel} initialEffort="high" />
+      </div>
+    )
+
+    const slider = screen.getByRole('slider', { name: 'agent.speed.effort' })
+    const firstWheel = createEvent.wheel(slider, { deltaY: -15, cancelable: true })
+    fireEvent(slider, firstWheel)
+    expect(firstWheel.defaultPrevented).toBe(true)
+    fireEvent.wheel(slider, { deltaY: -15 })
+    expect(slider).toHaveAttribute('data-value', '3')
+
+    fireEvent.wheel(slider, { deltaY: -15 })
+    expect(slider).toHaveAttribute('data-value', '4')
+
+    fireEvent.wheel(slider, { deltaY: -100 })
+    expect(slider).toHaveAttribute('data-value', '5')
+
+    fireEvent.wheel(slider, { deltaY: -100 })
+    expect(slider).toHaveAttribute('data-value', '5')
+
+    fireEvent.wheel(slider, { deltaY: 100 })
+    expect(slider).toHaveAttribute('data-value', '4')
+    expect(outerWheel).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats line and page wheel events as one effort step each', () => {
+    render(<ControlledSpeedControl model={codexModel} initialEffort="high" />)
+
+    const slider = screen.getByRole('slider', { name: 'agent.speed.effort' })
+    fireEvent.wheel(slider, { deltaMode: WheelEvent.DOM_DELTA_LINE, deltaY: -1 })
+    expect(slider).toHaveAttribute('data-value', '4')
+
+    fireEvent.wheel(slider, { deltaMode: WheelEvent.DOM_DELTA_PAGE, deltaY: -1 })
+    expect(slider).toHaveAttribute('data-value', '5')
+  })
+
+  it('resets an incomplete wheel step when the wheel target ref is rebound', () => {
+    const { rerender } = render(<ControlledSpeedControl model={codexModel} initialEffort="high" />)
+
+    let slider = screen.getByRole('slider', { name: 'agent.speed.effort' })
+    fireEvent.wheel(slider, { deltaY: -20 })
+
+    rerender(<ControlledSpeedControl model={codexModel} initialEffort="high" />)
+    slider = screen.getByRole('slider', { name: 'agent.speed.effort' })
+    fireEvent.wheel(slider, { deltaY: -20 })
+    expect(slider).toHaveAttribute('data-value', '3')
+
+    fireEvent.wheel(slider, { deltaY: -20 })
+    expect(slider).toHaveAttribute('data-value', '4')
+  })
+
+  it('toggles Fast only for a capable provider-model pair', () => {
+    const { rerender } = render(<ControlledSpeedControl model={codexModel} initialEffort="max" />)
+
+    const fastButton = screen.getByRole('button', { name: 'agent.speed.fast' })
+    expect(fastButton).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(fastButton)
+    expect(fastButton).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'agent.speed.title' })).toHaveTextContent('agent.speed.fast')
+
+    rerender(<ControlledSpeedControl model={{ ...codexModel, supportsFastMode: false }} initialEffort="max" />)
+    expect(screen.queryByRole('button', { name: 'agent.speed.fast' })).not.toBeInTheDocument()
+  })
+
+  it('hides Fast when the caller has nowhere to persist it', () => {
+    render(<ModelSpeedControl model={codexModel} reasoningEffort="max" onReasoningEffortChange={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: 'agent.speed.fast' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('reasoning-slider')).toBeInTheDocument()
+  })
+})
+
+describe('ModelSpeedControl summary verbosity', () => {
+  const summaryModel = {
+    ...codexModel,
+    reasoning: { ...codexModel.reasoning, summaryOptions: ['auto', 'concise', 'detailed'] }
+  } satisfies Model
+
+  it('reports the picked verbosity and marks it selected', async () => {
+    const onReasoningSummaryChange = vi.fn()
+    render(
+      <ModelSpeedControl
+        model={summaryModel}
+        reasoningEffort="default"
+        reasoningSummary="concise"
+        fastMode={false}
+        onReasoningEffortChange={vi.fn()}
+        onReasoningSummaryChange={onReasoningSummaryChange}
+        onFastModeChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: 'agent.speed.summary.concise' })).toHaveAttribute('aria-pressed', 'true')
+    await userEvent.click(screen.getByRole('button', { name: 'agent.speed.summary.detailed' }))
+    expect(onReasoningSummaryChange).toHaveBeenCalledWith('detailed')
+  })
+
+  // Endpoints without a summary knob (every third-party Responses host) must show nothing.
+})
+
+describe('ModelSpeedControl service tiers', () => {
+  const groqModel: Model = {
+    ...codexModel,
+    id: 'groq::openai/gpt-oss-120b',
+    providerId: 'groq',
+    apiModelId: 'openai/gpt-oss-120b',
+    capabilities: [],
+    reasoning: undefined,
+    supportsFastMode: undefined,
+    requestControls: {
+      serviceTier: { default: 'standard', options: ['standard', 'auto', 'fast', 'flex'] }
+    }
+  }
+
+  it('renders the four Groq tiers as an accessible vertical radio group and persists a selection', async () => {
+    render(<ControlledServiceTier model={groqModel} initialTier="auto" />)
+
+    const group = screen.getByRole('radiogroup', { name: 'agent.speed.service_tier.label' })
+    expect(group).toHaveAttribute('data-value', 'auto')
+
+    await userEvent.click(screen.getByRole('radio', { name: 'agent.speed.service_tier.fast' }))
+    expect(group).toHaveAttribute('data-value', 'fast')
+  })
+
+  it('keeps an unsupported saved tier as a disabled selection with the effective tier explained', () => {
+    const openRouterModel: Model = {
+      ...groqModel,
+      providerId: 'openrouter',
+      requestControls: { serviceTier: { default: 'standard' as const, options: ['standard', 'fast', 'flex'] } }
+    }
+    expect(resolveSupportedServiceTier(openRouterModel, 'auto')).toBe('standard')
+
+    render(<ControlledServiceTier model={openRouterModel} initialTier="auto" />)
+
+    // The saved choice stays selected (and unwritten) even though it cannot be used here.
+    expect(screen.getByRole('radiogroup', { name: 'agent.speed.service_tier.label' })).toHaveAttribute(
+      'data-value',
+      'auto'
+    )
+    const savedRadio = screen.getByRole('radio', { name: 'agent.speed.service_tier.auto' })
+    expect(savedRadio).toHaveAttribute('aria-disabled', 'true')
+    expect(screen.getByText('agent.speed.service_tier.unsupported')).toBeInTheDocument()
+    // The three declared tiers plus the disabled saved tier render; nothing else.
+    expect(screen.getByRole('radio', { name: 'agent.speed.service_tier.flex' })).toBeInTheDocument()
+    expect(screen.getAllByRole('radio')).toHaveLength(4)
+  })
+
+  it('shows both the saved and effective tier in the trigger while they differ', () => {
+    const openRouterModel: Model = {
+      ...groqModel,
+      providerId: 'openrouter',
+      requestControls: { serviceTier: { default: 'standard' as const, options: ['standard', 'fast', 'flex'] } }
+    }
+    render(<ControlledServiceTier model={openRouterModel} initialTier="auto" />)
+
+    expect(screen.getByRole('button', { name: 'agent.speed.title' })).toHaveTextContent(
+      'agent.speed.service_tier.auto → agent.speed.service_tier.standard'
+    )
+  })
+
+  it('persists a supported pick over an unsupported saved tier', async () => {
+    const openRouterModel: Model = {
+      ...groqModel,
+      providerId: 'openrouter',
+      requestControls: { serviceTier: { default: 'standard' as const, options: ['standard', 'fast', 'flex'] } }
+    }
+    render(<ControlledServiceTier model={openRouterModel} initialTier="auto" />)
+
+    await userEvent.click(screen.getByRole('radio', { name: 'agent.speed.service_tier.fast' }))
+    expect(screen.getByRole('radiogroup', { name: 'agent.speed.service_tier.label' })).toHaveAttribute(
+      'data-value',
+      'fast'
+    )
+    expect(screen.queryByText('agent.speed.service_tier.unsupported')).not.toBeInTheDocument()
+  })
+
+  it('keeps Standard as the default for a model that declares no tiers', () => {
+    const noControlModel: Model = { ...groqModel, requestControls: undefined }
+    expect(resolveSupportedServiceTier(noControlModel, 'flex')).toBe('standard')
+  })
+
+  it('reveals provider terms only behind the Details toggle, never as primary labels', async () => {
+    const wiredModel: Model = {
+      ...groqModel,
+      requestControls: {
+        serviceTier: {
+          default: 'standard',
+          options: ['standard', 'fast'],
+          values: { standard: 'default', fast: 'priority' }
+        }
+      }
+    }
+    render(<ControlledServiceTier model={wiredModel} initialTier="standard" />)
+
+    expect(screen.queryByText('agent.speed.service_tier.provider_value')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'agent.speed.service_tier.details' }))
+    expect(screen.getAllByText('agent.speed.service_tier.provider_value')).toHaveLength(2)
+    // Primary labels stay the shared tier names.
+    expect(screen.getByRole('radio', { name: 'agent.speed.service_tier.fast' })).toBeInTheDocument()
+  })
+
+  it('omits the Details toggle when the endpoint carries no provider terms', () => {
+    render(<ControlledServiceTier model={groqModel} initialTier="standard" />)
+    expect(screen.queryByRole('button', { name: 'agent.speed.service_tier.details' })).not.toBeInTheDocument()
+  })
+})

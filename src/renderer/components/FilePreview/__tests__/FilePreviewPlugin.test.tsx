@@ -1,0 +1,210 @@
+import type * as SentryRenderer from '@sentry/electron/renderer'
+import { MockCherrystudioUI } from '@test-mocks/renderer/CherrystudioUI'
+import '@testing-library/jest-dom/vitest'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { FilePreviewLayout, FilePreviewToolbar } from '@cherrystudio/file-preview/react'
+import { initSentry } from '@renderer/services/sentry'
+import type { AbsoluteFilePath } from '@shared/types/file'
+
+import type * as FilePreviewRegistryModule from '../filePreviewRegistry'
+
+const mocks = vi.hoisted(() => ({
+  captureException: vi.fn(),
+  ipcApiRequest: vi.fn(),
+  load: vi.fn()
+}))
+
+vi.unmock('@logger')
+vi.mock('@sentry/electron/renderer', async (importOriginal) => ({
+  ...(await importOriginal<typeof SentryRenderer>()),
+  init: vi.fn(),
+  captureException: mocks.captureException
+}))
+
+vi.mock('@renderer/ipc', () => ({
+  ipcApi: { request: mocks.ipcApiRequest }
+}))
+
+vi.mock('@cherrystudio/ui', () => ({
+  EmptyState: ({ title, description }: { title?: string; description?: string }) => (
+    <div data-testid="empty-state">
+      <div>{title}</div>
+      <div>{description}</div>
+    </div>
+  ),
+  ScrollArea: MockCherrystudioUI.ScrollArea
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key })
+}))
+
+vi.mock('../filePreviewRegistry', async (importOriginal) => {
+  const actual = await importOriginal<typeof FilePreviewRegistryModule>()
+  const plugin = {
+    id: 'markdown',
+    extensions: ['md'],
+    load: mocks.load
+  }
+
+  return {
+    ...actual,
+    filePreviewRegistry: actual.createFilePreviewRegistry({ extensionPlugins: [plugin] })
+  }
+})
+
+import { FilePreview } from '../FilePreview'
+
+beforeEach(() => {
+  vi.stubEnv('DEV', false)
+  initSentry()
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  mocks.ipcApiRequest.mockResolvedValue({
+    kind: 'file',
+    type: 'text',
+    size: 128,
+    createdAt: 1,
+    modifiedAt: 1,
+    mime: 'text/markdown'
+  })
+  mocks.load.mockReset()
+  mocks.load.mockResolvedValue({
+    default: ({
+      filePath,
+      fileName,
+      metadata,
+      refreshKey,
+      type
+    }: {
+      filePath: AbsoluteFilePath
+      fileName: string
+      metadata: { size: number }
+      refreshKey: number
+      type?: string
+    }) => (
+      <FilePreviewLayout.Frame>
+        <FilePreviewToolbar aria-label="Preview tools">
+          <button type="button">Zoom in</button>
+        </FilePreviewToolbar>
+        <FilePreviewLayout.Content>
+          <div
+            data-testid="plugin-preview"
+            data-file-path={filePath}
+            data-file-name={fileName}
+            data-file-size={metadata.size}
+            data-refresh-key={refreshKey}
+            data-preview-type={type}
+          />
+        </FilePreviewLayout.Content>
+      </FilePreviewLayout.Frame>
+    )
+  })
+})
+
+afterEach(() => {
+  cleanup()
+  vi.unstubAllEnvs()
+  vi.clearAllMocks()
+  vi.restoreAllMocks()
+})
+
+describe('FilePreview plugin loading', () => {
+  it('preloads the matching plugin while metadata is pending and reuses that load', async () => {
+    let resolveMetadata: (metadata: {
+      kind: 'file'
+      type: 'text'
+      size: number
+      createdAt: number
+      modifiedAt: number
+      mime: string
+    }) => void
+    mocks.ipcApiRequest.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveMetadata = resolve
+        })
+    )
+
+    render(<FilePreview filePath={'/tmp/README.md' as AbsoluteFilePath} />)
+
+    await waitFor(() => expect(mocks.load).toHaveBeenCalledOnce())
+    expect(screen.getByText('file_preview.loading')).toBeInTheDocument()
+    expect(screen.queryByTestId('plugin-preview')).not.toBeInTheDocument()
+
+    resolveMetadata!({
+      kind: 'file',
+      type: 'text',
+      size: 128,
+      createdAt: 1,
+      modifiedAt: 1,
+      mime: 'text/markdown'
+    })
+
+    expect(await screen.findByTestId('plugin-preview')).toBeInTheDocument()
+    expect(mocks.load).toHaveBeenCalledOnce()
+  })
+
+  it('shows a localized loading state while the plugin is pending', () => {
+    mocks.load.mockImplementationOnce(() => new Promise(() => {}))
+
+    render(<FilePreview filePath={'/tmp/README.md' as AbsoluteFilePath} />)
+
+    expect(screen.getByText('file_preview.loading')).toBeInTheDocument()
+  })
+
+  it('lazy loads a matching plugin with the canonical file descriptor', async () => {
+    render(
+      <FilePreview filePath={'/tmp/workspace/notes/../README.md' as AbsoluteFilePath} refreshKey={4} type="artifact" />
+    )
+
+    expect(await screen.findByTestId('plugin-preview')).toHaveAttribute('data-file-path', '/tmp/workspace/README.md')
+    expect(screen.getByTestId('plugin-preview')).toHaveAttribute('data-file-name', 'README.md')
+    expect(screen.getByTestId('plugin-preview')).toHaveAttribute('data-file-size', '128')
+    expect(screen.getByTestId('plugin-preview')).toHaveAttribute('data-refresh-key', '4')
+    expect(screen.getByTestId('plugin-preview')).toHaveAttribute('data-preview-type', 'artifact')
+    expect(mocks.load).toHaveBeenCalledTimes(1)
+  })
+
+  it('contains plugin loader failures inside the preview surface', async () => {
+    mocks.load.mockRejectedValueOnce(new Error('failed to fetch plugin chunk'))
+
+    render(<FilePreview filePath={'/tmp/README.md' as AbsoluteFilePath} />)
+
+    expect(await screen.findByText('file_preview.load_error.title')).toBeInTheDocument()
+    expect(screen.getByText('file_preview.load_error.description')).toBeInTheDocument()
+  })
+
+  it('contains plugin render failures inside the preview surface', async () => {
+    const error = new Error('plugin render failed')
+    mocks.load.mockResolvedValueOnce({
+      default: () => {
+        throw error
+      }
+    })
+
+    render(<FilePreview filePath={'/tmp/README.md' as AbsoluteFilePath} />)
+
+    expect(await screen.findByText('file_preview.load_error.title')).toBeInTheDocument()
+    expect(screen.getByText('file_preview.load_error.description')).toBeInTheDocument()
+    expect(mocks.captureException).toHaveBeenCalledExactlyOnceWith(
+      error,
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          operation: 'react.render',
+          'capture.source': 'log',
+          'failure.source': 'application',
+          'failure.kind': 'defect',
+          'failure.reason': 'render_failed',
+          'failure.outcome': 'failed'
+        })
+      })
+    )
+  })
+})
+
+vi.mock('@renderer/services/fileObservation', async () => {
+  const { mockFileObservationService } = await import('@test-mocks/renderer/FileObservationService')
+  return { fileObservationService: mockFileObservationService }
+})

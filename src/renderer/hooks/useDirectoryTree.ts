@@ -1,0 +1,47 @@
+import { useLayoutEffect, useMemo, useRef, useSyncExternalStore } from 'react'
+
+import { DirectoryTreeSession, type DirectoryTreeState } from '@renderer/services/DirectoryTreeSession'
+import type { DirectoryTreeOptions, TreeMutationEvent, TreeNode } from '@shared/utils/file'
+
+export interface UseDirectoryTreeResult extends DirectoryTreeState {
+  refresh(): Promise<void>
+  /** O(1) lookup keyed by absolute path. Stable across mutations. */
+  getNode(absPath: string): TreeNode | null
+}
+
+const EMPTY: DirectoryTreeState = { root: null, treeId: null, isLoading: false, error: null, version: 0 }
+const emptySnapshot = () => EMPTY
+const emptySubscribe = () => () => undefined
+const emptyNode = () => null
+const emptyRefresh = async () => {}
+
+/**
+ * @param onMutation Receives every revision after the mirror applies it, including activation replay
+ *   and brief Activity suspension. Old-root events are ignored after a root change.
+ *   A visible root change releases the old session immediately; while hidden, release waits
+ *   until the original ten-second idle deadline or visibility resumes, whichever comes first.
+ */
+export function useDirectoryTree(
+  rootPath: string | undefined,
+  options?: DirectoryTreeOptions,
+  onMutation?: (event: TreeMutationEvent) => void
+): UseDirectoryTreeResult {
+  const inputs = useRef({ rootPath, options, onMutation })
+  inputs.current = { rootPath, options, onMutation }
+  const session = useMemo(
+    () =>
+      rootPath
+        ? new DirectoryTreeSession(rootPath, inputs.current.options, (event) => {
+            if (inputs.current.rootPath === rootPath) inputs.current.onMutation?.(event)
+          })
+        : undefined,
+    [rootPath]
+  )
+  const previous = useRef(session)
+  useLayoutEffect(() => {
+    if (previous.current !== session) previous.current?.dispose()
+    previous.current = session
+  }, [session])
+  const state = useSyncExternalStore(session?.subscribe ?? emptySubscribe, session?.getSnapshot ?? emptySnapshot)
+  return { ...state, getNode: session?.getNode ?? emptyNode, refresh: session?.refresh ?? emptyRefresh }
+}
