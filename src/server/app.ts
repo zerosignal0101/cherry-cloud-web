@@ -2,9 +2,21 @@ import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import fastifyStatic from '@fastify/static'
+import fastifyWebsocket from '@fastify/websocket'
 import Fastify, { type FastifyInstance } from 'fastify'
 
+import { AccessGuard } from './auth/guard'
+import { registerSystemRoutes } from './routes/system'
+import { EventHub } from './transport/events'
+import { registerRpcRoutes, registerWebSocketRoute } from './transport/plugins'
+import { RpcRegistry } from './transport/registry'
 import type { ServerConfig } from './config'
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    events: EventHub
+  }
+}
 
 export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   const app = Fastify({
@@ -16,7 +28,21 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
     bodyLimit: 32 * 1024 * 1024
   })
 
-  app.get('/api/health', async () => ({ ok: true, uptime: process.uptime() }))
+  const events = new EventHub()
+  const guard = new AccessGuard(config.authToken)
+  const registry = new RpcRegistry()
+  registerSystemRoutes(registry)
+
+  app.decorate('events', events)
+  app.addHook('onClose', async () => events.closeAll())
+
+  await app.register(fastifyWebsocket, {
+    options: { maxPayload: 4 * 1024 * 1024 }
+  })
+  await registerRpcRoutes(app, { registry, guard })
+  await registerWebSocketRoute(app, { registry, guard })
+
+  app.get('/api/health', async () => ({ ok: true, uptime: process.uptime(), events: events.size }))
 
   const hasWebBuild = existsSync(resolve(config.webDist, 'index.html'))
   if (hasWebBuild) {

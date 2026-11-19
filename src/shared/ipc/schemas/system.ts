@@ -24,6 +24,11 @@ const screenCapturePermissionStatusSchema = z.enum(['authorized', 'not-determine
  * unsigned dev binary), and denied (send the user to System Settings).
  */
 export const systemRequestSchemas = {
+  /** Web transport liveness probe: verifies the RPC envelope end to end. */
+  'system.ping': defineRoute({
+    input: z.object({ echo: z.string().optional() }).optional(),
+    output: z.object({ echo: z.string().optional(), serverTime: z.number(), transport: z.literal('web') })
+  }),
   'system.get_device_type': defineRoute({ input: z.void(), output: z.string() }),
   'system.get_native_theme': defineRoute({
     input: z.void(),

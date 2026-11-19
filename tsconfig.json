@@ -1,3 +1,16 @@
 {
-  "files": []
+  "files": [],
+  "compilerOptions": {
+    "paths": {
+      "@application": ["./src/main/core/application/Application"],
+      "@data/*": ["./src/main/data/*"],
+      "@logger": ["./src/main/core/logger/LoggerService"],
+      "@main/*": ["./src/main/*"],
+      "@renderer/*": ["./src/renderer/*"],
+      "@server/*": ["./src/server/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@cherrystudio/ui": ["./packages/ui/src/index.ts"],
+      "@cherrystudio/ui/*": ["./packages/ui/src/*"]
+    }
+  }
 }
