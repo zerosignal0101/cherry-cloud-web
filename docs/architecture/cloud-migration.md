@@ -5,6 +5,7 @@
 ## 0. 当前状态
 
 - M0 完成：源码基线入库，SPA 可构建，服务端可启动（`/api/health`、静态资源、深链回退均验证通过），`pnpm typecheck` 与 `pnpm lint` 通过。
+- M1 完成：`POST /api/rpc` 复用上游 `IpcRouter` 与 zod 契约，`WS /api/ws` 推送事件；浏览器侧 `window.api.ipcApi` 改由 `src/renderer/ipc/webApi.ts` 实现（HTTP 一元调用 + WS 事件 + 重连）；新增 Node 平台层（数据目录、密钥加密）；`system.ping` 端到端验证通过。鉴权暂为 `APP_TOKEN`，M3 替换。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
 - 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；这些文件在 M5 删除。
 - `pnpm lint` 目前只覆盖 `src/server` 与新脚本；`src/shared`、`src/renderer` 待 M1 完成 `window.api` 真实类型后再纳入。

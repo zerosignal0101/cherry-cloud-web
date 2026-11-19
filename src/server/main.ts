@@ -1,12 +1,13 @@
-import { mkdirSync } from 'node:fs'
-
 import { buildApp } from './app'
 import { assertWebDist, loadConfig } from './config'
+import { ensureDataPaths, resolveDataPaths } from './platform/paths'
 
 async function main(): Promise<void> {
   const config = loadConfig()
   assertWebDist(config)
-  mkdirSync(config.dataDir, { recursive: true })
+
+  const paths = resolveDataPaths(config.dataDir)
+  ensureDataPaths(paths)
 
   const app = await buildApp(config)
 
@@ -19,10 +20,10 @@ async function main(): Promise<void> {
   process.once('SIGTERM', () => void shutdown('SIGTERM'))
 
   await app.listen({ host: config.host, port: config.port })
-  app.log.info({ dataDir: config.dataDir }, 'cherry-cloud-web server ready')
+  app.log.info({ dataDir: paths.root, database: paths.database }, 'cherry-cloud-web server ready')
 }
 
 main().catch((error) => {
-  console.error(error)
+  process.stderr.write(`${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`)
   process.exit(1)
 })
