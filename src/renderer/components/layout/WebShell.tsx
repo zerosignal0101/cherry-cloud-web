@@ -5,7 +5,6 @@ import { useCallback, useMemo } from 'react'
 import { Tooltip } from '@cherrystudio/ui'
 import AppLogo from '@renderer/assets/images/logo.png'
 import { ResourceViewSourceProvider } from '@renderer/components/ResourceViewSourceProvider'
-import { useKeyboardViewportHeight } from '@renderer/hooks/useKeyboardViewportHeight'
 import { getDefaultRouteTitle } from '@renderer/utils/routeTitle'
 import { cn } from '@renderer/utils/style'
 
@@ -85,13 +84,9 @@ function useLabels(): Array<NavItem & { title: string }> {
  */
 export function WebShell({ children }: { children: React.ReactNode }) {
   const pathname = useActivePath()
-  const keyboardViewportHeight = useKeyboardViewportHeight()
 
   return (
-    <div
-      data-ui="app.shell"
-      style={keyboardViewportHeight ? { height: keyboardViewportHeight } : undefined}
-      className="flex h-dvh w-full flex-row overflow-hidden bg-sidebar text-foreground">
+    <div data-ui="app.shell" className="flex h-dvh w-full flex-row overflow-hidden bg-sidebar text-foreground">
       <DesktopRail pathname={pathname} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <main

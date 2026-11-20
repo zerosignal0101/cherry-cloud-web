@@ -10,6 +10,7 @@ import {
   useComposerDockMotionTransition
 } from '@renderer/components/chat/motion/composerDockMotion'
 import { useOptionalQuickPanel } from '@renderer/components/QuickPanel'
+import { useKeyboardViewportInset } from '@renderer/hooks/useKeyboardViewportInset'
 import { cn } from '@renderer/utils/style'
 
 const COMPOSER_MESSAGE_GAP_PX = 16
@@ -55,11 +56,14 @@ export default function ComposerDockTransitionFrame({
   const composerRef = useRef<HTMLDivElement>(null)
   const [bottomOverlayInsets, setBottomOverlayInsets] = useState<ChatBottomOverlayInsets | null>(null)
   const [composerInlineInsets, setComposerInlineInsets] = useState<ComposerInlineInsets>(ZERO_COMPOSER_INLINE_INSETS)
+  const [dockKeyboardLift, setDockKeyboardLift] = useState(0)
   const isDocked = placement === 'docked'
   const hasComposer = Boolean(composer)
   const dockMotionTransition = useComposerDockMotionTransition(placement)
   const dockMotionAttributes = getComposerDockMotionAttributes(dockMotionTransition)
   const quickPanel = useOptionalQuickPanel()
+  // The shell never resizes for the keyboard, so the dock alone steps above it.
+  const keyboardInset = useKeyboardViewportInset()
 
   // Home placement asks the quick panel to fill the available height above the input.
   // Pushed explicitly through context (no DOM contract); no-op when there is no provider.
@@ -77,6 +81,15 @@ export default function ComposerDockTransitionFrame({
     let observedInsetTarget: HTMLElement | null = null
 
     const updateInset = () => {
+      // The keyboard covers the bottom of the layout viewport, but this stage
+      // already stops above the shell's bottom bar. Lift the dock only by the
+      // part of the keyboard that actually overlaps the stage, otherwise the
+      // composer floats a bar-height above the keyboard instead of resting on it.
+      const stageRect = rootRef.current?.getBoundingClientRect()
+      const stageBottomGap = stageRect ? Math.max(0, window.innerHeight - stageRect.bottom) : 0
+      const nextDockKeyboardLift = Math.max(0, keyboardInset - stageBottomGap)
+      setDockKeyboardLift((current) => (current === nextDockKeyboardLift ? current : nextDockKeyboardLift))
+
       if (!isDocked || !hasComposer) {
         setBottomOverlayInsets(null)
         setComposerInlineInsets((current) =>
@@ -151,7 +164,7 @@ export default function ComposerDockTransitionFrame({
       mutationObserver?.disconnect()
       observer?.disconnect()
     }
-  }, [hasComposer, isDocked])
+  }, [hasComposer, isDocked, keyboardInset])
 
   return (
     <div ref={rootRef} data-composer-stage="" className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
@@ -165,14 +178,15 @@ export default function ComposerDockTransitionFrame({
 
       <div
         data-composer-dock-layer=""
-        style={
-          isDocked
+        style={{
+          ...(dockKeyboardLift > 0 ? { bottom: dockKeyboardLift } : null),
+          ...(isDocked
             ? {
                 paddingInlineStart: composerInlineInsets.left,
                 paddingInlineEnd: composerInlineInsets.right
               }
-            : undefined
-        }
+            : null)
+        }}
         className={cn(
           // The whole dock stack stays click-through: the layer, the wrapper, and
           // any width-capped centering inside the composer all span or flank the
