@@ -89,10 +89,10 @@ const HistoryTopBar = ({
 
   return (
     <>
-      <div className="flex h-11 shrink-0 items-center gap-2 bg-card px-2">
+      <div className="flex h-11 shrink-0 items-center gap-2 bg-card px-2 max-sm:h-auto max-sm:flex-wrap max-sm:gap-y-1.5 max-sm:py-1.5">
         {toolbarLeading ? <div className="flex shrink-0 items-center">{toolbarLeading}</div> : null}
 
-        <div className="w-[220px] max-w-[38vw] [&_[data-slot=input-group-control]]:h-8 [&_[data-slot=input-group]]:h-8">
+        <div className="w-[220px] max-w-[38vw] [&_[data-slot=input-group-control]]:h-8 [&_[data-slot=input-group]]:h-8 max-sm:w-auto max-sm:max-w-none max-sm:min-w-0 max-sm:flex-1">
           <SearchInput
             value={searchText}
             placeholder={searchPlaceholder}
@@ -103,85 +103,89 @@ const HistoryTopBar = ({
           />
         </div>
 
-        {renderSourceFilter(selectedSourceId === ALL_SOURCE_ID ? null : selectedSourceId, (id) =>
-          onSourceSelect(id ?? ALL_SOURCE_ID)
-        )}
-        {statusOptions && selectedStatus && onStatusSelect && (
-          <div className="group/status-select relative flex items-center">
-            <Select
-              value={selectedStatus === ALL_SOURCE_ID ? '' : selectedStatus}
-              onValueChange={(value) => onStatusSelect(value as HistorySourceStatus)}>
-              <SelectTrigger
-                aria-label={statusLabel}
-                className={cn(
-                  'h-8 w-[132px] text-xs',
-                  selectedStatus !== ALL_SOURCE_ID &&
-                    '[&_svg]:transition-opacity group-focus-within/status-select:[&_svg]:opacity-0 group-hover/status-select:[&_svg]:opacity-0 no-hover:[&_svg]:opacity-0'
-                )}>
-                <SelectValue placeholder={statusPlaceholder ?? statusLabel} />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions
-                  .filter((option) => option.id !== ALL_SOURCE_ID)
-                  .map((option) => (
-                    <SelectItem key={option.id} value={option.id} className="text-xs">
-                      <span className="flex items-center gap-2">
-                        {option.dotClassName && (
-                          <span className={cn('size-2 rounded-full bg-current', option.dotClassName)} />
-                        )}
-                        {option.label}
-                      </span>
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-            {selectedStatus !== ALL_SOURCE_ID ? (
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label={t('common.clear')}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onStatusSelect(ALL_SOURCE_ID)
-                }}
-                className="text-muted-foreground pointer-events-none absolute top-1/2 right-2 flex size-5 min-h-0 shrink-0 -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-0 opacity-0 shadow-none transition-[background-color,color,opacity] group-focus-within/status-select:pointer-events-auto group-focus-within/status-select:opacity-100 group-hover/status-select:pointer-events-auto group-hover/status-select:opacity-100 hover:bg-muted hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 no-hover:pointer-events-auto no-hover:opacity-100">
-                <X size={12} />
-              </Button>
-            ) : null}
-          </div>
-        )}
+        {/* Phones cannot fit the search plus every filter and bulk action on one line:
+            the group below takes its own full-width row under the search. */}
+        <div className="flex min-w-0 flex-1 items-center gap-2 max-sm:w-full max-sm:flex-none max-sm:flex-wrap max-sm:gap-y-1.5">
+          {renderSourceFilter(selectedSourceId === ALL_SOURCE_ID ? null : selectedSourceId, (id) =>
+            onSourceSelect(id ?? ALL_SOURCE_ID)
+          )}
+          {statusOptions && selectedStatus && onStatusSelect && (
+            <div className="group/status-select relative flex items-center">
+              <Select
+                value={selectedStatus === ALL_SOURCE_ID ? '' : selectedStatus}
+                onValueChange={(value) => onStatusSelect(value as HistorySourceStatus)}>
+                <SelectTrigger
+                  aria-label={statusLabel}
+                  className={cn(
+                    'h-8 w-[132px] text-xs',
+                    selectedStatus !== ALL_SOURCE_ID &&
+                      '[&_svg]:transition-opacity group-focus-within/status-select:[&_svg]:opacity-0 group-hover/status-select:[&_svg]:opacity-0 no-hover:[&_svg]:opacity-0'
+                  )}>
+                  <SelectValue placeholder={statusPlaceholder ?? statusLabel} />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions
+                    .filter((option) => option.id !== ALL_SOURCE_ID)
+                    .map((option) => (
+                      <SelectItem key={option.id} value={option.id} className="text-xs">
+                        <span className="flex items-center gap-2">
+                          {option.dotClassName && (
+                            <span className={cn('size-2 rounded-full bg-current', option.dotClassName)} />
+                          )}
+                          {option.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {selectedStatus !== ALL_SOURCE_ID ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={t('common.clear')}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onStatusSelect(ALL_SOURCE_ID)
+                  }}
+                  className="text-muted-foreground pointer-events-none absolute top-1/2 right-2 flex size-5 min-h-0 shrink-0 -translate-y-1/2 items-center justify-center rounded-full bg-transparent p-0 opacity-0 shadow-none transition-[background-color,color,opacity] group-focus-within/status-select:pointer-events-auto group-focus-within/status-select:opacity-100 group-hover/status-select:pointer-events-auto group-hover/status-select:opacity-100 hover:bg-muted hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 no-hover:pointer-events-auto no-hover:opacity-100">
+                  <X size={12} />
+                </Button>
+              ) : null}
+            </div>
+          )}
 
-        <div className="min-w-0 flex-1" />
+          <div className="min-w-0 flex-1" />
 
-        {mode === 'assistant' && (
+          {mode === 'assistant' && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 gap-1.5 rounded-md px-2.5 text-xs shadow-none"
+              disabled={!canBulkMove}
+              onClick={() => {
+                setMoveTargetId((current) => current || moveTargets[0]?.id || '')
+                setMoveDialogOpen(true)
+              }}>
+              <FolderInput className="size-3.5" />
+              <span>
+                {t('history.records.bulkMove')}
+                {selectedCount > 0 ? ` (${selectedCount})` : ''}
+              </span>
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"
-            className="h-8 gap-1.5 rounded-md px-2.5 text-xs shadow-none"
-            disabled={!canBulkMove}
-            onClick={() => {
-              setMoveTargetId((current) => current || moveTargets[0]?.id || '')
-              setMoveDialogOpen(true)
-            }}>
-            <FolderInput className="size-3.5" />
+            className="h-8 gap-1.5 rounded-md px-2.5 text-xs text-destructive shadow-none hover:text-destructive"
+            disabled={!canBulkDelete}
+            onClick={() => void onBulkDelete?.()}>
+            <Archive className="size-3.5" />
             <span>
-              {t('history.records.bulkMove')}
-              {selectedCount > 0 ? ` (${selectedCount})` : ''}
+              {t('history.records.bulkArchive')}
+              {bulkDeleteCount > 0 ? ` (${bulkDeleteCount})` : ''}
             </span>
           </Button>
-        )}
-        <Button
-          type="button"
-          variant="outline"
-          className="h-8 gap-1.5 rounded-md px-2.5 text-xs text-destructive shadow-none hover:text-destructive"
-          disabled={!canBulkDelete}
-          onClick={() => void onBulkDelete?.()}>
-          <Archive className="size-3.5" />
-          <span>
-            {t('history.records.bulkArchive')}
-            {bulkDeleteCount > 0 ? ` (${bulkDeleteCount})` : ''}
-          </span>
-        </Button>
+        </div>
       </div>
 
       <ConfirmDialog
