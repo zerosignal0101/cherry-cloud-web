@@ -25,7 +25,10 @@ describe('MiniAppAssets', () => {
     expect(token).toBe(signer.tokenFor('com.example.app'))
     expect(signer.verify('com.example.app', token)).toBe(true)
     expect(signer.verify('com.example.other', token)).toBe(false)
-    expect(signer.verify('com.example.app', `${token.slice(0, -1)}A`)).toBe(false)
+    // Pick a replacement that cannot equal the original last character, otherwise the
+    // "tampered" token is occasionally the untouched one and the assertion flakes.
+    const tampered = `${token.slice(0, -1)}${token.endsWith('A') ? 'B' : 'A'}`
+    expect(signer.verify('com.example.app', tampered)).toBe(false)
   })
 
   it('keeps the key on disk so restored tabs resolve after a restart', () => {
