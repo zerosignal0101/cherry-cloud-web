@@ -1,7 +1,13 @@
 import dayjs from 'dayjs'
 import type { TFunction } from 'i18next'
 import { Archive, PinIcon } from 'lucide-react'
-import type { ReactElement, ReactNode, Ref } from 'react'
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  ReactElement,
+  ReactNode,
+  Ref
+} from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { Button, Checkbox, RowFlex } from '@cherrystudio/ui'
@@ -198,28 +204,59 @@ export const HistorySelectionCell = ({
 interface HistoryTitleButtonProps {
   title: string
   onOpen?: () => void
+  /** When present the title is a real link so the browser can open it elsewhere. */
+  href?: string
 }
 
-export const HistoryTitleButton = ({ title, onOpen }: HistoryTitleButtonProps) => (
-  <span
-    data-history-record-title
-    role="button"
-    tabIndex={0}
-    className="text-muted-foreground -mx-1 block w-full max-w-full min-w-0 cursor-pointer truncate rounded-sm px-1 py-0 text-left font-medium transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline focus-visible:outline-none"
-    title={title}
-    onClick={(event) => {
-      event.stopPropagation()
-      onOpen?.()
-    }}
-    onKeyDown={(event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      event.stopPropagation()
-      onOpen?.()
-    }}>
-    {title}
-  </span>
-)
+const historyTitleClassName =
+  'text-muted-foreground -mx-1 block w-full max-w-full min-w-0 cursor-pointer truncate rounded-sm px-1 py-0 text-left font-medium no-underline transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:underline focus-visible:outline-none'
+
+export const HistoryTitleButton = ({ title, onOpen, href }: HistoryTitleButtonProps) => {
+  const handleClick = (event: ReactMouseEvent<HTMLElement>) => {
+    event.stopPropagation()
+    // Modified clicks and non-primary buttons belong to the browser (new tab, new
+    // window, download); only a plain click navigates in place.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+    event.preventDefault()
+    onOpen?.()
+  }
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    // A focused link would reload the whole app on Enter; keep keyboard activation
+    // on the in-app path. Space is not a link default at all.
+    if (!onOpen) return
+    event.preventDefault()
+    event.stopPropagation()
+    onOpen()
+  }
+
+  if (href) {
+    return (
+      <a
+        data-history-record-title
+        className={historyTitleClassName}
+        title={title}
+        href={href}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}>
+        {title}
+      </a>
+    )
+  }
+
+  return (
+    <span
+      data-history-record-title
+      role="button"
+      tabIndex={0}
+      className={historyTitleClassName}
+      title={title}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}>
+      {title}
+    </span>
+  )
+}
 
 interface HistoryActionContextMenuProps<TContext = unknown> {
   actions: readonly ResolvedAction<TContext>[]
@@ -443,6 +480,7 @@ interface HistoryRecordRowProps {
   timeLabel: string
   title: string
   unpinLabel: string
+  href?: string
   onAction: (action: ResolvedAction) => void | Promise<void>
   onOpen?: () => void
   onSelectedChange: (checked: boolean, selectRange?: boolean) => void
@@ -465,6 +503,7 @@ export const HistoryRecordRow = ({
   timeLabel,
   title,
   unpinLabel,
+  href,
   onAction,
   onOpen,
   onSelectedChange,
@@ -495,7 +534,7 @@ export const HistoryRecordRow = ({
       <RowFlex className="min-w-0 flex-1 items-center">
         <div className="min-w-0 flex-1" data-testid="history-record-rename-field">
           <RowFlex className="min-w-0 flex-1 items-center gap-1.5">
-            <HistoryTitleButton title={title} onOpen={onOpen} />
+            <HistoryTitleButton title={title} href={href} onOpen={onOpen} />
           </RowFlex>
         </div>
       </RowFlex>

@@ -125,6 +125,7 @@ function HistoryRecordListScopedRow<T>({
       rowRef={rowRef}
       avatar={descriptor.renderAvatar(item)}
       deleteLabel={descriptor.strings.deleteLabel}
+      href={descriptor.getHref?.(item)}
       isPinned={pinned}
       isSelected={!pinned && isSelected(id)}
       minHeight={descriptor.rowHeight}
@@ -163,6 +164,7 @@ export function HistoryRecordList<T>({
   const {
     getId,
     getName,
+    getHref,
     renderRowState,
     getRowActions,
     getSelectLabel,
@@ -184,6 +186,7 @@ export function HistoryRecordList<T>({
       deleteLabel,
       getId,
       getName,
+      getHref,
       renderRowState,
       getRowActions,
       getSelectLabel,

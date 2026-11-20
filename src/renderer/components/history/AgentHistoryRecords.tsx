@@ -190,10 +190,13 @@ const AgentHistoryRecords = ({
   const handleSessionSelect = useCallback(
     (session: SessionListItem) => {
       const title = session.name || t('common.unnamed')
-      if (conversationNav.openConversationTab(session.id, title, { forceNew: true })) return
+      const openedTabId = conversationNav.openConversationTab(session.id, title, { forceNew: true })
+      // See AssistantHistoryRecords: the page can be reused when the shell is
+      // URL-backed, so the history surface must close regardless of the tab result.
+      onClose()
+      if (openedTabId) return
 
       onRecordSelect?.(session.id)
-      onClose()
     },
     [conversationNav, onClose, onRecordSelect, t]
   )
@@ -469,6 +472,7 @@ const AgentHistoryRecords = ({
         }
       },
       onOpen: handleSessionSelect,
+      getHref: (session: SessionListItem) => conversationNav.urlForKey(session.id),
       onTogglePin: (session: SessionListItem) => handleToggleSessionPin(session.id),
       renderRowMenu: (_session: SessionListItem, row: ReactElement, rowActions: HistoryRowActions) =>
         rowActions.actions.length ? (
@@ -481,6 +485,7 @@ const AgentHistoryRecords = ({
     }),
     [
       agentById,
+      conversationNav,
       handleSessionSelect,
       handleToggleSessionPin,
       historySessionLabel,

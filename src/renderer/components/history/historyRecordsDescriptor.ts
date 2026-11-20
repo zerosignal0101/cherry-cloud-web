@@ -78,6 +78,11 @@ export interface HistoryRecordDescriptor<T> {
   /** Build the row's menu actions; `openRename` lets a menu item open the rename dialog. */
   getRowActions: (item: T, openRename: HistoryOpenRename, rowState: HistoryRowState) => HistoryRowActions
   onOpen: (item: T) => void
+  /**
+   * Conversation URL for the row title. Rendering it as a real link keeps the
+   * browser's own affordances (middle click, "open in new tab") working.
+   */
+  getHref?: (item: T) => string | undefined
   onTogglePin: (item: T) => boolean | void | Promise<boolean | void>
   /** Wrap a rendered row with its right-click context menu (returns the row unchanged if empty). */
   renderRowMenu: (item: T, row: ReactElement, actions: HistoryRowActions) => ReactElement

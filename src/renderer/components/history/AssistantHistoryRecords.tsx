@@ -241,10 +241,14 @@ const AssistantHistoryRecords = ({
   const handleTopicSelect = useCallback(
     (topic: ApiTopic) => {
       const title = topic.name || t('chat.default.topic.name')
-      if (conversationNav.openConversationTab(topic.id, title, { forceNew: true })) return
+      const openedTabId = conversationNav.openConversationTab(topic.id, title, { forceNew: true })
+      // Opening a tab can reuse this page when the shell is URL-backed, so the
+      // history surface has to close either way — otherwise it keeps painting over
+      // the conversation the URL now points at.
+      onClose()
+      if (openedTabId) return
 
       onRecordSelect?.(getRendererTopic(topic))
-      onClose()
     },
     [conversationNav, getRendererTopic, onClose, onRecordSelect, t]
   )
@@ -584,6 +588,7 @@ const AssistantHistoryRecords = ({
         }
       },
       onOpen: handleTopicSelect,
+      getHref: (topic: HistoryTopicItem) => conversationNav.urlForKey(topic.id),
       onTogglePin: handlePinTopic,
       renderRowMenu: (_topic: HistoryTopicItem, row: ReactElement, rowActions: HistoryRowActions) =>
         rowActions.actions.length ? (
@@ -597,6 +602,7 @@ const AssistantHistoryRecords = ({
     [
       assistantById,
       assistantIconType,
+      conversationNav,
       defaultModelId,
       handlePinTopic,
       handleTopicSelect,

@@ -23,6 +23,8 @@ export interface ConversationNavigation {
    * tabs untouched. Unlike a tab detach this does not require `key` to be an open tab.
    */
   openConversationWindow: (key: string, title?: string) => void
+  /** Route URL for `key`, for callers that need a real link (new-tab affordances). */
+  urlForKey: (key: string) => string | undefined
 }
 
 function openConversationTabImpl(
@@ -71,7 +73,8 @@ export function useConversationNavigation(appId: ConversationAppId): Conversatio
         openConversationWindowImpl(appId, key, title)
         return undefined
       },
-      openConversationWindow: (key, title) => openConversationWindowImpl(appId, key, title)
+      openConversationWindow: (key, title) => openConversationWindowImpl(appId, key, title),
+      urlForKey: (key) => getSidebarApp(appId)?.conversationRoute?.urlForKey(key)
     }),
     [appId, isDetachedWindowFrame, tabs]
   )
