@@ -349,7 +349,11 @@ export function ChatAppShell({
                 composerElevated && '!transform-none !will-change-auto'
               )}>
               {topBar && (
-                <div className="relative z-10 shrink-0">
+                // Selector popovers mount next to their trigger, so this bar must
+                // outrank every surface inside the center area (greeting overlay and
+                // composer dock both sit at z-10). At equal z the later sibling wins,
+                // which is why an open selector used to be painted over by the greeting.
+                <div className="relative z-20 shrink-0">
                   <ErrorBoundary>{topBar}</ErrorBoundary>
                 </div>
               )}
