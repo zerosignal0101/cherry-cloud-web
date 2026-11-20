@@ -213,11 +213,7 @@ describe('GeneralSettings', () => {
     MockUsePreferenceUtils.setMultiplePreferenceValues({
       'BootConfig.app.remote_debugging.enabled': false,
       'BootConfig.app.remote_debugging.port': 9222,
-      'app.developer_mode.enabled': false,
-      'app.tray.enabled': true,
-      'app.tray.on_close': true,
-      'app.tray.on_launch': true,
-      'feature.quick_assistant.click_tray_to_show': true
+      'app.developer_mode.enabled': false
     })
     mockUseModelSelectorData.mockReset()
     ipcRequestMock.mockReset()
@@ -710,21 +706,6 @@ describe('GeneralSettings', () => {
     const fallbackTrigger = screen.getByText('settings.models.retry.fallback_models_unavailable').closest('button')
     expect(fallbackTrigger).toBeInTheDocument()
     expect(fallbackTrigger).toHaveAttribute('aria-invalid', 'true')
-  })
-
-  it('turns off every tray-dependent preference when the tray is disabled', async () => {
-    render(<GeneralSettings />)
-
-    const trayRow = screen.getByText('settings.tray.show').closest<HTMLElement>('[data-testid="setting-row"]')
-    expect(trayRow).not.toBeNull()
-    fireEvent.click(within(trayRow!).getByRole('switch'))
-
-    await waitFor(() => {
-      expect(MockUsePreferenceUtils.getPreferenceValue('app.tray.enabled')).toBe(false)
-      expect(MockUsePreferenceUtils.getPreferenceValue('app.tray.on_close')).toBe(false)
-      expect(MockUsePreferenceUtils.getPreferenceValue('app.tray.on_launch')).toBe(false)
-      expect(MockUsePreferenceUtils.getPreferenceValue('feature.quick_assistant.click_tray_to_show')).toBe(false)
-    })
   })
 
   it('shows the resolved interface language in its own module when no preference is saved', () => {

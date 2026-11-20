@@ -11,26 +11,48 @@ import { resolveDataPaths } from '@platform/dataPaths'
 import Fastify, { type FastifyInstance } from 'fastify'
 
 import { application } from '@application'
+import { loggerService } from '@logger'
 
+import { registerAiRoutes, registerCapabilityRoutes, registerTranslateRoutes } from './ai/routes'
+import { startAiRuntime, stopAiRuntime } from './ai/runtime'
+import { configureWindowManager } from './ai/webServices'
 import { AuthGuard } from './auth/guard'
 import { AuthStore } from './auth/password'
 import { SessionSigner } from './auth/session'
-import { startAiRuntime, stopAiRuntime } from './ai/runtime'
-import { registerAiRoutes, registerCapabilityRoutes, registerFileIpcRoutes } from './ai/routes'
-import { configureWindowManager } from './ai/webServices'
 import type { ServerConfig } from './config'
 import { openDatabase, type DatabaseHandle } from './data/database'
 import { configureDbService } from './data/dbService'
 import { webSeeders } from './data/seeders'
 import { installWindowManager, uninstallWindowManager } from './data/windowManager'
+import { registerAgentRoutes } from './features/agents/routes'
+import { AutoBackupScheduler } from './features/backup/AutoBackupScheduler'
+import { BackupService } from './features/backup/BackupService'
+import { promotePendingRestore } from './features/backup/restoreGate'
+import { registerBackupRoutes } from './features/backup/routes'
+import { registerBrowserRoutes } from './features/browser/routes'
+import { registerExportRoutes } from './features/export/routes'
+import { MiniAppAssets } from './features/miniapps/MiniAppAssets'
+import { registerMiniAppHttpRoutes, registerMiniAppRoutes } from './features/miniapps/routes'
+import { NotesStorage } from './features/notes/NotesStorage'
+import { registerNotesRoutes } from './features/notes/routes'
+import { registerSkillRoutes, registerSkillUploadRoutes } from './features/skills/routes'
+import { SkillStorage } from './features/skills/SkillStorage'
+import { AgentWorkspaceNamespace } from './features/workspace/AgentWorkspaceNamespace'
+import { registerWorkspaceRoutes } from './features/workspace/routes'
+import { WorkspaceService } from './features/workspace/WorkspaceService'
 import { registerFileRoutes } from './files/routes'
 import { MAX_UPLOAD_BYTES } from './files/service'
-import { deriveKeyFromSecret, loadOrCreateKeyFile } from './platform/secrets'
+import { deriveKeyFromSecret, loadOrCreateKeyFile, SecretBox } from './platform/secrets'
+import { SecretStore } from './platform/secretStore'
 import { registerAuthRoutes, sanitizeNext } from './routes/auth'
+import { registerCacheRoutes } from './routes/cache'
+import { registerComputerUseRoutes } from './routes/computerUse'
 import { getApiServer, registerDataRoutes } from './routes/data'
 import { registerHostRoutes } from './routes/host'
+import { registerNotificationRoutes } from './routes/notification'
 import { registerPreferenceRoutes } from './routes/preference'
 import { registerSystemRoutes } from './routes/system'
+import { registerUiRoutes } from './routes/ui'
 import { ConnectionRegistry } from './transport/connections'
 import { EventHub } from './transport/events'
 import { registerRpcRoutes, registerWebSocketRoute } from './transport/plugins'
@@ -58,6 +80,10 @@ function isPublicPath(rawUrl: string): boolean {
 export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   application.setDataDir(config.dataDir)
   const dataPaths = resolveDataPaths(config.dataDir)
+  const restoreOutcome = await promotePendingRestore(dataPaths, config.migrationsDir)
+  if (restoreOutcome === 'promoted') {
+    loggerService.withContext('Server').info('Promoted a staged restore before opening the database')
+  }
 
   const app = Fastify({
     logger:
@@ -86,12 +112,30 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   const events = new EventHub()
   const connections = new ConnectionRegistry()
   const registry = new RpcRegistry()
+  const workspaceService = new WorkspaceService(dataPaths.workspaces)
   registerSystemRoutes(registry)
   registerHostRoutes(registry)
-  registerAiRoutes(registry)
-  registerFileIpcRoutes(registry)
+  registerAiRoutes(registry, { workspaceService })
+  registerTranslateRoutes(registry)
+  registerNotificationRoutes(registry)
+  registerCacheRoutes(registry)
+  registerComputerUseRoutes(registry)
+  registerExportRoutes(registry)
+  const miniAppAssets = new MiniAppAssets(dataPaths.root)
+  registerMiniAppRoutes(registry, miniAppAssets)
+  const notesStorage = new NotesStorage(dataPaths.notes)
+  const skillStorage = new SkillStorage(dataPaths.agentsSkills)
+  const agentWorkspaces = new AgentWorkspaceNamespace(dataPaths.root)
+  registerNotesRoutes(registry, { storage: notesStorage, namespaces: [skillStorage, agentWorkspaces] })
+  registerAgentRoutes(registry)
+  registerBrowserRoutes(registry)
+  registerSkillRoutes(registry, { storage: skillStorage })
   registerCapabilityRoutes(registry)
   registerPreferenceRoutes(registry, connections)
+  registerWorkspaceRoutes(registry, workspaceService)
+
+  const secretStore = new SecretStore(dataPaths.secretStore, new SecretBox(config.appSecret, dataPaths.secrets))
+  application.register('SecretService', secretStore)
 
   const db = openDatabase({
     databasePath: dataPaths.database,
@@ -102,14 +146,27 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   configureDbService(db)
   configureWindowManager(installWindowManager(connections))
 
+  const backupService = new BackupService({
+    dataPaths,
+    database: db,
+    secretStore,
+    appVersion: process.env.APP_VERSION ?? '0.1.0',
+    migrationsDir: config.migrationsDir
+  })
+  const autoBackupScheduler = new AutoBackupScheduler(backupService)
+  registerBackupRoutes(registry, { backup: backupService, scheduler: autoBackupScheduler })
+
   app.decorate('events', events)
   app.decorate('db', db)
   app.addHook('onClose', async () => {
+    autoBackupScheduler.stop()
+    backupService.abort()
     await stopAiRuntime()
     events.closeAll()
     uninstallWindowManager()
     db.close()
     application.unregister('DbService')
+    application.unregister('SecretService')
   })
 
   await app.register(fastifyCookie)
@@ -129,14 +186,23 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   })
 
   await registerAuthRoutes(app, { guard, store, signer })
+  await registerUiRoutes(app)
   await registerRpcRoutes(app, { registry, guard, connections })
   await registerWebSocketRoute(app, { registry, guard, connections })
   await registerFileRoutes(app, { guard })
-  await registerDataRoutes(app, { guard, apiServer: getApiServer() })
+  await registerSkillUploadRoutes(app, { guard, dataRoot: dataPaths.root })
+  await registerDataRoutes(app, { guard, apiServer: getApiServer(), miniAppAssets })
+  await registerMiniAppHttpRoutes(app, { guard, dataRoot: dataPaths.root, assets: miniAppAssets })
 
   // The AI stack plugs into the upstream lifecycle; start it only after the
   // database and the transport are ready, since its services resolve both.
   await startAiRuntime()
+  try {
+    await backupService.migrateLegacySecrets()
+  } catch (error) {
+    app.log.warn({ error }, 'Failed to migrate legacy backup credentials')
+  }
+  autoBackupScheduler.start()
 
   app.get('/api/health', async () => ({
     ok: true,
@@ -163,10 +229,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
     if (!hasWebBuild) return reply.code(503).send({ error: 'web_build_missing' })
     // The shell itself must not be cached: it is the same document for the
     // authenticated app and the login gate. Hashed assets keep their default.
-    return reply
-      .header('cache-control', 'no-store')
-      .type('text/html')
-      .sendFile('index.html', { cacheControl: false })
+    return reply.header('cache-control', 'no-store').type('text/html').sendFile('index.html', { cacheControl: false })
   })
 
   app.setNotFoundHandler((request, reply) => {

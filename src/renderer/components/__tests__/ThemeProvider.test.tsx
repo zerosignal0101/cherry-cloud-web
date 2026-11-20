@@ -1,5 +1,5 @@
 import { MockUsePreferenceUtils } from '@test-mocks/renderer/usePreference'
-import { render, waitFor } from '@testing-library/react'
+import { act, render, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useTheme } from '@renderer/hooks/useTheme'
@@ -78,10 +78,19 @@ describe('ThemeProvider first frame', () => {
     expect(renderedThemes[0]).toBe(ThemeMode.dark)
   })
 
-  it('uses Electron resolved theme when the renderer media query disagrees', async () => {
+  it('follows OS appearance changes while the system theme is selected', async () => {
     MockUsePreferenceUtils.setPreferenceValue('ui.theme_mode', ThemeMode.system)
-    stubMatchMedia(false)
-    ipcMocks.request.mockResolvedValue(ThemeMode.dark)
+    const listeners: Array<(event: MediaQueryListEvent) => void> = []
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn((_: string, listener: (event: MediaQueryListEvent) => void) =>
+          listeners.push(listener)
+        ),
+        removeEventListener: vi.fn()
+      })
+    })
 
     render(
       <ThemeProvider>
@@ -90,7 +99,15 @@ describe('ThemeProvider first frame', () => {
     )
 
     expect(renderedThemes[0]).toBe(ThemeMode.light)
+
+    act(() => {
+      for (const listener of listeners) listener({ matches: true } as MediaQueryListEvent)
+    })
     await waitFor(() => expect(renderedThemes.at(-1)).toBe(ThemeMode.dark))
-    expect(ipcMocks.request).toHaveBeenCalledWith('system.get_native_theme')
+
+    act(() => {
+      for (const listener of listeners) listener({ matches: false } as MediaQueryListEvent)
+    })
+    await waitFor(() => expect(renderedThemes.at(-1)).toBe(ThemeMode.light))
   })
 })

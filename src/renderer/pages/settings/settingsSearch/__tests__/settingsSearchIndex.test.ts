@@ -200,7 +200,6 @@ describe('settings search index aliases', () => {
     ['对话样式', 'message-style'],
     ['thinking', 'thought-auto-collapse'],
     ['思维链', 'thought-auto-collapse'],
-    ['开机自启', 'launch-onboot'],
     ['恢复出厂', 'data-reset'],
     ['侧边栏', 'chat-list-position'],
     ['上下文数量', 'context-max-messages']
@@ -214,7 +213,6 @@ describe('Korean settings discovery', () => {
   it.each([
     ['언어', 'setting-general-display-language'],
     ['프록시', 'setting-general-proxy-mode'],
-    ['자동시작', 'setting-general-launch-onboot'],
     ['proxy', 'setting-general-proxy-mode']
   ])('finds the setting for %s with a Korean interface', (query, focusId) => {
     const results = rankEntries(

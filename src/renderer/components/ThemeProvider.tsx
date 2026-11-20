@@ -2,10 +2,9 @@ import type { PropsWithChildren } from 'react'
 import React, { useEffect, useState } from 'react'
 
 import { usePreference } from '@data/hooks/usePreference'
-import { loggerService } from '@logger'
 import { ThemeContext } from '@renderer/hooks/useTheme'
 import useUserTheme from '@renderer/hooks/useUserTheme'
-import { ipcApi, useIpcOn } from '@renderer/ipc'
+import { useIpcOn } from '@renderer/ipc'
 import { isMac, isWin } from '@renderer/utils/platform'
 import { ThemeMode } from '@shared/data/preference/preferenceTypes'
 
@@ -13,7 +12,6 @@ interface ThemeProviderProps extends PropsWithChildren {
   defaultTheme?: ThemeMode
 }
 
-const logger = loggerService.withContext('ThemeProvider')
 const THEME_PREFERENCE_OPTIONS = { optimistic: false } as const
 
 const tailwindThemeChange = (theme: ThemeMode) => {
@@ -84,19 +82,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
       return
     }
 
-    let active = true
-    void ipcApi
-      .request('system.get_native_theme')
-      .then((theme) => {
-        if (active) {
-          setActualTheme(theme)
-        }
-      })
-      .catch((error) => logger.error('Failed to resolve system theme', error as Error))
+    // The browser (not the server) owns the OS appearance, so track
+    // `prefers-color-scheme` directly and follow it while it is selected.
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const applySystemTheme = () => setActualTheme(mediaQuery.matches ? ThemeMode.dark : ThemeMode.light)
 
-    return () => {
-      active = false
-    }
+    applySystemTheme()
+    mediaQuery.addEventListener('change', applySystemTheme)
+    return () => mediaQuery.removeEventListener('change', applySystemTheme)
   }, [settedTheme])
 
   return (

@@ -1,7 +1,8 @@
 import '@renderer/assets/styles/index.css'
 import '@renderer/assets/styles/tailwind.css'
-import { installWebApi } from '@renderer/ipc/webApi'
 import { createRoot } from 'react-dom/client'
+
+import { installWebApi } from '@renderer/ipc/webApi'
 
 /**
  * The transport facade must exist before any application module is evaluated:
@@ -38,6 +39,7 @@ if (await isAuthenticated()) {
   root.render(<MainApp />)
 } else {
   const { default: LoginApp } = await import('@renderer/windows/login/LoginApp')
-  root.render(<LoginApp />)
+  const { prepareLoginPage } = await import('@renderer/windows/login/loginBootstrap')
+  const language = await prepareLoginPage()
+  root.render(<LoginApp language={language} />)
 }
-

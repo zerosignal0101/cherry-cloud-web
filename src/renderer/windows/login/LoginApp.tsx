@@ -9,6 +9,35 @@ import { useState } from 'react'
  * auth endpoints, which are public.
  */
 
+/**
+ * The login gate cannot use the lazy i18n catalogs: loading them reads the
+ * preference service, which requires a session. Keep the handful of strings in
+ * a local dictionary chosen from the configured app language (served by the
+ * public UI bootstrap) and fall back to the browser language.
+ */
+function createLoginCopy(language: string | null | undefined) {
+  const prefersChinese = (language ?? navigator.language).toLowerCase().startsWith('zh')
+  return prefersChinese
+    ? {
+        subtitle: '请输入访问密码',
+        password: '密码',
+        signIn: '登录',
+        signingIn: '登录中…',
+        rateLimited: '尝试次数过多，请稍后再试',
+        wrongPassword: '密码错误',
+        networkError: '网络错误，请重试'
+      }
+    : {
+        subtitle: 'Enter your access password',
+        password: 'Password',
+        signIn: 'Sign in',
+        signingIn: 'Signing in…',
+        rateLimited: 'Too many attempts. Please try again later.',
+        wrongPassword: 'Incorrect password',
+        networkError: 'Network error. Please try again.'
+      }
+}
+
 /** Same rule as the server: only a same-origin absolute path may be resumed. */
 function nextPath(): string {
   const raw = new URLSearchParams(window.location.search).get('next')
@@ -17,10 +46,11 @@ function nextPath(): string {
   return raw
 }
 
-export default function LoginApp(): React.ReactElement {
+export default function LoginApp({ language }: { language?: string | null }): React.ReactElement {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string>()
   const [pending, setPending] = useState(false)
+  const copy = createLoginCopy(language)
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -39,31 +69,29 @@ export default function LoginApp(): React.ReactElement {
         window.location.replace(nextPath())
         return
       }
-      setError(response.status === 429 ? '尝试次数过多，请稍后再试' : '密码错误')
+      setError(response.status === 429 ? copy.rateLimited : copy.wrongPassword)
       setPassword('')
     } catch {
-      setError('网络错误，请重试')
+      setError(copy.networkError)
     } finally {
       setPending(false)
     }
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-background px-6 py-8 text-foreground">
+    <div className="flex min-h-dvh w-full flex-1 items-center justify-center bg-sidebar px-6 py-8 text-foreground">
       <form
         onSubmit={submit}
         className="w-full max-w-sm rounded-2xl border-[0.5px] border-border bg-card p-7 shadow-sm">
         <h1 className="m-0 font-semibold text-lg">Cherry Studio</h1>
-        <p className="mt-1 mb-5 text-muted-foreground text-sm">请输入访问密码</p>
+        <p className="mt-1 mb-5 text-muted-foreground text-sm">{copy.subtitle}</p>
         {error && (
-          <p
-            role="alert"
-            className="mb-4 rounded-lg bg-error/10 px-3 py-2 text-error text-sm dark:bg-error/20">
+          <p role="alert" className="mb-4 rounded-lg bg-error/10 px-3 py-2 text-error text-sm dark:bg-error/20">
             {error}
           </p>
         )}
         <label htmlFor="password" className="mb-1.5 block text-muted-foreground text-sm">
-          密码
+          {copy.password}
         </label>
         <input
           id="password"
@@ -80,7 +108,7 @@ export default function LoginApp(): React.ReactElement {
           type="submit"
           disabled={pending}
           className="mt-4 w-full rounded-[10px] bg-primary px-3 py-2.5 font-medium text-[15px] text-primary-foreground disabled:cursor-progress disabled:opacity-60">
-          {pending ? '登录中…' : '登录'}
+          {pending ? copy.signingIn : copy.signIn}
         </button>
       </form>
     </div>

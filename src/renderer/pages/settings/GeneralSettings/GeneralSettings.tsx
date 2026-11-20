@@ -18,14 +18,14 @@ import {
   HelpTooltip
 } from '@cherrystudio/ui'
 import { cn } from '@cherrystudio/ui/lib/utils'
-import { useMultiplePreferences, usePreference } from '@data/hooks/usePreference'
-import { CherryCloudModelSelector as ModelSelector } from '@renderer/components/cherryCloud/CherryCloudModelSelector'
-import { useCherryCloudModelSelectorData } from '@renderer/components/cherryCloud/useCherryCloudModelSelectorData'
+import { usePreference } from '@data/hooks/usePreference'
 import CopyButton from '@renderer/components/CopyButton'
 import {
   countStaleSelectedModelIds,
   hasStaleSelectedModelIds,
-  type ModelSelectorFilter
+  ModelSelector,
+  type ModelSelectorFilter,
+  useModelSelectorData
 } from '@renderer/components/ModelSelector'
 import { AgentLanguageField } from '@renderer/components/resourceCatalog/dialogs/components/AgentLanguageField'
 import Selector from '@renderer/components/Selector'
@@ -39,17 +39,14 @@ import {
   SettingTitle
 } from '@renderer/components/SettingsPrimitives'
 import { useTheme } from '@renderer/hooks/useTheme'
-import { useTimer } from '@renderer/hooks/useTimer'
 import { appLanguageOptions, isAppLanguage } from '@renderer/i18n/languages'
 import i18n from '@renderer/i18n/resolver'
 import { ipcApi } from '@renderer/ipc'
 import { settingsControlClasses } from '@renderer/pages/settings/settingsStyles'
-import { popup } from '@renderer/services/popup'
 import { toast } from '@renderer/services/toast'
 import { formatErrorMessage } from '@renderer/utils/error'
 import { isValidProxyUrl } from '@renderer/utils/url'
-import { isManagedCherryCloudModel } from '@shared/data/presets/cherryai'
-import { isUniqueModelId, parseUniqueModelId, type UniqueModelId } from '@shared/data/types/model'
+import type { UniqueModelId } from '@shared/data/types/model'
 import type { OutputFor } from '@shared/ipc/types'
 import { defaultLanguage } from '@shared/utils/languages'
 import { isNonChatModel } from '@shared/utils/model'
@@ -84,26 +81,11 @@ function getRetryFallbackModelsTriggerLabel(
 
 const defaultByPassRules = 'localhost,127.0.0.1,::1'
 
-const TRAY_PREFERENCE_KEYS = {
-  enabled: 'app.tray.enabled',
-  onClose: 'app.tray.on_close',
-  onLaunch: 'app.tray.on_launch',
-  clickTrayToShowQuickAssistant: 'feature.quick_assistant.click_tray_to_show'
-} as const
-
 const GeneralSettings: FC = () => {
   const { t } = useTranslation()
   const { theme } = useTheme()
-  const { setTimeoutTimer } = useTimer()
 
   const [language, setLanguage] = usePreference('app.language')
-  const [disableHardwareAcceleration, setDisableHardwareAcceleration] = usePreference(
-    'BootConfig.app.disable_hardware_acceleration'
-  )
-  const [launchOnBoot, setLaunchOnBoot] = usePreference('app.launch_on_boot')
-  const [trayPreferences, setTrayPreferences] = useMultiplePreferences(TRAY_PREFERENCE_KEYS)
-  const { enabled: tray, onClose: trayOnClose, onLaunch: launchToTray } = trayPreferences
-  const [preventSleepWhenBusy, setPreventSleepWhenBusy] = usePreference('app.power.prevent_sleep_when_busy')
   const [allowPrivateNetworkFetch, setAllowPrivateNetworkFetch] = usePreference('app.fetch.allow_private_network')
   const [commitAttribution, setCommitAttribution] = usePreference('agent.commit_attribution.enabled')
   const [storeProxyMode, setProxyMode] = usePreference('app.proxy.mode')
@@ -144,10 +126,8 @@ const GeneralSettings: FC = () => {
     resolvedSelectedModelIds: resolvedRetryFallbackModelIds,
     isLoading: isFallbackSelectorDataLoading,
     modelsError: fallbackModelsCatalogError,
-    providersError: fallbackProvidersCatalogError,
-    cloudAvailabilityReady: fallbackCloudAvailabilityReady,
-    cloudAvailabilityError: fallbackCloudAvailabilityError
-  } = useCherryCloudModelSelectorData({
+    providersError: fallbackProvidersCatalogError
+  } = useModelSelectorData({
     filter: chatModelFilter,
     selectedModelIds: configuredRetryFallbackModelIds,
     searchText: '',
@@ -158,21 +138,10 @@ const GeneralSettings: FC = () => {
   // Cloud IDs, so it must not hide known stale non-Cloud selections.
   const canEvaluateFallbackStale =
     !isFallbackSelectorDataLoading && fallbackModelsCatalogError == null && fallbackProvidersCatalogError == null
-  const isFallbackCloudAvailabilityKnown = fallbackCloudAvailabilityReady && fallbackCloudAvailabilityError == null
-  const classifiedRetryFallbackModelIds = useMemo(() => {
-    if (isFallbackCloudAvailabilityKnown) return resolvedRetryFallbackModelIds
-    const unknownCloudIds = configuredRetryFallbackModelIds.filter(
-      (id) => isUniqueModelId(id) && isManagedCherryCloudModel(parseUniqueModelId(id).providerId)
-    )
-    // Presentation-only: keep unknown Cloud selections neutral. Do not change
-    // selector resolution, persisted IDs, or runtime fallback behavior.
-    return [...new Set([...resolvedRetryFallbackModelIds, ...unknownCloudIds])]
-  }, [configuredRetryFallbackModelIds, isFallbackCloudAvailabilityKnown, resolvedRetryFallbackModelIds])
   const hasInvalidRetryFallbackModels =
-    canEvaluateFallbackStale &&
-    hasStaleSelectedModelIds(configuredRetryFallbackModelIds, classifiedRetryFallbackModelIds)
+    canEvaluateFallbackStale && hasStaleSelectedModelIds(configuredRetryFallbackModelIds, resolvedRetryFallbackModelIds)
   const retryFallbackModelsTriggerLabel = canEvaluateFallbackStale
-    ? getRetryFallbackModelsTriggerLabel(configuredRetryFallbackModelIds, classifiedRetryFallbackModelIds, t)
+    ? getRetryFallbackModelsTriggerLabel(configuredRetryFallbackModelIds, resolvedRetryFallbackModelIds, t)
     : configuredRetryFallbackModelIds.length > 0
       ? t('settings.models.retry.fallback_models_count', { count: configuredRetryFallbackModelIds.length })
       : t('settings.models.empty')
@@ -182,22 +151,6 @@ const GeneralSettings: FC = () => {
     { value: 'custom', label: t('settings.proxy.mode.custom') },
     { value: 'none', label: t('settings.proxy.mode.none') }
   ]
-
-  const updateTray = (isShowTray: boolean) => {
-    void setTrayPreferences(
-      isShowTray
-        ? { enabled: true }
-        : { enabled: false, onClose: false, onLaunch: false, clickTrayToShowQuickAssistant: false }
-    )
-  }
-
-  const updateTrayOnClose = (isTrayOnClose: boolean) => {
-    void setTrayPreferences(isTrayOnClose && !tray ? { enabled: true, onClose: true } : { onClose: isTrayOnClose })
-  }
-
-  const updateLaunchToTray = (isLaunchToTray: boolean) => {
-    void setTrayPreferences(isLaunchToTray && !tray ? { enabled: true, onLaunch: true } : { onLaunch: isLaunchToTray })
-  }
 
   const isProxyTestAction = (event: FocusEvent<HTMLInputElement>) =>
     event.relatedTarget instanceof Node && proxyTestButtonRef.current?.contains(event.relatedTarget)
@@ -306,34 +259,6 @@ const GeneralSettings: FC = () => {
     return proxyTestResult.success ? t('settings.proxy.test.success', values) : t('settings.proxy.test.failure', values)
   }
 
-  const handleHardwareAccelerationChange = async (checked: boolean) => {
-    const confirmed = await popup.confirm({
-      title: t('settings.hardware_acceleration.confirm.title'),
-      content: checked
-        ? t('settings.hardware_acceleration.confirm.content_disable')
-        : t('settings.hardware_acceleration.confirm.content_enable'),
-      okText: t('common.confirm'),
-      cancelText: t('common.cancel'),
-      centered: true
-    })
-    if (!confirmed) return
-
-    try {
-      await setDisableHardwareAcceleration(checked)
-    } catch (error) {
-      toast.error(formatErrorMessage(error))
-      throw error
-    }
-
-    setTimeoutTimer(
-      'handleHardwareAccelerationChange',
-      () => {
-        void ipcApi.request('app.relaunch')
-      },
-      500
-    )
-  }
-
   const saveDeveloperSettings = async (save: () => Promise<void>) => {
     if (developerSettingsSaving.current) return
     developerSettingsSaving.current = true
@@ -405,29 +330,6 @@ const GeneralSettings: FC = () => {
               </SelectContent>
             </Select>
           </div>
-        </SettingRow>
-      </SettingGroup>
-      <SettingGroup theme={theme}>
-        <SettingTitle>{t('settings.general.sections.startup')}</SettingTitle>
-        <SettingDivider />
-        <SettingRow id="setting-general-launch-onboot" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.launch.onboot')}</SettingRowTitle>
-          <Switch checked={launchOnBoot} onCheckedChange={(checked) => void setLaunchOnBoot(checked)} />
-        </SettingRow>
-        <SettingDivider />
-        <SettingRow id="setting-general-tray-show" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.tray.show')}</SettingRowTitle>
-          <Switch checked={tray} onCheckedChange={(checked) => updateTray(checked)} />
-        </SettingRow>
-        <SettingDivider />
-        <SettingRow id="setting-general-launch-totray" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.launch.totray')}</SettingRowTitle>
-          <Switch checked={launchToTray} onCheckedChange={(checked) => updateLaunchToTray(checked)} />
-        </SettingRow>
-        <SettingDivider />
-        <SettingRow id="setting-general-tray-onclose" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.tray.onclose')}</SettingRowTitle>
-          <Switch checked={trayOnClose} onCheckedChange={(checked) => updateTrayOnClose(checked)} />
         </SettingRow>
       </SettingGroup>
       <SettingGroup theme={theme}>
@@ -521,19 +423,6 @@ const GeneralSettings: FC = () => {
             checked={allowPrivateNetworkFetch}
             onCheckedChange={(checked) => void setAllowPrivateNetworkFetch(checked)}
           />
-        </SettingRow>
-      </SettingGroup>
-      <SettingGroup theme={theme}>
-        <SettingTitle>{t('settings.general.sections.runtime')}</SettingTitle>
-        <SettingDivider />
-        <SettingRow id="setting-general-hardware-acceleration" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.hardware_acceleration.title')}</SettingRowTitle>
-          <Switch checked={disableHardwareAcceleration} onCheckedChange={handleHardwareAccelerationChange} />
-        </SettingRow>
-        <SettingDivider />
-        <SettingRow id="setting-general-prevent-sleep-when-busy" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.power.prevent_sleep_when_busy')}</SettingRowTitle>
-          <Switch checked={preventSleepWhenBusy} onCheckedChange={(checked) => void setPreventSleepWhenBusy(checked)} />
         </SettingRow>
       </SettingGroup>
       <ContextManagementSettings />
