@@ -57,6 +57,7 @@ export default function ComposerDockTransitionFrame({
   const [bottomOverlayInsets, setBottomOverlayInsets] = useState<ChatBottomOverlayInsets | null>(null)
   const [composerInlineInsets, setComposerInlineInsets] = useState<ComposerInlineInsets>(ZERO_COMPOSER_INLINE_INSETS)
   const [dockKeyboardLift, setDockKeyboardLift] = useState(0)
+  const [composerHasFocus, setComposerHasFocus] = useState(false)
   const isDocked = placement === 'docked'
   const hasComposer = Boolean(composer)
   const dockMotionTransition = useComposerDockMotionTransition(placement)
@@ -74,6 +75,31 @@ export default function ComposerDockTransitionFrame({
     return () => setQuickPanelFill(false)
   }, [placement, setQuickPanelFill])
 
+  // Only a focused composer follows the keyboard. Selector panels take focus into
+  // their own search field, and the page has to stay put in that case.
+  useLayoutEffect(() => {
+    const node = composerRef.current
+    if (!node) return undefined
+
+    const syncFocus = () => {
+      const focused = node.contains(document.activeElement)
+      setComposerHasFocus((current) => (current === focused ? current : focused))
+    }
+    // `focusout` fires before the next element takes focus, so re-read the active
+    // element after the browser finishes moving it.
+    const scheduleSync = () => {
+      window.requestAnimationFrame(syncFocus)
+    }
+
+    syncFocus()
+    document.addEventListener('focusin', scheduleSync)
+    document.addEventListener('focusout', scheduleSync)
+    return () => {
+      document.removeEventListener('focusin', scheduleSync)
+      document.removeEventListener('focusout', scheduleSync)
+    }
+  }, [hasComposer])
+
   useLayoutEffect(() => {
     const node = composerRef.current
     if (!node) return
@@ -87,7 +113,7 @@ export default function ComposerDockTransitionFrame({
       // composer floats a bar-height above the keyboard instead of resting on it.
       const stageRect = rootRef.current?.getBoundingClientRect()
       const stageBottomGap = stageRect ? Math.max(0, window.innerHeight - stageRect.bottom) : 0
-      const nextDockKeyboardLift = Math.max(0, keyboardInset - stageBottomGap)
+      const nextDockKeyboardLift = composerHasFocus ? Math.max(0, keyboardInset - stageBottomGap) : 0
       setDockKeyboardLift((current) => (current === nextDockKeyboardLift ? current : nextDockKeyboardLift))
 
       if (!isDocked || !hasComposer) {
@@ -164,7 +190,7 @@ export default function ComposerDockTransitionFrame({
       mutationObserver?.disconnect()
       observer?.disconnect()
     }
-  }, [hasComposer, isDocked, keyboardInset])
+  }, [composerHasFocus, hasComposer, isDocked, keyboardInset])
 
   return (
     <div ref={rootRef} data-composer-stage="" className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden">
