@@ -31,6 +31,7 @@ import { promotePendingRestore } from './features/backup/restoreGate'
 import { registerBackupRoutes } from './features/backup/routes'
 import { registerBrowserRoutes } from './features/browser/routes'
 import { registerExportRoutes } from './features/export/routes'
+import { registerFileProcessingRoutes } from './features/fileProcessing/routes'
 import { MiniAppAssets } from './features/miniapps/MiniAppAssets'
 import { registerMiniAppHttpRoutes, registerMiniAppRoutes } from './features/miniapps/routes'
 import { NotesStorage } from './features/notes/NotesStorage'
@@ -131,6 +132,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   registerBrowserRoutes(registry)
   registerSkillRoutes(registry, { storage: skillStorage })
   registerCapabilityRoutes(registry)
+  registerFileProcessingRoutes(registry)
   registerPreferenceRoutes(registry, connections)
   registerWorkspaceRoutes(registry, workspaceService)
 

@@ -6,6 +6,8 @@
  *   target for it and the service that imports it is not registered.
  * - `registry-js` and `@paymoapp/electron-shutdown-handler` are Windows-only
  *   native addons, imported lazily behind platform checks.
+ * - `@napi-rs/system-ocr` is the platform OCR binding behind the desktop
+ *   `system` processor; it is never loaded on the Linux server.
  * - `?raw` / `?nodeWorker` are Electron Vite import queries. The server build
  *   resolves them in `vite.server.config.ts`; these declarations give the type
  *   checker the shapes those imports produce.
@@ -42,6 +44,22 @@ declare module 'registry-js' {
   export const HKEY: any
   export const RegistryValueType: any
   export function enumerateValuesSafe(...args: any[]): any[]
+}
+
+/**
+ * Platform OCR binding for the desktop `system` processor. It is a native addon
+ * the web build does not ship; the processor's `isSupported()` keeps it off the
+ * list on Linux, and its handler catches a failed lazy import with a readable
+ * error. The declaration only lets the file-processing registry type-check.
+ */
+declare module '@napi-rs/system-ocr' {
+  export const OcrAccuracy: { Fast: number; Accurate: number }
+  export function recognize(
+    image: string | Uint8Array,
+    accuracy: number,
+    langs?: string[],
+    signal?: AbortSignal
+  ): Promise<{ text: string }>
 }
 
 declare module '@paymoapp/electron-shutdown-handler' {

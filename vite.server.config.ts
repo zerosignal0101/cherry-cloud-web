@@ -51,6 +51,10 @@ function electronViteCompat(): Plugin {
 const externalPackages = [
   'better-sqlite3',
   '@napi-rs/canvas',
+  // Optional platform binding behind the desktop `system` OCR processor. It is
+  // not installed in the web build; the handler turns the failed lazy import
+  // into a readable error instead of failing the bundle.
+  '@napi-rs/system-ocr',
   '@node-rs/xxhash',
   'sharp',
   'tesseract.js',

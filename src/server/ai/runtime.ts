@@ -19,6 +19,7 @@ import { LifecycleManager, Phase, ServiceContainer, type ServiceConstructor } fr
 import { PowerService } from '@main/core/power/PowerService'
 import { SchedulerService } from '@main/core/scheduler/SchedulerService'
 import { ApiGatewayService } from '@main/features/apiGateway/ApiGatewayService'
+import { TesseractRuntimeService } from '@main/features/fileProcessing'
 import { FileEditService } from '@main/services/file/FileEditService'
 import { FileManager } from '@main/services/file/FileManager'
 import { FileObservationService } from '@main/services/file/observation/FileObservationService'
@@ -28,6 +29,7 @@ import { WebSearchService } from '@main/services/webSearch/WebSearchService'
 
 import { WebDbService } from '../data/dbService'
 import { ServerBrowserSessionService } from '../features/browser/ServerBrowserSessionService'
+import { WebFileProcessingService } from '../features/fileProcessing/WebFileProcessingService'
 import { WebNotificationService } from './webNotificationService'
 import {
   WebAnalyticsService,
@@ -82,6 +84,8 @@ const webServices = [
   DirectoryTreeManager,
   FileEditService,
   FileManager,
+  TesseractRuntimeService,
+  WebFileProcessingService,
   ProviderRegistryUpdaterService,
   WebSearchService,
   McpPackageService,

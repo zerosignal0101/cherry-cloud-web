@@ -100,6 +100,13 @@
 - 站点 iframe 仍由对方的 `X-Frame-Options`/`frame-ancestors` 决定，被拒绝时只能新标签页打开。
 - 新增文案只保证 `en-US`/`zh-CN`；其余语言缺失键回退英文。
 
+## 0.8 文档处理与 OCR 已完成内容
+
+- `file_processing.*` 已注册：`list_available_processors`、`start_task`、`get_task`、`open_mineru.check_connectivity`。设置页“文档处理”“OCR”不再显示“加载可用处理器失败”，处理器默认项、API Key、API Host 与语言选项继续走 preference。
+- `FileProcessingService` 与 `TesseractRuntimeService` 加入 Web 生命周期；OCR/文档转换任务与桌面一致，进度经共享缓存 `file_processing.task.*` 同步，过期条目仍可用 `get_task` 读回。
+- 可用处理器按 Web 运行能力收窄：Tesseract（进程内 worker）、PaddleOCR、Mistral（远程 API），以及 MinerU、Doc2X、Open MinerU（远程轮询/探测）。`local-paddleocr` 与 `local-document` 依赖 Electron utility process 与本地 ONNX 模型，不进入列表，避免暴露无法完成下载的入口。
+- `@paddleocr/api-sdk` 补入依赖，PaddleOCR 的两个能力可实际调用；`@napi-rs/system-ocr` 仅补类型声明，`system` 处理器在 Linux 上本就不满足 `isSupported()`。
+
 ## 0. 目标与原则
 
 把下列桌面能力移植为服务端执行、浏览器展示的功能：
@@ -134,6 +141,7 @@
 | 小应用 | `/app/mini-app/*` | 站点/本地小应用均走 sandbox iframe；包上传、签名资源、能力桥、安装/卸载/授权可用 | 更新/回滚、内置包、市场安装延后 | **已完成（M13，见 §0.4）** |
 | 笔记 | `/app/notes` | `notes.*` 已注册；内容在 `DATA_DIR/notes`，树/编辑经 `/notes` 路径翻译 | 无 | **已完成（M11）** |
 | 翻译 | `/app/translate` | 历史/语言/偏好走 DataApi 与 preference；`translate.open` 未注册 | 文件读取依赖本地路径；PDF 依赖 BabelDOC | 文本翻译优先，文件/PDF 延后 |
+| 文档处理与 OCR | `/settings/file-processing`、`/settings/ocr` | `file_processing.*` 已注册；Tesseract 与远程处理器可配置/执行；任务进度经共享缓存同步 | 本地 ONNX 模型依赖 utility process，暂不列出 | **已完成（见 §0.8）** |
 | 定时任务 | `/app/scheduled-tasks` | 读接口可用；`SchedulerService`/`JobManager` 已在生命周期 | `AgentJobsService`、`NotificationService`、`ChannelManager` 未注册 | 中小工作量，优先 |
 | 云盘备份 | `/settings/data` | WebDAV/S3 手动与自动备份、列表/删除、暂存恢复、进度事件；凭据在 SecretService；Word 导出服务端生成 | 恢复需重启进程；备份文件含加密凭据 | **已完成（M15，见 §3.8）** |
 
@@ -189,7 +197,7 @@
 - 注册 `translate.open`，复用 `AiStreamManager` 的 `ai.stream.*` 推送，文本翻译可用。
 - 语言识别走已注册的 `ai.text.generate`；历史、收藏、自定义语言继续走 DataApi。
 - 文件翻译改为浏览器选择 `File` → `POST /api/files` → 服务端读取 `FileEntry`；只支持纯文本/Markdown 的第一版。
-- PDF/OCR/BabelDOC、`pdfjs.resource.read`、`file_processing.*` 延后。
+- PDF/OCR/BabelDOC、`pdfjs.resource.read` 延后；`file_processing.*` 已注册（见 §0.8）。
 
 改动点：
 
