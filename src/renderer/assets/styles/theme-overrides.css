@@ -1,0 +1,24 @@
+/*
+ * Web overrides for the vendored design tokens.
+ *
+ * Loaded after `tailwind.css` on purpose: the token providers in
+ * `@cherrystudio/ui` are unlayered, so an override has to win by source order
+ * instead of by cascade layer. Keeping the overrides in an app-owned file also
+ * means the vendored package can be re-synced without losing them.
+ */
+
+/*
+ * Dark surfaces are opaque in the browser.
+ *
+ * The vendored dark theme paints `--cs-background` at 55% alpha and the message
+ * well at 0.1727/0.55 so the macOS transparent window shows its vibrancy
+ * through them. A web page has no window behind the document, so that alpha
+ * composites over the browser's white canvas and every dark surface renders as
+ * washed-out grey — visibly different from the solid light theme. Use the
+ * opaque equivalents instead; `--chat-message-well` takes the tone it was
+ * designed to resolve to over the rails.
+ */
+.dark {
+  --cs-background: oklch(0.209 0 0);
+  --chat-message-well: oklch(0.191 0 0);
+}

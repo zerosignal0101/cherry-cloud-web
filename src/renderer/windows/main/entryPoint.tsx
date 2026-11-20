@@ -1,5 +1,7 @@
 import '@renderer/assets/styles/index.css'
 import '@renderer/assets/styles/tailwind.css'
+// Must stay after `tailwind.css`: it overrides unlayered vendored tokens by order.
+import '@renderer/assets/styles/theme-overrides.css'
 import { createRoot } from 'react-dom/client'
 
 import { installWebApi } from '@renderer/ipc/webApi'
