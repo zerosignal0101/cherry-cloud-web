@@ -266,7 +266,13 @@ const MessageItemContent: FC<Omit<Props, 'messageParts'>> = ({
       )}>
       <HorizontalScrollContainer
         classNames={{
-          content: cn('flex-1 flex-row items-center justify-between')
+          // Phones cannot fit the action row and the token readout side by side, and
+          // scrolling the footer hid the readout past the right edge. Stack it below
+          // the actions instead; the container still scrolls if the actions themselves overflow.
+            content: cn(
+              'flex-1 flex-row items-center justify-between',
+              'max-sm:flex-col max-sm:items-stretch max-sm:justify-end max-sm:gap-0.5!'
+            )
         }}>
         <MessageMenuBar
           message={message}
