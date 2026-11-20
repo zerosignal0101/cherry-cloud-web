@@ -1,12 +1,13 @@
-import { FolderOpen, MessageSquare, Settings } from 'lucide-react'
+import { useRouter, useRouterState } from '@tanstack/react-router'
+import { CalendarClock, FolderOpen, Languages, MessageSquare, Settings } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 
 import { Tooltip } from '@cherrystudio/ui'
 import AppLogo from '@renderer/assets/images/logo.png'
 import { ResourceViewSourceProvider } from '@renderer/components/ResourceViewSourceProvider'
+import { useKeyboardViewportHeight } from '@renderer/hooks/useKeyboardViewportHeight'
 import { getDefaultRouteTitle } from '@renderer/utils/routeTitle'
 import { cn } from '@renderer/utils/style'
-import { useRouter, useRouterState } from '@tanstack/react-router'
 
 interface NavItem {
   href: string
@@ -14,14 +15,17 @@ interface NavItem {
 }
 
 /**
- * The first-version surfaces. Everything else that the desktop renderer could
- * open (knowledge, agents, paintings, code, notes, translate, mini-apps,
- * scheduled tasks) is deferred, so it is deliberately absent from every shell
- * instead of leading to a page the server does not serve.
+ * The surfaces enabled so far. Everything else that the desktop renderer could
+ * open (knowledge, agents, paintings, notes, mini-apps) is still deferred, so it
+ * stays absent from every shell instead of leading to a page the server does not
+ * serve. Translate and scheduled tasks joined the first-version set in M10 (see
+ * docs/architecture/feature-migration.md).
  */
 const NAV_ITEMS: NavItem[] = [
   { href: '/app/chat', icon: MessageSquare },
   { href: '/app/files', icon: FolderOpen },
+  { href: '/app/translate', icon: Languages },
+  { href: '/app/scheduled-tasks', icon: CalendarClock },
   { href: '/settings', icon: Settings }
 ]
 
@@ -81,9 +85,13 @@ function useLabels(): Array<NavItem & { title: string }> {
  */
 export function WebShell({ children }: { children: React.ReactNode }) {
   const pathname = useActivePath()
+  const keyboardViewportHeight = useKeyboardViewportHeight()
 
   return (
-    <div data-ui="app.shell" className="flex h-dvh w-full flex-row overflow-hidden bg-sidebar text-foreground">
+    <div
+      data-ui="app.shell"
+      style={keyboardViewportHeight ? { height: keyboardViewportHeight } : undefined}
+      className="flex h-dvh w-full flex-row overflow-hidden bg-sidebar text-foreground">
       <DesktopRail pathname={pathname} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <main
@@ -103,7 +111,10 @@ export function WebShell({ children }: { children: React.ReactNode }) {
 function DesktopRail({ pathname }: { pathname: string }) {
   const items = useLabels()
   return (
-    <nav aria-label="主导航" className="hidden w-14 shrink-0 flex-col items-center gap-1 py-3 md:flex">
+    <nav
+      data-ui="app.desktop-nav"
+      aria-label="主导航"
+      className="hidden w-14 shrink-0 flex-col items-center gap-1 py-3 md:flex">
       <img src={AppLogo} alt="" aria-hidden="true" className="mb-3 size-8 rounded-xl" />
       {items.map(({ href, icon: Icon, title }) => {
         const active = isActive(pathname, href)
@@ -131,6 +142,7 @@ function MobileBar({ pathname }: { pathname: string }) {
   const items = useLabels()
   return (
     <nav
+      data-ui="app.mobile-nav"
       aria-label="主导航"
       className="flex shrink-0 items-stretch justify-around border-t-[0.5px] border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
       {items.map(({ href, icon: Icon, title }) => {
