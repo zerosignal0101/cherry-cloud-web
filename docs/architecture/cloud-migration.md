@@ -83,6 +83,7 @@
 - 移动端可用性修正：
   - 软键盘：Shell 保持 `dvh` 高度，不再按 `visualViewport` 改写高度，也不再声明 `interactive-widget=resizes-content`。原先二者会把底部导航顶到键盘上方并重排整页，连输入框位于顶部的表单也跟着跳动。键盘避让只发生在对话舞台：`useKeyboardViewportInset` 给出被遮挡高度，`ComposerDockTransitionFrame` 按“舞台底部到视口底部的距离”折算后只上移 composer，且只在焦点位于 composer 内时生效——点开选择器的搜索框同样会唤起键盘，此时页面必须保持不动。聊天内容区因此仍会在键盘打开时收缩（与桌面聊天一致），其余页面布局不动。
   - 顶栏选择器层级：`ChatAppShell` 的 top bar 从 `z-10` 提到 `z-20`。选择器浮层挂载在触发器旁，若与问候层、composer 同处 `z-10`，DOM 靠后的内容会盖住浮层。
+  - 消息脚注：`sm` 以下把 Token 读数折到操作图标下一行——两者并排时脚注内容宽于可用宽度，读数会被推到屏幕右缘之外。Token 详情原本只由 HoverCard 承载，触摸设备上悬停不会触发，因此按指针类型区分：细指针保持悬停预览 + 点击定位，粗指针点按后弹出详情对话框（`useCoarsePointer`）。
   - 助手/智能体编辑与新建弹窗：`sm` 以下改为贴顶全高 sheet，左侧固定宽度 tab 轨道改成可横向滚动的标签条，表单行标签列收窄；不再出现 390px 宽下内容被 144px 轨道挤掉的情况。
   - 对话控件顺序改为先模型、后助手/智能体，窄屏收成图标时模型仍紧邻输入区。
   - 暗色表面：`packages/ui` 的 dark tokens 为 macOS 透明窗口的 vibrancy 保留了 55% alpha，浏览器里会与白色画布混合成发灰的半透明面。Web 侧在 `src/renderer/assets/styles/theme-overrides.css` 覆盖为不透明等值色（须在 `tailwind.css` 之后加载；该文件不在同步区，重新同步 `packages/ui` 不会丢）。

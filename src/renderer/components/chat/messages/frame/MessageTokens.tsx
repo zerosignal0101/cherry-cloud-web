@@ -2,8 +2,9 @@ import type { FC, MouseEvent } from 'react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@cherrystudio/ui'
+import { Dialog, DialogContent, DialogTitle, HoverCard, HoverCardContent, HoverCardTrigger } from '@cherrystudio/ui'
 import { useInfiniteFlatItems, useInfiniteQuery } from '@renderer/data/hooks/useDataApi'
+import { useCoarsePointer } from '@renderer/hooks/useCoarsePointer'
 
 import { useMessageListActions, useMessageListMeta } from '../MessageListProvider'
 import type { MessageListItem } from '../types'
@@ -14,12 +15,12 @@ interface MessageTokensProps {
   message: MessageListItem
 }
 
+const MESSAGE_TOKENS_BUTTON_CLASS =
+  'message-tokens cursor-pointer select-text text-right text-muted-foreground text-xs tabular-nums leading-5 transition-colors duration-150 hover:text-foreground focus-visible:text-foreground focus-visible:underline focus-visible:outline-none'
+
 function UserMessageTokens({ label, onLocate }: { label: string; onLocate: () => void }) {
   return (
-    <button
-      type="button"
-      className="message-tokens cursor-pointer select-text text-right text-muted-foreground text-xs tabular-nums leading-5 transition-colors duration-150 hover:text-foreground focus-visible:text-foreground focus-visible:underline focus-visible:outline-none"
-      onClick={onLocate}>
+    <button type="button" className={MESSAGE_TOKENS_BUTTON_CLASS} onClick={onLocate}>
       {label}
     </button>
   )
@@ -38,6 +39,9 @@ function AssistantMessageTokens({
   const [isDetailsOpen, setIsDetailsOpen] = useState(false)
   const [isDetailsDismissed, setIsDetailsDismissed] = useState(false)
   const contentId = useId()
+  const { t } = useTranslation()
+  // Touch devices never fire the hover that opens the preview, so they get a tap target instead.
+  const isCoarsePointer = useCoarsePointer()
   const messageKind = useMessageListMeta().aiUsageMessageKind ?? 'chat'
   const { pages, isLoading, isRefreshing, hasNext, loadNext } = useInfiniteQuery('/ai-usage-records', {
     enabled: isDetailsOpen && message.stats?.runtimeTiming !== undefined,
@@ -100,13 +104,47 @@ function AssistantMessageTokens({
     loadNext()
   }, [hasNext, isDetailsVisible, isRefreshing, loadNext, pages.length, showMoreDetails])
 
+  const detailsCard = (
+    <MessageTokenDetailsCard
+      message={message}
+      records={records}
+      showMoreDetails={showMoreDetails}
+      isLoadingDetails={isLoading || isRefreshing}
+      onShowMoreDetailsChange={setShowMoreDetails}
+    />
+  )
+
+  if (isCoarsePointer) {
+    return (
+      <>
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={isDetailsOpen}
+          className={MESSAGE_TOKENS_BUTTON_CLASS}
+          onClick={() => setIsDetailsOpen(true)}>
+          {label}
+        </button>
+        <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+          <DialogContent
+            showCloseButton={false}
+            aria-describedby={undefined}
+            className="max-h-[min(80dvh,34rem)] w-[min(28rem,calc(100vw-1.5rem))] gap-0 overflow-y-auto rounded-2xl p-0">
+            <DialogTitle className="sr-only">{t('chat.message.token_details.usage')}</DialogTitle>
+            {detailsCard}
+          </DialogContent>
+        </Dialog>
+      </>
+    )
+  }
+
   return (
     <HoverCard open={isDetailsVisible} onOpenChange={handleDetailsOpenChange} openDelay={200} closeDelay={100}>
       <HoverCardTrigger asChild>
         <button
           type="button"
           aria-describedby={isDetailsVisible ? contentId : undefined}
-          className="message-tokens cursor-pointer select-text text-right text-muted-foreground text-xs tabular-nums leading-5 transition-colors duration-150 hover:text-foreground focus-visible:text-foreground focus-visible:underline focus-visible:outline-none"
+          className={MESSAGE_TOKENS_BUTTON_CLASS}
           onBlur={handleBlur}
           onMouseDown={handleMouseDown}
           onMouseEnter={handleMouseBoundary}
@@ -122,13 +160,7 @@ function AssistantMessageTokens({
         sideOffset={8}
         collisionPadding={12}
         className="w-[28rem] max-w-(--radix-hover-card-content-available-width) p-0">
-        <MessageTokenDetailsCard
-          message={message}
-          records={records}
-          showMoreDetails={showMoreDetails}
-          isLoadingDetails={isLoading || isRefreshing}
-          onShowMoreDetailsChange={setShowMoreDetails}
-        />
+        {detailsCard}
       </HoverCardContent>
     </HoverCard>
   )
