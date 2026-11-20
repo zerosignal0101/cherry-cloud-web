@@ -24,7 +24,10 @@ export default defineConfig({
       { find: '@application', replacement: resolvePath('./src/platform/application.ts') },
       { find: /^electron$/, replacement: resolvePath('./src/platform/electron/index.ts') },
       // Vendored upstream packages, resolved from source like the builds do.
-      { find: /^@cherrystudio\/ai-core\/contextOverflow$/, replacement: resolvePath('./vendor/ai-core/src/contextOverflow.ts') },
+      {
+        find: /^@cherrystudio\/ai-core\/contextOverflow$/,
+        replacement: resolvePath('./vendor/ai-core/src/contextOverflow.ts')
+      },
       { find: /^@cherrystudio\/ai-core\/provider$/, replacement: resolvePath('./vendor/ai-core/src/core/providers') },
       {
         find: /^@cherrystudio\/ai-core\/built-in\/plugins$/,
@@ -39,7 +42,7 @@ export default defineConfig({
   },
   test: {
     include: ['src/server/**/*.test.ts', 'src/shared/**/*.test.ts'],
-    // Code CLI ships in a later milestone; its bundled skill resources are not vendored yet.
+    // The CLI preset table stays for BinaryManager's mise recipes; its bundled skill resources are not vendored.
     exclude: [
       '**/node_modules/**',
       'src/shared/data/presets/__tests__/codeCliTools.test.ts',

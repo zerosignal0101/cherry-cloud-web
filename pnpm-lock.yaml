@@ -270,6 +270,12 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: 0.3.311
         version: 0.3.311(patch_hash=b89b3f4bbaf29e79be6f1de79f027ab65862b7656ce3d1c3ae7481f016093abe)(@anthropic-ai/sdk@0.93.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.32.0(supports-color@10.2.2)(zod@4.4.3))(zod@4.4.3)
+      '@aws-sdk/client-s3':
+        specifier: ^3.1171.0
+        version: 3.1171.0
+      '@aws-sdk/lib-storage':
+        specifier: ^3.1171.0
+        version: 3.1171.0(@aws-sdk/client-s3@3.1171.0)
       '@cherrystudio/analytics-client':
         specifier: 1.4.0
         version: 1.4.0(typescript@5.9.3)
@@ -303,15 +309,33 @@ importers:
       '@earendil-works/pi-ai':
         specifier: 1.5.2
         version: 1.5.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.0(supports-color@10.2.2)(zod@4.4.3))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(undici@6.27.0)(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-codemode':
+        specifier: 1.5.2
+        version: 1.5.2
       '@earendil-works/pi-coding-agent':
         specifier: 1.5.2
         version: 1.5.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.0(supports-color@10.2.2)(zod@4.4.3))(@smithy/signature-v4@5.7.5)(supports-color@10.2.2)(ws@8.21.3)(zod@4.4.3)
       '@earendil-works/pi-durable':
         specifier: 1.5.2
         version: 1.5.2(@aws-sdk/credential-provider-node@3.972.97)(@modelcontextprotocol/sdk@1.32.0(supports-color@10.2.2)(zod@4.4.3))(@smithy/signature-v4@5.7.5)(esbuild@0.25.12)(react@19.3.1)(supports-color@10.2.2)(undici@6.27.0)(ws@8.21.3)(zod@4.4.3)
+      '@earendil-works/pi-schema':
+        specifier: 1.5.2
+        version: 1.5.2
       '@earendil-works/pi-telemetry':
         specifier: 1.5.2
         version: 1.5.2
+      '@elysia/bearer':
+        specifier: 1.4.4
+        version: 1.4.4(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))
+      '@elysia/cors':
+        specifier: 1.4.3
+        version: 1.4.3(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))
+      '@elysia/node':
+        specifier: 1.4.6
+        version: 1.4.6(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))
+      '@elysia/openapi':
+        specifier: ^1.4.17
+        version: 1.4.17(@sinclair/typebox@0.34.52)(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))(typescript@5.9.3)
       '@fastify/cookie':
         specifier: ^11.1.5
         version: 11.1.5
@@ -381,6 +405,9 @@ importers:
       dingtalk-stream:
         specifier: 2.1.7-beta.1
         version: 2.1.7-beta.1(patch_hash=b81b5999ab52fb82bc76c6c7599eb74137cf8c6304b84aa5e8d3c3c562049172)(supports-color@10.2.2)
+      elysia:
+        specifier: 1.4.32
+        version: 1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3)
       fastify:
         specifier: ^5.12.8
         version: 5.12.8
@@ -396,6 +423,9 @@ importers:
       jsdom:
         specifier: 26.1.0
         version: 26.1.0(supports-color@10.2.2)
+      playwright-core:
+        specifier: 1.62.1
+        version: 1.62.1
       quick-lru:
         specifier: 5.1.1
         version: 5.1.1
@@ -1965,8 +1995,16 @@ packages:
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
 
+  '@aws-sdk/checksums@3.1002.5':
+    resolution: {integrity: sha512-OHlfkNzDFjYnwNPABhwAkDTUi0HPjfsKUHJDR0bSMORpCXNzRpInPCNCIT08xKDhjaPlcLJ+2Av+Sk7hHnuC8A==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-bedrock-runtime@3.1127.0':
     resolution: {integrity: sha512-IDl/lrPb90aH+pZFHGNDmgH9nAUQj5PlZH1sJ3w7RikctyjHSnY3oNjZhrLoaBoQn/rNK0zsP6OHEqEhj2tdLA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/client-s3@3.1171.0':
+    resolution: {integrity: sha512-EIWM2ZuLBYqwM1W1PkNIWrQzFy6Y7WBwVpEDpnCrMtcQyIN3VOXbf0uy+0xG2dbv+PcvxIlEK8A1ohdbyMV72w==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/core@3.981.0':
@@ -2009,8 +2047,18 @@ packages:
     resolution: {integrity: sha512-YVB1wrpE1WF8NvMpaRyhwm9XBYl3HTbPNEIgybi0b0XpmBrJ7Y3Y/drbxh9qAVMbR+0hcwM63GPWzhOVRuerfg==}
     engines: {node: '>=20.0.0'}
 
+  '@aws-sdk/lib-storage@3.1171.0':
+    resolution: {integrity: sha512-TbV9meuyAshkD35h1Kw9BYZF8sXqDHT6fCmUdWsxiepxZMSjmnNRqc8zjJx5ahuV5/ReD2l3cJ/WJtMoh5lM7w==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@aws-sdk/client-s3': ^3.1171.0
+
   '@aws-sdk/middleware-eventstream@3.972.38':
     resolution: {integrity: sha512-4K6FDz2BxH3rve8Hw/8uApWXKCuKKMeYKzY23PoiGqUBWaA23eAy+GzW9aoG3Cm7HqgYzqkljl3ECJRJCxGs7g==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/middleware-sdk-s3@3.972.89':
+    resolution: {integrity: sha512-Lem2/ZT1eOicVATBukPRPm2S4JAmrTEkP3/dnJE9iTeyqIKqsJF2j04f5L0o+rrZIrwR13swiQMdzcE5jXRzNA==}
     engines: {node: '>=20.0.0'}
 
   '@aws-sdk/middleware-websocket@3.972.66':
@@ -2434,6 +2482,28 @@ packages:
   '@electron/get@5.1.0':
     resolution: {integrity: sha512-3kSBtG8ObcTVfXanm5vVJ6UnBLEVmVsRk1M+vGqCuMBV+XLCbJYuWQful+yIy0GQDsSlK0kHEriEHn7SPk4EnA==}
     engines: {node: '>=22.12.0'}
+
+  '@elysia/bearer@1.4.4':
+    resolution: {integrity: sha512-mYf6rj1e/N1h579udHiuvqvU0+i0O/qbKhNCSfxTln0StXztMGUX234MeiIFhbnq9sUBs37bDApy2ou8lflQUg==}
+    peerDependencies:
+      elysia: '>= 1.4.3'
+
+  '@elysia/cors@1.4.3':
+    resolution: {integrity: sha512-GaqNr6ufqAKbw8SVbxYozHdGFQm1AhXWvndWvoK9uyep99Jq+uI5msQfRkzUo1s5QGIjkCkCGX9XGViaDsp+0A==}
+    peerDependencies:
+      elysia: '>= 1.4.0'
+
+  '@elysia/node@1.4.6':
+    resolution: {integrity: sha512-UqtpX6E2uz3KJ9c/MWBJ4/3WDpUN15CzNWPUS/QbGMqO6Cmjqluh+pZqW5Yaday1+HL/JADj+zG8BjtHvRun2g==}
+    peerDependencies:
+      elysia: '>= 1.4.0'
+
+  '@elysia/openapi@1.4.17':
+    resolution: {integrity: sha512-rmyqxfoQyM6QMsxelt6RMuM8b0I6y33KgGcrm5LKw2xIOVHRFg9EAbxFejZBfyZmVYkY3EazgaPNlEz4HJ3Thg==}
+    peerDependencies:
+      '@sinclair/typebox': '>= 0.34.0 < 1'
+      elysia: '>= 1.4.0'
+      typescript: '>= 5.0.0'
 
   '@emnapi/core@1.11.0':
     resolution: {integrity: sha512-l9Oo58x0HOP5znGzVhYW9U3e5wVuA4LAZU2AGezTmkhO1CgQRFDhDg4nneHsu/t3WniXg9QrG2nIXL/ZS8ln8Q==}
@@ -6238,6 +6308,9 @@ packages:
   '@silvia-odwyer/photon@0.3.3':
     resolution: {integrity: sha512-8BhUjEch4slwRe8uXnaA4vcA5uiiOTT90UMsxulOj2gN98X1p0q9Z4Ysk4DkD05uNgbR9XoSqtZ37w+33w4QKQ==}
 
+  '@sinclair/typebox@0.34.52':
+    resolution: {integrity: sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==}
+
   '@sindresorhus/fnv1a@3.1.0':
     resolution: {integrity: sha512-KV321z5m/0nuAg83W1dPLy85HpHDk7Sdi4fJbwvacWsEhAh+rZUW4ZfGcXmUIvjZg4ss2bcwNlRhJ7GBEUG08w==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
@@ -8485,6 +8558,9 @@ packages:
     resolution: {integrity: sha512-I7wzHwA3t1/lwXQh+A5PbNvJxgfo5r3xulgpYDB5zckTu/Z9oUK9biouBKQUjEqzaz3HnAT6TYoovmE+GqSf7A==}
     engines: {node: '>=0.10'}
 
+  buffer@5.6.0:
+    resolution: {integrity: sha512-/gDYp/UtU0eA1ys8bOs9J6a+E/KWIY+DZ+Q2WESNUA0jFRsJOc0SNUO6xJ5SGA1xueg3NL65W6s+NY5l9cunuw==}
+
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
 
@@ -8881,6 +8957,14 @@ packages:
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
+
+  crossws@0.4.17:
+    resolution: {integrity: sha512-YG2kyfafNXKmu7e6k64yrj6whrw7m5sBIsOSXOlJ/72X3TQWRQuw8DhvXFDcBk8HF77PnTSygnm7xpYCTnFpow==}
+    peerDependencies:
+      srvx: '>=0.11.5'
+    peerDependenciesMeta:
+      srvx:
+        optional: true
 
   crypt@0.0.2:
     resolution: {integrity: sha512-mCxBlsHFYh9C+HVpiEacem8FEBnMXgU9gy4zmNC+SXAZNB/1idgp/aulFJ4FgCi7GPEVbfyng092GqL2k2rmow==}
@@ -9469,6 +9553,21 @@ packages:
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
+  elysia@1.4.32:
+    resolution: {integrity: sha512-pSWBPKJe0t24r6oQydL8xmFnbOOVs0bXN1ShIwSPxXJbE/z9NRRXs8FigQRhXyjdbi3YSuJgEKe22BVx4cU99w==}
+    peerDependencies:
+      '@sinclair/typebox': '>= 0.34.0 < 1'
+      '@types/bun': '>= 1.2.0'
+      exact-mirror: '>= 0.2.9 < 1'
+      file-type: '>= 20.0.0'
+      openapi-types: '>= 12.0.0'
+      typescript: '>= 5.0.0'
+    peerDependenciesMeta:
+      '@types/bun':
+        optional: true
+      typescript:
+        optional: true
+
   emittery@1.2.0:
     resolution: {integrity: sha512-KxdRyyFcS85pH3dnU8Y5yFUm2YJdaHwcBZWrfG8o89ZY9a13/f9itbN+YG3ELbBo9Pg5zvIozstmuV8bX13q6g==}
     engines: {node: '>=14.16'}
@@ -9834,6 +9933,14 @@ packages:
   eventsource@3.0.7:
     resolution: {integrity: sha512-CRT1WTyuQoD771GW56XEZFQ/ZoSfWid1alKGDYMmkt2yl8UXrVR4pspqWNEcqKvVIzg6PAltWjxcSSPrboA4iA==}
     engines: {node: '>=18.0.0'}
+
+  exact-mirror@0.2.9:
+    resolution: {integrity: sha512-7+ecLdWdlY0Br1E1Fax2Pss5VU3b1WQwJ8bdyt5azPNdhKHuivjQlV8baXF9NkQwlvnyOwaM6ITBiuK43PQ4wg==}
+    peerDependencies:
+      '@sinclair/typebox': ^0.34.15
+    peerDependenciesMeta:
+      '@sinclair/typebox':
+        optional: true
 
   exceljs@4.4.0:
     resolution: {integrity: sha512-XctvKaEMaj1Ii9oDOqbW/6e1gXknSY4g/aLCDicOXqBE4M0nRWkUu0PTp++UPNzoFY12BNHMfs/VadKIS6llvg==}
@@ -11524,6 +11631,9 @@ packages:
   mediabunny@1.58.0:
     resolution: {integrity: sha512-0jW6vSDVqWwNe3+WBryrMzC2mUBfk6E5KQLGXLdKVGzclceXXIsbayEkAsNDCuoTcoMiVI62sPDnkkFDxiMjGw==}
 
+  memoirist@0.4.0:
+    resolution: {integrity: sha512-zxTgA0mSYELa66DimuNQDvyLq36AwDlTuVRbnQtB+VuTcKWm5Qc4z3WkSpgsFWHNhexqkIooqpv4hdcqrX5Nmg==}
+
   merge-descriptors@2.0.0:
     resolution: {integrity: sha512-Snk314V5ayFLhp3fkUREub6WtjBfPdCPY1Ln8/8munuLuiYhsABgBVWsozAG+MWMbVEvcdcpbi9R7ww22l9Q3g==}
     engines: {node: '>=18'}
@@ -12033,6 +12143,9 @@ packages:
         optional: true
       zod:
         optional: true
+
+  openapi-types@12.1.3:
+    resolution: {integrity: sha512-N4YtSYJqghVu4iek2ZUvcN/0aqH1kRDuNqzcycDxhOUpg7GdvLa2F3DgS6yBNhInhv2r/6I0Flkn7CqL8+nIcw==}
 
   opencollective-postinstall@2.0.3:
     resolution: {integrity: sha512-8AV/sCtuzUeTo8gQK5qDZzARrulB3egtLzFgteqB2tcT4Mw7B8Kt7JcDHmltjz6FOAHsvTevk70gZEbhM4ZS9Q==}
@@ -13224,6 +13337,11 @@ packages:
   sprintf-js@1.0.3:
     resolution: {integrity: sha512-D9cPgkvLlV3t3IzL0D0YLvGA9Ahk4PcvVwUbN0dSGr1aP0Nrt4AEnTUbuGvquEC0mA64Gqt1fzirlRs5ibXx8g==}
 
+  srvx@0.11.22:
+    resolution: {integrity: sha512-LqZxxBDMKuMAZzFzJnDCkFOrs9MZQZr0LvHiO/SuSZVdQaXD7xQ5UWTUxheJrQPve1qk9MG2B/yttUvJxw8egQ==}
+    engines: {node: '>=20.16.0'}
+    hasBin: true
+
   stable-hash-x@0.2.0:
     resolution: {integrity: sha512-o3yWv49B/o4QZk5ZcsALc6t0+eCelPc44zZsLtCQnZPDwFpDYSWcDnrv2TtMmMbQ7uKo3J0HTURCqckw23czNQ==}
     engines: {node: '>=12.0.0'}
@@ -13266,6 +13384,9 @@ packages:
         optional: true
       vite-plus:
         optional: true
+
+  stream-browserify@3.0.0:
+    resolution: {integrity: sha512-H73RAHsVBapbim0tU2JwwOiXUj+fikfiaoYAKHF3VJfA0pe2BCzkhAHBlLG6REzE+2WNZcxOXjK7lkso+9euLA==}
 
   stream-shift@1.0.3:
     resolution: {integrity: sha512-76ORR0DO1o1hlKwTbi/DM3EXWGf3ZJYO8cXX5RJwnul2DEg2oyoZyjLNoQM8WsvZiFKCRfC1O0J7iCvie3RZmQ==}
@@ -14763,6 +14884,14 @@ snapshots:
       '@csstools/css-tokenizer': 3.0.4
       lru-cache: 10.4.3
 
+  '@aws-sdk/checksums@3.1002.5':
+    dependencies:
+      '@aws-sdk/core': 3.981.0
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.41.0
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
   '@aws-sdk/client-bedrock-runtime@3.1127.0':
     dependencies:
       '@aws-sdk/core': 3.981.0
@@ -14775,6 +14904,20 @@ snapshots:
       '@smithy/core': 3.41.0
       '@smithy/fetch-http-handler': 5.8.1
       '@smithy/node-http-handler': 4.12.1
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
+  '@aws-sdk/client-s3@3.1171.0':
+    dependencies:
+      '@aws-sdk/checksums': 3.1002.5
+      '@aws-sdk/core': 3.981.0
+      '@aws-sdk/credential-provider-node': 3.972.97
+      '@aws-sdk/middleware-sdk-s3': 3.972.89
+      '@aws-sdk/signature-v4-multi-region': 3.996.52
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.41.0
+      '@smithy/fetch-http-handler': 5.8.1
+      '@smithy/node-http-handler': 4.14.2
       '@smithy/types': 4.20.0
       tslib: 2.9.1
 
@@ -14880,8 +15023,27 @@ snapshots:
       '@smithy/types': 4.20.0
       tslib: 2.9.1
 
+  '@aws-sdk/lib-storage@3.1171.0(@aws-sdk/client-s3@3.1171.0)':
+    dependencies:
+      '@aws-sdk/client-s3': 3.1171.0
+      '@smithy/core': 3.41.0
+      '@smithy/types': 4.20.0
+      buffer: 5.6.0
+      events: 3.3.0
+      stream-browserify: 3.0.0
+      tslib: 2.9.1
+
   '@aws-sdk/middleware-eventstream@3.972.38':
     dependencies:
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.41.0
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
+  '@aws-sdk/middleware-sdk-s3@3.972.89':
+    dependencies:
+      '@aws-sdk/core': 3.981.0
+      '@aws-sdk/signature-v4-multi-region': 3.996.52
       '@aws-sdk/types': 3.975.1
       '@smithy/core': 3.41.0
       '@smithy/types': 4.20.0
@@ -15639,6 +15801,26 @@ snapshots:
       undici: 7.30.2
     transitivePeerDependencies:
       - supports-color
+
+  '@elysia/bearer@1.4.4(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))':
+    dependencies:
+      elysia: 1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3)
+
+  '@elysia/cors@1.4.3(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))':
+    dependencies:
+      elysia: 1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3)
+
+  '@elysia/node@1.4.6(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))':
+    dependencies:
+      crossws: 0.4.17(srvx@0.11.22)
+      elysia: 1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3)
+      srvx: 0.11.22
+
+  '@elysia/openapi@1.4.17(@sinclair/typebox@0.34.52)(elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3))(typescript@5.9.3)':
+    dependencies:
+      '@sinclair/typebox': 0.34.52
+      elysia: 1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3)
+      typescript: 5.9.3
 
   '@emnapi/core@1.11.0':
     dependencies:
@@ -18853,6 +19035,8 @@ snapshots:
 
   '@silvia-odwyer/photon@0.3.3': {}
 
+  '@sinclair/typebox@0.34.52': {}
+
   '@sindresorhus/fnv1a@3.1.0': {}
 
   '@sindresorhus/merge-streams@4.0.0': {}
@@ -21310,6 +21494,11 @@ snapshots:
 
   buffer-indexof-polyfill@1.0.2: {}
 
+  buffer@5.6.0:
+    dependencies:
+      base64-js: 1.5.1
+      ieee754: 1.2.1
+
   buffer@5.7.1:
     dependencies:
       base64-js: 1.5.1
@@ -21679,6 +21868,10 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
+
+  crossws@0.4.17(srvx@0.11.22):
+    optionalDependencies:
+      srvx: 0.11.22
 
   crypt@0.0.2: {}
 
@@ -22251,6 +22444,18 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  elysia@1.4.32(@sinclair/typebox@0.34.52)(exact-mirror@0.2.9(@sinclair/typebox@0.34.52))(file-type@22.0.1(supports-color@10.2.2))(openapi-types@12.1.3)(typescript@5.9.3):
+    dependencies:
+      '@sinclair/typebox': 0.34.52
+      cookie: 1.1.1
+      exact-mirror: 0.2.9(@sinclair/typebox@0.34.52)
+      fast-decode-uri-component: 1.0.1
+      file-type: 22.0.1(supports-color@10.2.2)
+      memoirist: 0.4.0
+      openapi-types: 12.1.3
+    optionalDependencies:
+      typescript: 5.9.3
+
   emittery@1.2.0: {}
 
   emoji-picker-element-data@1.8.0: {}
@@ -22822,6 +23027,10 @@ snapshots:
   eventsource@3.0.7:
     dependencies:
       eventsource-parser: 3.1.1
+
+  exact-mirror@0.2.9(@sinclair/typebox@0.34.52):
+    optionalDependencies:
+      '@sinclair/typebox': 0.34.52
 
   exceljs@4.4.0:
     dependencies:
@@ -24876,6 +25085,8 @@ snapshots:
       '@types/dom-mediacapture-transform': 0.1.12
       '@types/dom-webcodecs': 0.1.13
 
+  memoirist@0.4.0: {}
+
   merge-descriptors@2.0.0: {}
 
   mermaid@11.17.2:
@@ -25529,6 +25740,8 @@ snapshots:
       undici: 8.12.3
       ws: 8.21.3
       zod: 4.4.3
+
+  openapi-types@12.1.3: {}
 
   opencollective-postinstall@2.0.3: {}
 
@@ -27034,6 +27247,8 @@ snapshots:
 
   sprintf-js@1.0.3: {}
 
+  srvx@0.11.22: {}
+
   stable-hash-x@0.2.0: {}
 
   stack-trace@0.0.10: {}
@@ -27082,6 +27297,11 @@ snapshots:
       - bufferutil
       - react
       - utf-8-validate
+
+  stream-browserify@3.0.0:
+    dependencies:
+      inherits: 2.0.4
+      readable-stream: 3.6.2
 
   stream-shift@1.0.3: {}
 

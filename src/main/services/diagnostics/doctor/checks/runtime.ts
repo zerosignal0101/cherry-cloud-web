@@ -1,6 +1,7 @@
 import { application } from '@application'
 import { agentService } from '@main/data/services/AgentService'
 import { providerService } from '@main/data/services/ProviderService'
+import { checkClaudeLogin } from '@main/services/oauth/claudeLogin'
 import { parseUniqueModelId } from '@shared/data/types/model'
 import { isExternalCliProvider } from '@shared/utils/provider'
 
@@ -41,9 +42,7 @@ export const claudeLogin = defineDoctorCheck({
       return isExternalCliProvider(providerService.getByProviderId(providerId))
     })
     if (!needsClaudeLogin) return { status: 'pass' }
-    const cli = application.get('CodeCliService')
-    if (!cli.isReady) throw new Error('Code CLI service is not ready')
-    if (await cli.checkClaudeLogin(signal)) return { status: 'pass' }
+    if (await checkClaudeLogin(signal)) return { status: 'pass' }
 
     return {
       status: 'warn',

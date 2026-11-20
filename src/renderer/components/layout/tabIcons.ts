@@ -1,5 +1,4 @@
 import {
-  Code,
   Clock,
   FileSearch,
   Folder,
@@ -37,7 +36,6 @@ export const ROUTE_ICONS: Record<string, IconComponent> = {
   '/app/knowledge': FileSearch,
   '/app/file-preview': ScanSearch,
   '/app/files': Folder,
-  '/app/code': Code,
   '/app/notes': NotepadText,
   '/app/release-notes': Sparkles,
   '/settings': Settings

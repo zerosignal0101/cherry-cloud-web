@@ -1,4 +1,4 @@
-import { Check, CheckCircle2, CircleAlert, Copy, RefreshCw, TerminalSquare } from 'lucide-react'
+import { Check, CheckCircle2, CircleAlert, Copy, RefreshCw } from 'lucide-react'
 import type { FC } from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -6,8 +6,6 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@cherrystudio/ui'
 import { loggerService } from '@logger'
 import { ipcApi } from '@renderer/ipc'
-import { toast } from '@renderer/services/toast'
-import { CodeCli } from '@shared/types/codeCli'
 
 import { useCopyToClipboard } from '../hooks/useCopyToClipboard'
 import { ProviderHelpLink } from '../primitives/ProviderSettingsPrimitives'
@@ -26,7 +24,6 @@ const ClaudeCodeSettings: FC<ClaudeCodeSettingsProps> = ({ providerId }) => {
   const { t } = useTranslation()
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null)
   const [checking, setChecking] = useState(false)
-  const [launching, setLaunching] = useState(false)
   const [commandCopied, copyCommand] = useCopyToClipboard()
 
   const checkLogin = useCallback(async () => {
@@ -44,27 +41,6 @@ const ClaudeCodeSettings: FC<ClaudeCodeSettingsProps> = ({ providerId }) => {
   useEffect(() => {
     void checkLogin()
   }, [checkLogin])
-
-  const handleOpenTerminal = useCallback(async () => {
-    setLaunching(true)
-    try {
-      const { homePath } = await ipcApi.request('app.get_info')
-      const result = await ipcApi.request('code_cli.run', {
-        mode: 'login-flow',
-        cliTool: CodeCli.CLAUDE_CODE,
-        directory: homePath
-      })
-      if (!result.success) {
-        logger.error('Failed to launch Claude login terminal', { message: result.message })
-        toast.error(t('settings.provider.claude_code.launch_failed'))
-      }
-    } catch (error) {
-      logger.error('Failed to launch Claude login terminal', error as Error)
-      toast.error(t('settings.provider.claude_code.launch_failed'))
-    } finally {
-      setLaunching(false)
-    }
-  }, [t])
 
   // Until the first probe resolves, loggedIn is null — show a loading row rather
   // than the sign-in panel, so an already-signed-in user doesn't see it flash.
@@ -112,10 +88,6 @@ const ClaudeCodeSettings: FC<ClaudeCodeSettingsProps> = ({ providerId }) => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button disabled={launching} onClick={() => void handleOpenTerminal()}>
-              <TerminalSquare className="size-4" />
-              {t('settings.provider.claude_code.open_terminal')}
-            </Button>
             <Button variant="secondary" onClick={() => void copyCommand(LOGIN_COMMAND)}>
               {commandCopied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
               <code className="font-mono">{LOGIN_COMMAND}</code>

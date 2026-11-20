@@ -181,9 +181,9 @@ describe('sidebar conversation navigation', () => {
     if (change === 'unmount') unmount()
     else {
       if (change === 'switch') {
-        state.tabs = [...state.tabs, { id: 'other', type: 'route', url: '/app/code', title: 'Code' }]
+        state.tabs = [...state.tabs, { id: 'other', type: 'route', url: '/app/marketplace', title: 'Marketplace' }]
         state.activeTabId = 'other'
-      } else tabs.updateTab('current', { url: '/app/code' })
+      } else tabs.updateTab('current', { url: '/app/marketplace' })
       rerender()
     }
     await act(async () => {
@@ -192,7 +192,9 @@ describe('sidebar conversation navigation', () => {
     })
     expect(state.activeTabId).toBe(change === 'switch' ? 'other' : 'current')
     expect(state.tabs).toHaveLength(change === 'switch' ? 2 : 1)
-    expect(state.tabs.find((tab) => tab.id === 'current')?.url).toBe(change === 'navigate' ? '/app/code' : '/app/files')
+    expect(state.tabs.find((tab) => tab.id === 'current')?.url).toBe(
+      change === 'navigate' ? '/app/marketplace' : '/app/files'
+    )
     MockDataApiUtils.resetMocks()
   })
 
@@ -307,7 +309,7 @@ describe('sidebar conversation navigation', () => {
     ]
   ] as const)('focuses the open tab for %s', async (providerId, resourceId, url) => {
     const { context, state } = statefulTabContext([
-      { id: 'current', type: 'route', url: '/app/code', title: 'Code' },
+      { id: 'current', type: 'route', url: '/app/marketplace', title: 'Marketplace' },
       { id: 'open', type: 'route', url, title: 'Open' }
     ])
 
@@ -340,18 +342,6 @@ describe('sidebar conversation navigation', () => {
     expect(state.tabs).toHaveLength(1)
     expect(state.activeTabId).toBe('current')
     MockDataApiUtils.resetMocks()
-  })
-
-  it('focuses an open code tool tab matched by param rather than by string equality', async () => {
-    const { context, state } = statefulTabContext([
-      { id: 'current', type: 'route', url: '/app/files', title: 'Files' },
-      { id: 'code', type: 'route', url: '/app/code?foo=1&tool=pi', title: 'Code' }
-    ])
-
-    await activateShortcut(context, 'core.code-cli', 'pi')
-
-    expect(state.activeTabId).toBe('code')
-    expect(state.tabs).toHaveLength(2)
   })
 
   it.each([
@@ -428,26 +418,29 @@ describe('sidebar conversation navigation', () => {
     MockDataApiUtils.resetMocks()
   })
 
-  it.each(['/app/files', '/app/mini-app/foo', '/app/code'])('transports Agent pin metadata from %s', async (url) => {
-    MockDataApiUtils.setCustomResponse('/agent-sessions/latest', 'GET', { session: { id: 'conversation-1' } })
-    const pinned = url === '/app/code'
-    const { context, state } = statefulTabContext([
-      { id: 'current', type: 'route', url, title: 'Current', isPinned: pinned, metadata: { unrelated: true } }
-    ])
+  it.each(['/app/files', '/app/mini-app/foo', '/app/marketplace'])(
+    'transports Agent pin metadata from %s',
+    async (url) => {
+      MockDataApiUtils.setCustomResponse('/agent-sessions/latest', 'GET', { session: { id: 'conversation-1' } })
+      const pinned = url === '/app/marketplace'
+      const { context, state } = statefulTabContext([
+        { id: 'current', type: 'route', url, title: 'Current', isPinned: pinned, metadata: { unrelated: true } }
+      ])
 
-    await activateShortcut(context, 'core.agent', 'owner-1')
+      await activateShortcut(context, 'core.agent', 'owner-1')
 
-    const opensNew = pinned
-    expect(state.tabs).toHaveLength(opensNew ? 2 : 1)
-    expect(state.activeTabId).toBe(opensNew ? 'opened-1' : 'current')
-    expect(state.tabs.find((tab) => tab.id === state.activeTabId)).toMatchObject({
-      url: '/app/agents?sessionId=conversation-1',
-      metadata: { agentPinPending: true }
-    })
-    expect(state.tabs.find((tab) => tab.id === state.activeTabId)?.metadata).not.toHaveProperty('unrelated')
-    if (opensNew) expect(state.tabs[0]).toMatchObject({ url, metadata: { unrelated: true } })
-    MockDataApiUtils.resetMocks()
-  })
+      const opensNew = pinned
+      expect(state.tabs).toHaveLength(opensNew ? 2 : 1)
+      expect(state.activeTabId).toBe(opensNew ? 'opened-1' : 'current')
+      expect(state.tabs.find((tab) => tab.id === state.activeTabId)).toMatchObject({
+        url: '/app/agents?sessionId=conversation-1',
+        metadata: { agentPinPending: true }
+      })
+      expect(state.tabs.find((tab) => tab.id === state.activeTabId)?.metadata).not.toHaveProperty('unrelated')
+      if (opensNew) expect(state.tabs[0]).toMatchObject({ url, metadata: { unrelated: true } })
+      MockDataApiUtils.resetMocks()
+    }
+  )
 
   it('drops the previous conversation owner as soon as the route changes', () => {
     MockUseDataApiUtils.mockQueryData('/topics/topic-1', {

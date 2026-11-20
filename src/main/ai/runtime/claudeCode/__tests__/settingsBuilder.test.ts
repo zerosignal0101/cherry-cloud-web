@@ -3037,7 +3037,7 @@ describe('buildClaudeCodeSessionSettings', () => {
 
     it('falls back CLAUDE_CONFIG_DIR to ~/.claude when the shell exports it empty', async () => {
       // An empty CLAUDE_CONFIG_DIR must not pass through (it would point the SDK at /.credentials.json);
-      // the fallback uses || so it matches CodeCliService's login probe rather than diverging from it.
+      // the fallback uses || so it matches the login probe in services/oauth/claudeLogin rather than diverging from it.
       mocks.getShellEnv.mockResolvedValue({ CLAUDE_CONFIG_DIR: '' })
 
       const settings = await buildClaudeCodeSessionSettings(

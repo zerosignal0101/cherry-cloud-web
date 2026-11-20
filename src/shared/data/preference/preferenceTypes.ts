@@ -6,7 +6,6 @@ import type { AgentSessionWorkspaceSource } from '@shared/data/api/schemas/agent
 import type { BootConfigPreferenceKeys } from '@shared/data/bootConfig/bootConfigTypes'
 import type { AgentLanguage } from '@shared/data/types/agentLanguage'
 import type { UniqueModelId } from '@shared/data/types/model'
-import { CodeCli } from '@shared/types/codeCli'
 import type { ShortcutBinding } from '@shared/utils/shortcut'
 
 import type { PreferenceSchemas } from './preferenceSchemas'
@@ -158,7 +157,6 @@ export const SIDEBAR_FAVORITES = [
   'mini_app',
   'knowledge',
   'files',
-  'code_tools',
   'notes',
   'openclaw'
 ] as const
@@ -368,57 +366,6 @@ export interface WebSearchProvider {
   /** Basic auth password (from user overrides) */
   basicAuthPassword: string
 }
-
-// ============================================================================
-// CodeCLI Types
-// ============================================================================
-
-export const CODE_CLI_IDS = Object.values(CodeCli) as unknown as readonly [
-  'claude-code',
-  'openai-codex',
-  'opencode',
-  'openclaw',
-  'deepseek-harness',
-  'gemini-cli',
-  'antigravity-cli',
-  'qwen-code',
-  'kimi-code',
-  'qoder-cli',
-  'github-copilot-cli',
-  'pi',
-  'hermes',
-  'minimax-code'
-]
-
-export type CodeCliId = (typeof CODE_CLI_IDS)[number]
-
-/** A per-tool provider entry, keyed by providerId in `CodeCliToolState.providers`. */
-export interface CliProviderConfig {
-  /**
-   * Unique model id ("providerId::modelId"), or null for the two legal
-   * model-less states: the own-login placeholder and a Claude detailed-models
-   * config with no common model.
-   */
-  modelId: UniqueModelId | null
-  /** User-edited tool-specific config blob. */
-  config?: Record<string, unknown>
-  /** Sort order in the provider list (lower = first). */
-  sortIndex?: number
-}
-
-/** Per-CLI-tool state: per-provider configs (keyed by providerId) + the active one. */
-export interface CodeCliToolState {
-  providers: Record<string, CliProviderConfig>
-  /** Currently enabled providerId (single-select). */
-  current: string | null
-  /** Terminal app — an id from `code_cli.get_available_terminals`. */
-  terminal?: string
-  /** Working directory for this CLI tool (shared across all its providers). */
-  directory?: string
-}
-
-/** Preference value for `feature.code_cli.configs`. */
-export type CodeCliConfigs = Partial<Record<CodeCliId, CodeCliToolState>>
 
 // ============================================================================
 // WebSearch Compression Types (v2 - Flattened)

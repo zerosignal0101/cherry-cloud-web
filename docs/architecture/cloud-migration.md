@@ -27,7 +27,7 @@
   - 双 Shell：`md:` 以上是 56px 图标导航栏；以下为底部导航（对话 / 文件 / 设置）。导航项即首版范围，知识库、Agents、绘画、代码、笔记、翻译、定时任务、小应用等分期入口不再出现。
   - 设置菜单裁剪为 Web 子集：供应商、模型、MCP、提示词、联网搜索、文档处理、OCR、通用、外观、通知、数据、归档、用量、关于；Cherry 账号/订阅/网关、本地模型、划词助手/快捷助手/截图/快捷键、webview 浏览器、Agents/技能、通道与设备配对均不下发。
   - 移动端：设置导航收进抽屉，页头显示当前分区并可打开菜单；供应商设置改为列表/详情两级（返回按钮回到列表）；文件页固定分类栏在手机上换成页头筛选菜单；对话列表在手机上浮在聊天之上（点空白处关闭），不再挤压正文。
-  - 登录：`/login` 由服务端返回 SPA shell，`entryPoint` 先查 `/api/auth/status`，未登录渲染独立 `LoginApp`（不触碰 preference/IPC，避免 401 回跳），登录成功整页跳转；已登录访问 `/login` 由服务端 302 到 `next`。设置页底部提供退出登录。原服务端渲染登录 HTML 已删除。
+  - 登录：`/login` 由服务端返回 SPA shell，`entryPoint` 先查 `/api/auth/status`，未登录渲染独立 `LoginApp`（不读取 preference/IPC；通过公开的 `/api/ui/bootstrap` 取主题模式与界面语言，避免 401 回跳），登录成功整页跳转；已登录访问 `/login` 由服务端 302 到 `next`。设置页底部提供退出登录。原服务端渲染登录 HTML 已删除。
   - 文件子系统接通：服务端生命周期注册 `FileManager`，并在 `/api/rpc` 注册 `file.*` 路由（元数据、物理路径、条目创建/回收等）；`window.api.file` 由 `src/renderer/ipc/webFile.ts` 实现，`select` 走浏览器选择器并上传，`save`/`saveImage` 触发下载，字节型 `createInternalEntry` 走 `POST /api/files`。
   - 附件发送改为浏览器语义：composer 的附件持有所选 `File`（`ComposerAttachment.blob`），发送时上传为 internal `FileEntry`，消息部分带 `providerMetadata.cherry.fileEntryId` 与 `/media/:id` URL；服务端 `fileProcessor` 通过 `FileManager` 读取字节。粘贴、拖放、附件按钮都不再依赖桌面路径。
   - 文件页上传改为浏览器语义：按钮与拖放都走 `POST /api/files`，不再依赖桌面路径；图片预览 URL 对 internal 条目使用 `/media/:id`。
@@ -38,8 +38,47 @@
   - 注册 `WebSearchService` 与 `web_search.*` RPC 路由，设置页的联网搜索提供商开关、API Key、检查按钮均可用；未配置密钥时返回领域错误而非 `ROUTE_NOT_FOUND`。
   - 注册 `mcp.*` RPC 路由（服务器增删启停、工具/资源/提示词、交互回复）；`McpRuntimeService`/`McpCatalogService` 已在生命周期中。桌面协议的 MCP 安装入口由 `WebProtocolService` 占位（列表为空、安装请求明确拒绝），MCP 设置页不再展示桌面二进制依赖面板。
   - 已验证：供应商/模型/联网搜索/MCP 设置页渲染无控制台错误，web_search 与 mcp 路由均有响应，目录更新在启动后自动完成。
+- M10 完成（共享基座与低成本功能）：
+  - `WorkspaceService` + `workspace.*` RPC：所有功能域共用的服务端目录沙箱，路径限制在 `DATA_DIR/workspaces`，拒绝绝对路径、`..`、反斜杠与符号链接；支持工作区创建/删除、文件树、读写与删除。
+  - `SecretStore`：基于 `SecretBox` 的服务端凭据存储（`DATA_DIR/secrets.json`，0600、原子写入），供后续 WebDAV/S3/频道凭据使用；不向渲染进程暴露明文。
+  - `WebNotificationService`：以站内记录 + WebSocket `notification.present`/`notification.conversation` 取代系统通知；注册 `notification.send`/`notification.activate`，任务结果通知可落库、未读状态可更新。
+  - 共享缓存桥：`cache.get_all_shared` + `cache.sync_shared`，`CacheService` 的 shared 层变更经 WS `cache:sync` 推送到各标签页；`jobs.state.*` 等运行状态恢复实时性，persist 层保持标签页本地。
+  - 翻译文本接通：注册 `translate.open`，复用 `AiStreamManager` 的 `ai.stream.*`；未配置模型时返回 `translate.error.not_configured`，不再出现 `ROUTE_NOT_FOUND`。PDF/OCR 翻译仍延后。
+  - 定时任务接通：注册 `AgentJobsService`，并补齐 `NotificationService`、`ChannelManager`、`AgentLifecycleService` 的 Web 适配（无频道/无运行时能力时降级）；任务的创建、读取、暂停/恢复、删除走服务端调度器，真实执行由 M12 的 Pi 运行时接通。
+  - 导航加入翻译与定时任务入口；共享 Agent 界面挂载时探测桌面控制改为返回空快照，避免无意义报错。
+  - 已验证：工作区 RPC、Agent + 定时任务创建/列表/删除、翻译路由错误语义、通知发送/已读、桌面与手机双 Shell 导航。
+- 首版之后的八个功能域（Agents 与技能、代码工作区、浏览器、小应用、笔记、翻译、定时任务、云盘备份）已单独规划，见 [feature-migration.md](feature-migration.md)。执行顺序为 M10 共享基座与低成本功能 → M11 笔记 → M12 Agents 与技能 → M13 小应用与浏览器 → M14 代码工作区 → M15 云盘备份与导出 → M16 收口。
+- M11 完成（笔记）：
+  - 渲染进程只使用逻辑根 `/notes`；`NotesStorage` 将其映射到 `DATA_DIR/notes`，并校验 `..`、反斜杠、NUL、越界与符号链接。`app.get_info.notesPath` 返回 `/notes`，不再暴露宿主目录。
+  - `notes.*` RPC 提供创建目录、写入/读取、重命名、移动、递归删除、列表与服务端全文搜索；重命名/移动/删除同步维护 `note` 表的星标/展开元数据。
+  - 笔记树与编辑器继续复用 `file.tree.*` / `file.edit.*`，服务端在 `/notes` 边界翻译快照、变更事件、编辑租约和文件观察路径；缺少 ripgrep 时使用 Node `fs` 回退扫描。
+  - 笔记设置移除目录选择；粘贴图片写入 `/media/<id>`，导入 Markdown 的旧 `file://.../files/<id>` 链接在写入时重写。
+  - HTTP/WS 传输增加二进制标记（base64）编解码，修复 `Uint8Array` 经 JSON 退化；标签页断线保留 15 秒重连宽限，刷新后编辑租约仍可用。
+  - 已验证：新建、编辑、自动保存、刷新保留、重命名、移动、删除、搜索、附件图片与双端页面；无控制台错误。
+- M12 完成（Agents 与技能）：
+  - 技能库以 `DATA_DIR/Skills` 为根，`SkillStorage` 在 `/skills` 逻辑根与宿主目录间翻译；ZIP 安装改为 `POST /api/skills/install` 上传，目录安装与 `folder.open` 从 Web 流程移除。
+  - 注册 `AgentSessionRuntimeService`、`AgentLifecycleService`、`AgentSessionDeliveryService`、`AgentImportService`、`AgentJobsService`；Web 运行时为 `pi`，会话创建、发送、流式回复、停止与用量记录已端到端验证。
+  - 固定版本 Pi SDK 缺少 `objectTransports`，Pi 模型请求改走内部回环 API Gateway；`pi-durable`（未发布 Pi 包）与 `claude-code`（二进制/子进程）延后。
+  - Agent 工作区统一为逻辑 `/workspaces/<id>`，memory 路径投影为 `/agents/<agentId>/...`；DataApi 与 RPC 响应不再泄露宿主路径。
+  - 已验证：ZIP 技能安装/读取、创建 Agent 与会话、Pi 消息与回复持久化、用量记录、工作区路径脱敏；`pnpm typecheck`、`pnpm lint`、`pnpm test`（149 文件 / 2213 用例）与 `pnpm build:web`、`pnpm build:server` 通过。
+- M13 完成（小应用与浏览器）：
+  - 本地小应用安装改为 `POST /api/miniapps/preview` 上传，沿用上游安装/授权/配额逻辑；运行资源经 `/api/miniapps/:appId/assets/:token/*` 的 HMAC 路径令牌提供，iframe 为 opaque origin，`window.cherry` 能力经宿主转发到 `mini_app.bridge.invoke`。
+  - 站点小应用与本地小应用都改为 sandbox iframe；`MiniAppTabsPool`/webview 池退化为空实现，安装、卸载、清空数据、授权与活动记录可用。
+  - `/app/browser` 改为 `IframeBrowser`，保留偏好与 `/browser-visits`；浏览器配置导入与相关入口删除。
+  - Agent 浏览器由 `ServerBrowserSessionService` 提供：`playwright-core` 每 MCP 连接一个 context/page，navigate/snapshot/click/type/screenshot 等工具经 SSRF 校验后执行，并以 `browser` MCP server 挂到 Agent 运行时。
+  - 部署需安装匹配 `playwright-core@1.62.1` 的 Chromium 或设置 `BROWSER_EXECUTABLE_PATH`。站点 iframe 被拒时的外部打开、AI 桥非流式、单页浏览器、更新/回滚与标注/打印等限制见 [feature-migration.md](feature-migration.md) §0.4。
+  - 已验证：签名资源与子资源、bridge 存储与权限、安装/详情/卸载；Playwright E2E open/snapshot/screenshot；`pnpm typecheck`、`pnpm lint`、`pnpm test`（150 文件 / 2217 用例）与 `pnpm build` 通过。
+- M14 代码工作区（已撤回）：
+  - 该里程碑曾提供 `/app/code` 配置管理与服务端 PTY 终端。站点不使用 CLI，页面、`CodeCliConfigService`、`/api/terminal`、`node-pty` 依赖与 `CODE_TERMINAL_*` 开关已整体移除，服务端不再注册对应 RPC 与路由。
 - 依赖版本按 cherry-studio 的 `pnpm-lock.yaml` 固定，避免 `^` 漂移导致 patch 失效与重复的 React/micromark 类型。
-- 为通过类型检查，renderer 中仍引用 Electron 类型的桌面专属文件使用 `src/renderer/types/electron-shim.d.ts` 占位；它们已不在导航/路由中，删除工作留到 M9 收口。
+- M16 完成（功能扩展收口）：
+  - 移除不可达的桌面路由、桌面窗口与 `<webview>` 运行时，删除 Electron 类型占位；会话右栏 webview 浏览器与 HTML artifact webview 不再挂载。
+  - HTML 文件与代码块 artifact 改由 sandbox iframe 渲染：静态层无脚本，交互层为 opaque origin（`allow-scripts`、无 `allow-same-origin`）并通过 `postMessage` 回传高度/滚轮；Agent 浏览器继续使用服务端无头 Playwright 与截图返回。
+  - 移除自动更新 UI、Cherry 账号/订阅/配额/CherryIN 登录与云模型选择器；账号菜单改为本地用户、通知、外观、帮助与设置，Onboarding 只保留自有供应商配置。
+  - 登录页使用本地中英文字典；新增 i18n 静态键覆盖测试，校验 `en-US` 与 `zh-CN`。
+  - 新增 Playwright 桌面 1440×900 与手机 390×844 主路径、`scripts/e2e-server.mjs` 临时数据目录启动脚本，以及 `docs/deployment.md`、systemd 与 Nginx 参考配置。
+  - 已验证：`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`pnpm test:e2e` 通过。
+- 渲染进程不再引用 Electron 类型。`src/renderer/types/web-globals.d.ts` 只声明 `installWebApi()` 安装的 `window.electron` 兼容对象（平台/环境探测与空操作 IPC），不包含 Electron 运行时。
 - `pnpm lint` 目前只覆盖 `src/server`、`src/platform` 与脚本；`src/shared`、`src/renderer` 待 `window.api` 真实类型收敛后再纳入。
 
 ## 1. 目标
@@ -64,6 +103,7 @@ WS   /api/ws           事件推送与 AI 流式（event + payload；会话 Cook
 POST /api/auth/login   密码登录，写入会话 Cookie
 POST /api/auth/logout  清除会话 Cookie
 GET  /api/auth/status  当前会话状态
+GET  /api/ui/bootstrap 登录页所需的主题模式与界面语言（公开，只读）
 GET  /login            返回 SPA shell；未登录由前端渲染登录页，已登录 302 到 next
 POST /api/files        附件上传（multipart，单文件）-> FileEntry 描述 + /media/:id
 GET  /media/:id        文件读取（Range / ETag）
@@ -78,13 +118,13 @@ GET  /media/:id        文件读取（Range / ETag）
 
 ### 首版包含
 
-对话（流式、推理、工具调用）、助手、话题、分组、供应商与模型、联网搜索、MCP、文件上传与预览、设置、鉴权、移动端布局。
+对话（流式、推理、工具调用）、助手、话题、分组、供应商与模型、联网搜索、MCP、文件上传与预览、设置、鉴权、移动端布局、翻译（文本）、定时任务（创建与调度，执行已由 M12 接通）、笔记、Agents 与技能（`pi` 运行时）、云盘备份（WebDAV/S3、自动备份、暂存恢复）。
 
 ### 首版不包含（分期）
 
-知识库/RAG、绘画、Agents 与技能、代码工作区、浏览器、小应用、笔记、翻译、定时任务、本地模型（OVMS/ONNX/ASR/TTS）、云盘备份。
+知识库/RAG、绘画、PDF/OCR 翻译、本地模型（OVMS/ONNX/ASR/TTS）、`pi-durable` 与 `claude-code` 运行时。笔记由 M11、Agents 与技能由 M12、浏览器与小应用由 M13、云盘备份与导出由 M15 移入首版。代码工作区（CLI 配置管理与服务端终端）已撤回，不提供 CLI 能力。
 
-页面与菜单在首版隐藏或删除，服务端不注册对应服务。
+页面与菜单在首版隐藏或删除，服务端不注册对应服务。首版之后的移植范围、顺序与验收标准见 [feature-migration.md](feature-migration.md)；未列入该文的桌面能力（托盘、快捷键、划词/快捷助手、截图、计算机控制、多窗口）不再移植。
 
 ## 4. 模块划分与上游同步
 
@@ -123,6 +163,15 @@ packages/ui/   vendored UI 包
 8. **M7 部署**：systemd、迁移、备份、日志、健康检查、反代示例。
 9. **M8 上游同步**：`upstream.json`、同步脚本、定期检查。
 10. **M9 收口**：单测、E2E、文档、i18n 裁剪。
+11. **M10 共享基座与低成本功能（完成）**：工作区沙箱、密钥、站内通知、状态桥；翻译文本、定时任务。
+12. **M11 笔记（完成）**：服务端内容根、树/搜索/附件、渲染层去路径化。
+13. **M12 Agents 与技能（完成）**：技能库与 ZIP 上传、`pi` 运行时、会话与工作区、memory；`pi-durable`/`claude-code` 延后。
+14. **M13 小应用与浏览器（完成）**：站点 iframe、本地包上传运行、服务端 Playwright 浏览器与 `browser` MCP。
+15. **M14 代码工作区（已撤回）**：CLI 配置管理与服务端终端随后按站点决定整体移除，不提供 CLI 能力。
+16. **M15 云盘备份与导出（完成）**：WebDAV/S3、自动备份、暂存恢复、凭据进 SecretService、服务端 Word 导出；恢复需要重启进程。
+17. **M16 功能扩展收口（完成）**：桌面残留与 webview 清理、HTML sandbox 预览、Cherry 云能力移除、E2E、i18n 键覆盖、部署文档。
+
+M10–M16 的详细范围与依赖见 [feature-migration.md](feature-migration.md)。
 
 ## 7. 风险
 
@@ -132,3 +181,4 @@ packages/ui/   vendored UI 包
 - 单进程 SQLite 不支持多副本：部署强制单实例，备份用 SQLite backup 而非拷贝。
 - 无状态会话无法逐条吊销：登出只清 Cookie，泄露的令牌在过期前仍有效；用 `SESSION_TTL_DAYS` 收敛窗口，如需即时失效则删除 `DATA_DIR/session.key`（会使全部会话失效）。
 - 密码校验用 scrypt（约几十毫秒/次），登录限速 10 次 / 5 分钟；暴力破解面已很小，但仍应把服务放在反向代理之后。
+- 功能扩展引入服务端执行面：Agent 运行时与服务端浏览器都意味着在宿主机执行代码或访问网络。统一走工作区沙箱、命令白名单、资源上限与默认关闭策略；凭据存服务端密钥，不进入偏好与日志。详见 [feature-migration.md](feature-migration.md) 第 6 节。

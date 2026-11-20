@@ -1,4 +1,5 @@
 import { application } from '@application'
+import { checkClaudeLogin } from '@main/services/oauth/claudeLogin'
 import { authorizeTokenDanceApiKey } from '@main/services/tokenDanceOAuth'
 import { isClaudeCodeProviderId } from '@shared/data/presets/claudeCode'
 import type { oauthRequestSchemas } from '@shared/ipc/schemas/oauth'
@@ -29,6 +30,6 @@ export const oauthHandlers: IpcHandlersFor<typeof oauthRequestSchemas> = {
     if (!isClaudeCodeProviderId(providerId)) {
       throw new Error(`Unsupported external-cli provider: ${providerId}`)
     }
-    return application.get('CodeCliService').checkClaudeLogin()
+    return checkClaudeLogin()
   }
 }

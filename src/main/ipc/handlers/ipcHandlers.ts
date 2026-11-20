@@ -13,9 +13,7 @@ import { channelHandlers } from './channel'
 import { cherryCloudHandlers } from './cherryCloud'
 import { cherryinHandlers } from './cherryin'
 import { citationHandlers } from './citation'
-import { codeCliHandlers } from './codeCli'
 import { computerUseHandlers } from './computerUse'
-import { deepSeekHarnessHandlers } from './deepSeekHarness'
 import { diagnosticsHandlers } from './diagnostics'
 import { doctorHandlers } from './doctor'
 import { doctorAgentHandlers } from './doctorAgent'
@@ -24,7 +22,6 @@ import { externalAppHandlers } from './externalApp'
 import { fileHandlers } from './file'
 import { fileObservationHandlers } from './fileObservation'
 import { fileProcessingHandlers } from './fileProcessing'
-import { hermesDashboardHandlers } from './hermesDashboard'
 import { knowledgeHandlers } from './knowledge'
 import { localModelHandlers } from './localModel'
 import { mcpHandlers } from './mcp'
@@ -76,9 +73,7 @@ export const ipcHandlers: IpcHandlersFor<IpcRequestSchemas> = {
   ...cherryinHandlers,
   ...cherryCloudHandlers,
   ...citationHandlers,
-  ...codeCliHandlers,
   ...computerUseHandlers,
-  ...deepSeekHarnessHandlers,
   ...diagnosticsHandlers,
   ...doctorHandlers,
   ...doctorAgentHandlers,
@@ -87,7 +82,6 @@ export const ipcHandlers: IpcHandlersFor<IpcRequestSchemas> = {
   ...fileHandlers,
   ...fileObservationHandlers,
   ...fileProcessingHandlers,
-  ...hermesDashboardHandlers,
   ...knowledgeHandlers,
   ...localModelHandlers,
   ...mcpHandlers,

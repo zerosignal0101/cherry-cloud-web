@@ -13,8 +13,6 @@
  *   schedules, notifies, delegates, and self-configures the agent.
  * - {@link registerKnowledgeTools} (`…__kb_search`, `…__kb_read`, `…__kb_list`,
  *   `…__kb_manage`) — owns knowledge-base exposure and per-call scope authorization.
- * - {@link registerCliTools} (`…__cli_list`, `…__cli_search`, `…__cli_install`) —
- *   delegates live discovery and approved installation to BinaryManager.
  * - {@link registerDocumentTools} (`…__to_markdown`) — converts workspace, agent-data, and
  *   session-attachment documents with Cherry's bundled converter and writes agent-private
  *   temporary Markdown.
@@ -57,7 +55,6 @@ import {
 } from '@shared/ai/builtinTools'
 
 import { type AutonomyToolsContext, registerAutonomyTools } from './cherryAutonomyTools'
-import { registerCliTools } from './cherryCliTools'
 import { type KnowledgeToolsContext, registerKnowledgeTools } from './cherryKnowledgeTools'
 
 export type CherryToolsOptions = AutonomyToolsContext & KnowledgeToolsContext & CherryDocumentContext
@@ -125,7 +122,6 @@ export function createCherryToolsServer(options: CherryToolsOptions): McpServer 
   registerBuiltinTools(server)
   registerKnowledgeTools(server, options)
   registerAutonomyTools(server, options)
-  registerCliTools(server)
   registerDocumentTools(server, options)
   return server
 }

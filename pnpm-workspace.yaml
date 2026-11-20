@@ -4,30 +4,30 @@ packages:
 engineStrict: true
 
 overrides:
-  '@types/react': 19.2.7
-  '@types/react-dom': 19.2.3
+  "@types/react": 19.2.7
+  "@types/react-dom": 19.2.3
   micromark-util-types@^2: 2.0.2
   mdast-util-from-markdown@^2: 2.0.2
   # Keep exactly one @ai-sdk/provider + provider-utils so `instanceof APICallError`
   # holds across every provider package (matches upstream).
-  '@ai-sdk/provider': 3.0.19
-  '@ai-sdk/provider-utils': 4.0.64
+  "@ai-sdk/provider": 3.0.19
+  "@ai-sdk/provider-utils": 4.0.64
 
 minimumReleaseAgeExclude:
-  - '@cherrystudio/ai-core@2.5.2'
-  - '@cherrystudio/file-preview@0.5.1'
-  - '@cherrystudio/provider-registry@0.7.1'
-  - '@cherrystudio/web-search@0.9.0'
+  - "@cherrystudio/ai-core@2.5.2"
+  - "@cherrystudio/file-preview@0.5.1"
+  - "@cherrystudio/provider-registry@0.7.1"
+  - "@cherrystudio/web-search@0.9.0"
 
 allowBuilds:
   better-sqlite3: true
   esbuild: true
   sharp: true
-  '@swc/core': true
+  "@swc/core": true
   protobufjs: true
   tesseract.js: true
-  '@google/genai': false
-  '@sentry/cli': false
+  "@google/genai": false
+  "@sentry/cli": false
   msw: false
   registry-js: false
   # Types only: the web build ships no Electron binary.

@@ -7,13 +7,12 @@ import { assistantRequestSchemas } from './assistant'
 import { type BackupEventSchemas, backupRequestSchemas } from './backup'
 import { type BinaryEventSchemas, binaryRequestSchemas } from './binary'
 import { type BrowserEventSchemas, browserRequestSchemas } from './browser'
+import { cacheRequestSchemas } from './cache'
 import { type ChannelEventSchemas, channelRequestSchemas } from './channel'
 import { type CherryCloudEventSchemas, cherryCloudRequestSchemas } from './cherryCloud'
 import { cherryinRequestSchemas } from './cherryin'
 import { citationRequestSchemas } from './citation'
-import { codeCliRequestSchemas } from './codeCli'
 import { type ComputerUseEventSchemas, computerUseRequestSchemas } from './computerUse'
-import { deepSeekHarnessRequestSchemas } from './deepSeekHarness'
 import { diagnosticsRequestSchemas } from './diagnostics'
 import { doctorRequestSchemas } from './doctor'
 import { doctorAgentRequestSchemas } from './doctorAgent'
@@ -22,12 +21,12 @@ import { externalAppRequestSchemas } from './externalApp'
 import { type FileEventSchemas, fileRequestSchemas } from './file'
 import { type FileObservationEventSchemas, fileObservationRequestSchemas } from './fileObservation'
 import { fileProcessingRequestSchemas } from './fileProcessing'
-import { hermesDashboardRequestSchemas } from './hermesDashboard'
 import { knowledgeRequestSchemas } from './knowledge'
 import { localModelRequestSchemas } from './localModel'
 import { type McpEventSchemas, mcpRequestSchemas } from './mcp'
 import { type MiniAppEventSchemas, miniAppRequestSchemas } from './miniApp'
 import { type NavigationEventSchemas, navigationRequestSchemas } from './navigation'
+import { notesRequestSchemas } from './notes'
 import { type NotificationEventSchemas, notificationRequestSchemas } from './notification'
 import { oauthRequestSchemas } from './oauth'
 import { openclawRequestSchemas } from './openclaw'
@@ -52,6 +51,7 @@ import { type VoiceEventSchemas, voiceRequestSchemas } from './voice'
 import { type WebSearchEventSchemas, webSearchRequestSchemas } from './webSearch'
 import { type WebviewEventSchemas, webviewRequestSchemas } from './webview'
 import { type WindowEventSchemas, windowRequestSchemas } from './window'
+import { workspaceRequestSchemas } from './workspace'
 
 /**
  * Global request registry — the single source of truth the main router parses
@@ -67,21 +67,19 @@ export const ipcRequestSchemas = {
   ...apiGatewayRequestSchemas,
   ...appRequestSchemas,
   ...backupRequestSchemas,
+  ...cacheRequestSchemas,
   ...binaryRequestSchemas,
   ...browserRequestSchemas,
   ...channelRequestSchemas,
   ...cherryinRequestSchemas,
   ...cherryCloudRequestSchemas,
   ...citationRequestSchemas,
-  ...codeCliRequestSchemas,
   ...computerUseRequestSchemas,
-  ...deepSeekHarnessRequestSchemas,
   ...diagnosticsRequestSchemas,
   ...doctorRequestSchemas,
   ...doctorAgentRequestSchemas,
   ...exportRequestSchemas,
   ...externalAppRequestSchemas,
-  ...hermesDashboardRequestSchemas,
   ...fileRequestSchemas,
   ...fileObservationRequestSchemas,
   ...fileProcessingRequestSchemas,
@@ -90,6 +88,7 @@ export const ipcRequestSchemas = {
   ...mcpRequestSchemas,
   ...miniAppRequestSchemas,
   ...navigationRequestSchemas,
+  ...notesRequestSchemas,
   ...notificationRequestSchemas,
   ...oauthRequestSchemas,
   ...openclawRequestSchemas,
@@ -113,7 +112,8 @@ export const ipcRequestSchemas = {
   ...trashRequestSchemas,
   ...webSearchRequestSchemas,
   ...webviewRequestSchemas,
-  ...windowRequestSchemas
+  ...windowRequestSchemas,
+  ...workspaceRequestSchemas
 } satisfies Record<string, RouteDef>
 
 export type IpcRequestSchemas = typeof ipcRequestSchemas

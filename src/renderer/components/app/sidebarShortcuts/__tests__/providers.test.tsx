@@ -7,7 +7,6 @@ import { dataApiService } from '@renderer/data/DataApiService'
 import { preferenceService } from '@renderer/data/PreferenceService'
 // @vitest-environment jsdom
 import type { SidebarShortcutTarget } from '@shared/data/preference/preferenceTypes'
-import { CodeCli } from '@shared/types/codeCli'
 
 import { createSidebarShortcutTarget } from '../../../../utils/sidebar'
 import { CORE_SIDEBAR_SHORTCUT_PROVIDERS } from '../providers'
@@ -43,7 +42,6 @@ describe('core sidebar shortcut providers', () => {
     ['core.knowledge-base', 'base/one', 'workspace', '/app/knowledge?baseId=base%2Fone'],
     ['core.topic', 'topic/one', 'workspace', '/app/chat?topicId=topic%2Fone'],
     ['core.agent-session', 'session/one', 'workspace', '/app/agents?sessionId=session%2Fone'],
-    ['core.code-cli', CodeCli.OPENAI_CODEX, 'workspace', '/app/code?tool=openai-codex'],
     [
       'core.file-entry',
       '018f47d2-e657-7b4c-a7c1-8b52cbb9d114',
@@ -111,29 +109,6 @@ describe('core sidebar shortcut providers', () => {
 
   it.each(['core.skill', 'core.mcp-server', 'core.provider'])('does not register %s', (providerId) => {
     expect(CORE_SIDEBAR_SHORTCUT_PROVIDERS.some((candidate) => candidate.id === providerId)).toBe(false)
-  })
-
-  it('accepts known Code Mate CLIs and rejects unknown resource ids', () => {
-    const shortcutProvider = provider('core.code-cli')
-
-    expect(shortcutProvider.validate(createSidebarShortcutTarget('core.code-cli', CodeCli.CLAUDE_CODE))).toBe(true)
-    expect(shortcutProvider.validate(createSidebarShortcutTarget('core.code-cli', 'unknown-cli'))).toBe(false)
-  })
-
-  it('resolves Code Mate CLIs from the static presentation catalog', async () => {
-    const targets = [
-      createSidebarShortcutTarget('core.code-cli', CodeCli.OPENAI_CODEX),
-      createSidebarShortcutTarget('core.code-cli', CodeCli.CLAUDE_CODE)
-    ]
-
-    const result = await provider('core.code-cli').resolveMany(targets)
-
-    expect([...result.values()].map((item) => item.label)).toEqual([
-      'code.cli_tools.claude_code',
-      'code.cli_tools.openai_codex'
-    ])
-    expect([...result.values()].every((item) => item.supportsNewTab)).toBe(true)
-    expect(mocks.dataGet).not.toHaveBeenCalled()
   })
 
   it('keeps a configured Mini App image in the full icon slot', async () => {
@@ -222,7 +197,6 @@ describe('core sidebar shortcut providers', () => {
     ['core.knowledge-base', 'base-1', '/app/knowledge?baseId=base-1'],
     ['core.topic', 'topic-1', '/app/chat?topicId=topic-1'],
     ['core.agent-session', 'session-1', '/app/agents?sessionId=session-1'],
-    ['core.code-cli', CodeCli.CLAUDE_CODE, '/app/code?tool=claude-code'],
     [
       'core.file-entry',
       '018f47d2-e657-7b4c-a7c1-8b52cbb9d114',

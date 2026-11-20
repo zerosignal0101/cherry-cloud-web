@@ -13,16 +13,10 @@ const binaryManager = {
   searchRegistry: vi.fn(),
   getLatestVersions: vi.fn()
 }
-const codeCliService = {
-  installCli: vi.fn(),
-  removeCli: vi.fn()
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
   appGetMock.mockImplementation((name: string) => {
     if (name === 'BinaryManager') return binaryManager
-    if (name === 'CodeCliService') return codeCliService
     throw new Error(`Unexpected application.get(${name})`)
   })
 })
@@ -30,24 +24,22 @@ beforeEach(() => {
 const ctx = { senderId: 'w1' }
 
 describe('binaryHandlers', () => {
-  it('install_tool delegates canonical Code CLI names to CodeCliService', async () => {
-    codeCliService.installCli.mockResolvedValue(undefined)
-    const request = { name: 'codex', targetVersion: '1.2.3' }
+  it('install_tool delegates to the manager', async () => {
+    binaryManager.installByName.mockResolvedValue(undefined)
+    const request = { name: 'babeldoc-stream', targetVersion: '0.6.4.post4' }
 
     await binaryHandlers['binary.install_tool'](request, ctx)
 
-    expect(codeCliService.installCli).toHaveBeenCalledWith(request)
-    expect(binaryManager.installByName).not.toHaveBeenCalled()
+    expect(binaryManager.installByName).toHaveBeenCalledWith(request)
   })
 
-  it('remove_tool delegates canonical Code CLI names to CodeCliService', async () => {
-    codeCliService.removeCli.mockResolvedValue({ status: 'removed' })
-    const request = { name: 'codex' }
+  it('remove_tool delegates to the manager', async () => {
+    binaryManager.removeTool.mockResolvedValue({ status: 'removed' })
+    const request = { name: 'babeldoc-stream' }
 
     await expect(binaryHandlers['binary.remove_tool'](request, ctx)).resolves.toEqual({ status: 'removed' })
 
-    expect(codeCliService.removeCli).toHaveBeenCalledWith(request)
-    expect(binaryManager.removeTool).not.toHaveBeenCalled()
+    expect(binaryManager.removeTool).toHaveBeenCalledWith(request)
   })
 
   it('get_tool_snapshots forwards names and returns the manager snapshots', async () => {

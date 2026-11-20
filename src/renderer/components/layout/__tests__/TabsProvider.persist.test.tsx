@@ -193,10 +193,10 @@ describe('pinned persistence with the real store and hook', () => {
   it('restores pinned home once and keeps distinct ids with the same URL', async () => {
     await mount([
       pin('home', { url: '/app/chat' }),
-      pin('code-a', { url: '/app/code' }),
-      pin('code-b', { url: '/app/code' })
+      pin('market-a', { url: '/app/marketplace' }),
+      pin('market-b', { url: '/app/marketplace' })
     ])
-    expect(context.tabs.map((tab) => tab.id)).toEqual(['home', 'code-a', 'code-b'])
+    expect(context.tabs.map((tab) => tab.id)).toEqual(['home', 'market-a', 'market-b'])
     expect(context.activeTabId).toBe('home')
     expect(context.tabs.filter((tab) => !tab.isDormant).map((tab) => tab.id)).toEqual(['home'])
     expect(service.getPersist('ui.tab.normal_tabs')).toEqual([])

@@ -45,9 +45,7 @@ export function loadConfig(): ServerConfig {
     throw new Error(`Invalid SESSION_TTL_DAYS: ${process.env.SESSION_TTL_DAYS}`)
   }
   if (!isLoopbackHost(host) && !process.env.ADMIN_PASSWORD && !existsSync(resolve(resolveDataDir(), 'auth.json'))) {
-    throw new Error(
-      'ADMIN_PASSWORD is required for the first start on a non-loopback address (at least 8 characters)'
-    )
+    throw new Error('ADMIN_PASSWORD is required for the first start on a non-loopback address (at least 8 characters)')
   }
 
   return {

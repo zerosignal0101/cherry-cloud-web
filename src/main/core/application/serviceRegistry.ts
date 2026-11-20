@@ -51,12 +51,10 @@ import { CherryCloudNotificationService } from '@main/services/cherryCloud/Cherr
 import { CherryCloudService } from '@main/services/cherryCloud/CherryCloudService'
 import { CherryInModelSyncService } from '@main/services/CherryInModelSyncService'
 import { CitationPreviewService } from '@main/services/CitationPreviewService'
-import { CodeCliService } from '@main/services/codeCli'
 import { CommandService } from '@main/services/CommandService'
 import { ComputerUseService } from '@main/services/ComputerUseService'
 import { ConversationNavigationService } from '@main/services/ConversationNavigationService'
 import { ConversationNotificationService } from '@main/services/ConversationNotificationService'
-import { DeepSeekHarnessService } from '@main/services/deepSeekHarness'
 import { DoctorAgentService, DoctorService } from '@main/services/diagnostics'
 import { ErrorReportingService } from '@main/services/errorReporting'
 import {
@@ -66,7 +64,6 @@ import {
   FileEditService,
   FileObservationService
 } from '@main/services/file'
-import { HermesDashboardService } from '@main/services/HermesDashboardService'
 import { LogRetentionService } from '@main/services/LogRetentionService'
 import { MainNetworkDevtoolsService } from '@main/services/mainNetworkDevtools'
 import { MainWindowService } from '@main/services/MainWindowService'
@@ -141,14 +138,11 @@ export const services = {
   AppMenuService,
   AppService,
   SkillSubscriptionService,
-  CodeCliService,
   CommandService,
   ConversationNavigationService,
   CitationPreviewService,
   CherryCloudService,
   CherryCloudNotificationService,
-  DeepSeekHarnessService,
-  HermesDashboardService,
   FileManager,
   FileEditService,
   AttachmentPresenceService,

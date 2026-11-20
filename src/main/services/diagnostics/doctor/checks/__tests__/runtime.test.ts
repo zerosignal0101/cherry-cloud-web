@@ -18,15 +18,12 @@ vi.mock('@application', async () => {
         return services.ready
       },
       getToolInventory: services.getToolInventory
-    },
-    CodeCliService: {
-      get isReady() {
-        return services.ready
-      },
-      checkClaudeLogin: services.checkClaudeLogin
     }
   } as never)
 })
+vi.mock('@main/services/oauth/claudeLogin', () => ({
+  checkClaudeLogin: services.checkClaudeLogin
+}))
 vi.mock('@main/data/services/AgentService', () => ({
   agentService: { listAgents: services.listAgents }
 }))
@@ -104,12 +101,6 @@ describe('runtime-managed-tools', () => {
 })
 
 describe('runtime-claude-login', () => {
-  it('does not claim the login state of an uninitialized service', async () => {
-    services.ready = false
-    services.listAgents.mockReturnValue({ agents: [agent()] })
-    await expect(claudeLogin.run(ctx)).rejects.toThrow('not ready')
-  })
-
   it('propagates login query failures', async () => {
     services.listAgents.mockReturnValue({ agents: [agent()] })
     services.checkClaudeLogin.mockRejectedValue(new Error('keychain locked'))

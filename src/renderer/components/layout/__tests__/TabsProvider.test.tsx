@@ -44,16 +44,6 @@ const PINNED_OPENCLAW_TAB: Tab = {
   isPinned: true
 }
 
-const PINNED_CODE_TAB: Tab = {
-  id: 'code',
-  type: 'route',
-  url: '/app/code',
-  title: 'Code',
-  lastAccessTime: 0,
-  isDormant: false,
-  isPinned: true
-}
-
 const HOME_TAB: Tab = {
   id: 'home',
   type: 'route',
@@ -660,11 +650,10 @@ describe('TabsProvider', () => {
     expect(persisted).toEqual([{ ...PINNED_FILES_TAB, isDormant: true }])
   })
 
-  // Reviewer B7: OpenClaw's sidebar entry + /app/openclaw route were removed (folded into Code), so a
-  // persisted OpenClaw pin must be redirected to /app/code on restore instead of resurrecting a dead
-  // route — and the reconciled list written back to the cache.
-  it('redirects a persisted OpenClaw pinned tab to the Code page on restore', async () => {
-    pinnedTabsValue = [PINNED_OPENCLAW_TAB, PINNED_FILES_TAB]
+  // OpenClaw and the Code page were removed, so a persisted pin for either must be dropped on
+  // restore instead of resurrecting a dead route — and the reconciled list written back to the cache.
+  it('drops persisted OpenClaw and Code pinned tabs on restore', async () => {
+    pinnedTabsValue = [PINNED_OPENCLAW_TAB, { ...PINNED_FILES_TAB, id: 'code', url: '/app/code' }]
 
     render(
       <TabsProvider initialDefaultTab={HOME_TAB}>
@@ -672,15 +661,12 @@ describe('TabsProvider', () => {
       </TabsProvider>
     )
 
-    expect(screen.getByTestId('tab-urls')).toHaveTextContent('/app/code,/app/files,/app/chat')
+    expect(screen.getByTestId('tab-urls')).toHaveTextContent('/app/chat')
     const persisted = setPinnedTabsMock.mock.calls.reduce<Tab[]>(
       (current, [action]) => (typeof action === 'function' ? action(current) : action),
       pinnedTabsValue
     )
-    expect(persisted).toEqual([
-      { ...PINNED_OPENCLAW_TAB, url: '/app/code', title: '/app/code', isDormant: true },
-      { ...PINNED_FILES_TAB, isDormant: true }
-    ])
+    expect(persisted).toEqual([])
   })
 
   it('closes active and adjacent tabs atomically when closing a batch', async () => {
@@ -881,10 +867,10 @@ describe('TabsProvider', () => {
 describe('TabsProvider session restore', () => {
   it('drops transient mini-app tabs whose in-memory descriptor disappears on restart', async () => {
     const codeTab: Tab = {
-      id: 'code',
+      id: 'marketplace',
       type: 'route',
-      url: '/app/code',
-      title: 'Code',
+      url: '/app/marketplace',
+      title: 'Marketplace',
       lastAccessTime: 1,
       isDormant: false
     }
@@ -1050,21 +1036,11 @@ describe('migratePinnedTabs', () => {
     expect(tabs).toEqual([PINNED_FILES_TAB])
   })
 
-  it('redirects an OpenClaw pin to the Code page and flags the change', () => {
-    const { tabs, changed } = migratePinnedTabs([PINNED_OPENCLAW_TAB, PINNED_FILES_TAB])
+  it('drops OpenClaw and Code pins and flags the change', () => {
+    const codePin: Tab = { ...PINNED_OPENCLAW_TAB, id: 'code', url: '/app/code', title: 'Code' }
+    const { tabs, changed } = migratePinnedTabs([PINNED_OPENCLAW_TAB, codePin, PINNED_FILES_TAB])
     expect(changed).toBe(true)
-    expect(tabs).toEqual([{ ...PINNED_OPENCLAW_TAB, url: '/app/code', title: '/app/code' }, PINNED_FILES_TAB])
-  })
-
-  it('drops the OpenClaw pin instead of duplicating an existing Code pin', () => {
-    const { tabs, changed } = migratePinnedTabs([PINNED_CODE_TAB, PINNED_OPENCLAW_TAB])
-    expect(changed).toBe(true)
-    expect(tabs).toEqual([PINNED_CODE_TAB])
-  })
-
-  it('collapses two OpenClaw pins into a single Code pin', () => {
-    const { tabs } = migratePinnedTabs([PINNED_OPENCLAW_TAB, { ...PINNED_OPENCLAW_TAB, id: 'openclaw2' }])
-    expect(tabs).toEqual([{ ...PINNED_OPENCLAW_TAB, url: '/app/code', title: '/app/code' }])
+    expect(tabs).toEqual([PINNED_FILES_TAB])
   })
 
   it('drops legacy library pins', () => {
@@ -1074,7 +1050,8 @@ describe('migratePinnedTabs', () => {
   })
 
   it('is a no-op when nothing needs migrating', () => {
-    const input = [PINNED_FILES_TAB, PINNED_CODE_TAB]
+    const marketplaceTab: Tab = { id: 'marketplace', type: 'route', url: '/app/marketplace', title: 'Marketplace' }
+    const input = [PINNED_FILES_TAB, marketplaceTab]
     const { tabs, changed } = migratePinnedTabs(input)
     expect(changed).toBe(false)
     expect(tabs).toEqual(input)

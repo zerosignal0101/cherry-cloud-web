@@ -410,7 +410,6 @@ vi.mock('@renderer/utils/routeTitle', () => ({
       '/app/paintings/zhipu': 'Paintings',
       '/app/translate': 'Translate',
       '/app/files': 'Files',
-      '/app/code': 'Code',
       '/app/openclaw': 'OpenClaw',
       '/app/notes': 'Notes',
       '/app/library': 'Library'
@@ -507,7 +506,6 @@ vi.mock('@renderer/i18n/label', () => ({
       mini_app: 'Mini Apps',
       knowledge: 'Knowledge',
       files: 'Files',
-      code_tools: 'Code',
       notes: 'Notes',
       openclaw: 'OpenClaw'
     })[key]
@@ -541,7 +539,6 @@ vi.mock('react-i18next', () => ({
           'launchpad.miniApps': 'Mini Apps',
           'library.title': 'Library',
           'title.apps': 'Apps',
-          'title.code': 'Code',
           'title.files': 'Files',
           'title.knowledge': 'Knowledge',
           'title.notes': 'Notes',

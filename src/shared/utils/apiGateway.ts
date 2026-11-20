@@ -1,9 +1,9 @@
 import { isManagedCherryAiDefaultModel } from '@shared/data/presets/cherryai'
 
 /**
- * Separator in the custom-model path Antigravity CLI carries (`gemini-api://<providerId>/models/<apiModelId>`).
- * The producer (`main/services/codeCli/antigravity.ts`) and the gateway route that parses it back
- * (`main/features/apiGateway/routes/gemini.ts`) must agree, so neither may hardcode it.
+ * Separator in the custom-model path the Antigravity CLI used to carry
+ * (`gemini-api://<providerId>/models/<apiModelId>`). The gateway route that parses it back
+ * (`main/features/apiGateway/routes/gemini.ts`) still honours the shape, so neither side may hardcode it.
  */
 export const ANTIGRAVITY_MODEL_PATH_SEPARATOR = '/models/'
 

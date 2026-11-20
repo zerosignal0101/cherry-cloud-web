@@ -1,5 +1,4 @@
 import { renderAgentEntityIcon, renderAssistantEntityIcon } from '@renderer/components/chat/resourceList/base'
-import { CLI_TOOLS, CliIcon } from '@renderer/components/icons/CliIcon'
 import MiniAppIcon from '@renderer/components/icons/MiniAppIcon'
 import { dataApiService } from '@renderer/data/DataApiService'
 import { preferenceService } from '@renderer/data/PreferenceService'
@@ -19,13 +18,11 @@ import {
 } from '@renderer/utils/sidebar'
 import { createSidebarShortcutId, type SidebarShortcutTarget } from '@shared/data/preference/preferenceTypes'
 import { FileEntryIdSchema } from '@shared/data/types/file'
-import { CodeCli } from '@shared/types/codeCli'
 
 import { SidebarIcon } from '../sidebarIcons'
 import type { ResolvedShortcut, SidebarShortcutProvider } from './types'
 
 const REVEAL_ACTIVATIONS = new Set<string | undefined>([undefined, 'reveal'])
-const CODE_CLI_TOOL_BY_ID = new Map<string, (typeof CLI_TOOLS)[number]>(CLI_TOOLS.map((tool) => [tool.value, tool]))
 
 function validates(providerId: string, target: SidebarShortcutTarget): boolean {
   return (
@@ -385,40 +382,6 @@ const fileEntryProvider: SidebarShortcutProvider = {
     isActiveResourceUrl(navigation.url, '/app/files', 'entryId', target.locator.resourceId)
 }
 
-const codeCliProvider: SidebarShortcutProvider = {
-  id: SIDEBAR_SHORTCUT_PROVIDER_IDS.CODE_CLI,
-  validate: (target) =>
-    validates(SIDEBAR_SHORTCUT_PROVIDER_IDS.CODE_CLI, target) && CODE_CLI_TOOL_BY_ID.has(target.locator.resourceId),
-  async resolveMany(targets) {
-    return mapRequested(
-      targets,
-      CLI_TOOLS,
-      (tool) => tool.value,
-      (tool) => ({
-        label: i18n.t(tool.label),
-        renderIcon: ({ slotSize, glyphSize }) => (
-          <CliIcon id={tool.value} size={tool.value === CodeCli.PI ? glyphSize : slotSize} />
-        ),
-        supportsNewTab: true
-      })
-    )
-  },
-  subscribe: (_targets, invalidate) => languageSubscription(invalidate),
-  activate(target, gateway) {
-    if (!this.validate(target)) return
-    const tool = CODE_CLI_TOOL_BY_ID.get(target.locator.resourceId)
-    if (!tool) return
-    const isActiveToolUrl = (url: string) => isActiveResourceUrl(url, '/app/code', 'tool', tool.value)
-    gateway.openWorkspace({
-      url: `/app/code?tool=${encodeURIComponent(tool.value)}`,
-      title: i18n.t(tool.label),
-      matchesCurrent: isActiveToolUrl,
-      matchesTab: isActiveToolUrl
-    })
-  },
-  isActive: (target, navigation) => isActiveResourceUrl(navigation.url, '/app/code', 'tool', target.locator.resourceId)
-}
-
 export const CORE_SIDEBAR_SHORTCUT_PROVIDERS: readonly SidebarShortcutProvider[] = [
   appProvider,
   miniAppProvider,
@@ -427,8 +390,7 @@ export const CORE_SIDEBAR_SHORTCUT_PROVIDERS: readonly SidebarShortcutProvider[]
   knowledgeBaseProvider,
   topicProvider,
   agentSessionProvider,
-  fileEntryProvider,
-  codeCliProvider
+  fileEntryProvider
 ]
 function resourceIconSubscription(
   endpoint: '/agents' | '/assistants',

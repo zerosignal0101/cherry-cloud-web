@@ -265,13 +265,13 @@ describe('navigate', () => {
         schemaVersion: 1,
         package: { version: '2.0.0-dev' },
         routes: {
-          all: ['/settings', '/settings/provider', '/settings/mcp/$', '/app/code', '/app/mini-app/$appId']
+          all: ['/settings', '/settings/provider', '/settings/mcp/$', '/app/notes', '/app/mini-app/$appId']
         }
       })
     )
     const client = await connectAssistantClient()
 
-    const currentRoute = await client.callTool({ name: 'navigate', arguments: { path: '/app/code' } })
+    const currentRoute = await client.callTool({ name: 'navigate', arguments: { path: '/app/notes' } })
     const dynamicRoute = await client.callTool({ name: 'navigate', arguments: { path: '/app/mini-app/example' } })
     const removedRoute = await client.callTool({ name: 'navigate', arguments: { path: '/app/openclaw' } })
     const unknownSettingsRoute = await client.callTool({
@@ -280,7 +280,7 @@ describe('navigate', () => {
     })
 
     expect(currentRoute.isError).not.toBe(true)
-    expect(toolResultText(currentRoute)).toContain('/app/code')
+    expect(toolResultText(currentRoute)).toContain('/app/notes')
     expect(dynamicRoute.isError).not.toBe(true)
     expect(removedRoute.isError).toBe(true)
     expect(unknownSettingsRoute.isError).toBe(true)

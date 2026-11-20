@@ -4,8 +4,10 @@ const { authorizeTokenDanceApiKeyMock } = vi.hoisted(() => ({
   authorizeTokenDanceApiKeyMock: vi.fn(() => Promise.resolve('td-key'))
 }))
 vi.mock('@main/services/tokenDanceOAuth', () => ({ authorizeTokenDanceApiKey: authorizeTokenDanceApiKeyMock }))
+vi.mock('@main/services/oauth/claudeLogin', () => ({ checkClaudeLogin: vi.fn(() => Promise.resolve(true)) }))
 
 import { application } from '@application'
+import { checkClaudeLogin } from '@main/services/oauth/claudeLogin'
 import { OAuthSignInCancelledError } from '@main/services/oauth/errors'
 import { IpcError } from '@shared/ipc/errors/IpcError'
 import { oauthErrorCodes } from '@shared/ipc/errors/oauth'
@@ -24,10 +26,6 @@ const runtimeService = {
   logout: vi.fn(() => Promise.resolve())
 }
 
-const codeCliService = {
-  checkClaudeLogin: vi.fn(() => Promise.resolve(true))
-}
-
 const mainWindowService = {
   showMainWindow: vi.fn()
 }
@@ -35,7 +33,6 @@ const mainWindowService = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(application.get).mockImplementation((name: string) => {
-    if (name === 'CodeCliService') return codeCliService as never
     if (name === 'MainWindowService') return mainWindowService as never
     if (name === 'OAuthRuntimeService') return runtimeService as never
     throw new Error(`Unexpected application.get(${name})`)
@@ -108,16 +105,15 @@ describe('oauthHandlers', () => {
     expect(authorizeTokenDanceApiKeyMock).toHaveBeenCalledOnce()
   })
 
-  it('dispatches check_external_login to CodeCliService', async () => {
+  it('probes the Claude login for an external-cli provider', async () => {
     await expect(oauthHandlers['oauth.check_external_login']({ providerId: 'claude-code' }, ctx)).resolves.toBe(true)
-    expect(application.get).toHaveBeenCalledWith('CodeCliService')
-    expect(codeCliService.checkClaudeLogin).toHaveBeenCalledTimes(1)
+    expect(checkClaudeLogin).toHaveBeenCalledTimes(1)
   })
 
   it('rejects check_external_login for a non-external-cli provider', () => {
     expect(() => oauthHandlers['oauth.check_external_login']({ providerId: 'codex' }, ctx)).toThrow(
       /Unsupported external-cli/
     )
-    expect(codeCliService.checkClaudeLogin).not.toHaveBeenCalled()
+    expect(checkClaudeLogin).not.toHaveBeenCalled()
   })
 })
