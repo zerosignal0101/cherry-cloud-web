@@ -48,20 +48,21 @@ const submenuItemClassName =
 
 // Neutralize TabsTrigger's default-variant layout leak (justify-center + flex-1) when a
 // MenuItem is rendered as a vertical tab via `asChild`, keeping rail items left-aligned at h-8.
+// On phones the rail turns into a horizontal strip, so items size to their label instead.
 export const resourceDialogRailItemClassName = cn(
   submenuItemClassName,
-  'data-[state=active]:!shadow-none flex-none justify-start'
+  'data-[state=active]:!shadow-none flex-none justify-start max-sm:w-auto max-sm:whitespace-nowrap'
 )
 
 const logger = loggerService.withContext('EditDialogShared')
 
 export const editDialogFormRowClassName =
-  'grid min-w-0 grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1 py-2.5'
+  'grid min-w-0 grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1 py-2.5 max-sm:grid-cols-[5rem_minmax(0,1fr)] max-sm:gap-x-3'
 export const editDialogFormRowLabelClassName = 'justify-self-end font-normal text-muted-foreground text-[13px]'
 export const resourceDialogCloseButtonClassName =
   '[&_[data-slot=dialog-close]]:top-[9px] [&_[data-slot=dialog-close]]:right-3 [&_[data-slot=dialog-close]]:flex [&_[data-slot=dialog-close]]:size-[30px] [&_[data-slot=dialog-close]]:items-center [&_[data-slot=dialog-close]]:justify-center [&_[data-slot=dialog-close]]:rounded-lg [&_[data-slot=dialog-close]]:hover:bg-foreground/[0.08] [&_[data-slot=dialog-close]]:focus-visible:bg-foreground/[0.08] [&_[data-slot=dialog-close]]:focus-visible:ring-1 [&_[data-slot=dialog-close]]:focus-visible:ring-foreground/20 [&_[data-slot=dialog-close]]:focus-visible:ring-offset-0'
 export const resourceDialogHeaderClassName =
-  'flex shrink-0 items-center gap-3 border-border-subtle border-b px-6 py-3.5 pr-12'
+  'flex shrink-0 items-center gap-3 border-border-subtle border-b px-6 py-3.5 pr-12 max-sm:px-4'
 export const resourceDialogTitleClassName = 'truncate text-sm'
 
 export type ModelLabelKey = 'modelId' | 'planModelId' | 'smallModelId' | 'contextCompressModelId'
@@ -455,7 +456,13 @@ export function EditDialogShell<TValues extends FieldValues>({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         ref={setDialogContentElement}
-        className={cn('flex h-[min(600px,76vh)] flex-col gap-0 p-0 sm:max-w-180', resourceDialogCloseButtonClassName)}>
+        className={cn(
+          'flex h-[min(600px,76vh)] flex-col gap-0 p-0 sm:max-w-180',
+          // Phone: become a full-height sheet pinned to the top edge. A centred
+          // box had no room for the rail plus a form once the keyboard opened.
+          'max-sm:top-0 max-sm:left-0 max-sm:h-dvh max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none',
+          resourceDialogCloseButtonClassName
+        )}>
         <Form {...form}>
           {/* Clipping lives on the form (rounded-[inherit]), not DialogContent: the dialog's
               transform makes it the containing block for portaled fixed poppers (model selector),
@@ -474,10 +481,14 @@ export function EditDialogShell<TValues extends FieldValues>({
               value={activeTab}
               onValueChange={handleTabValueChange}
               orientation="vertical"
-              className="min-h-0 flex-1 gap-0 overflow-hidden">
-              {/* Quiet rail surface keeps navigation distinct without competing with the form. */}
-              <div className="flex w-36 shrink-0 flex-col border-border border-r-[0.5px] bg-background-subtle">
-                <TabsList asChild className="h-auto w-full items-stretch justify-start rounded-none bg-transparent p-3">
+              className="min-h-0 flex-1 gap-0 overflow-hidden max-sm:flex-col">
+              {/* Quiet rail surface keeps navigation distinct without competing with the form.
+                  Below `sm` it becomes a scrollable strip above the form instead of a fixed
+                  column that would leave too little width for the fields. */}
+              <div className="flex w-36 shrink-0 flex-col border-border border-r-[0.5px] bg-background-subtle max-sm:w-full max-sm:flex-row max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b-[0.5px]">
+                <TabsList
+                  asChild
+                  className="h-auto w-full items-stretch justify-start rounded-none bg-transparent p-3 max-sm:flex-row max-sm:gap-1.5 max-sm:px-3 max-sm:py-2">
                   <MenuList>
                     {tabs.map((tab) => {
                       const hasChildren = Boolean(tab.children?.length)
@@ -496,13 +507,13 @@ export function EditDialogShell<TValues extends FieldValues>({
                       const groupExpanded = expandedGroupIds.has(tab.id)
 
                       return (
-                        <div key={tab.id} className="grid gap-1">
+                        <div key={tab.id} className="grid gap-1 max-sm:contents">
                           {hasChildren ? (
                             <MenuItem
                               label={tab.label}
                               aria-expanded={groupExpanded}
                               onClick={() => toggleTabGroup(tab.id)}
-                              className={submenuItemClassName}
+                              className={cn(submenuItemClassName, 'max-sm:w-auto max-sm:whitespace-nowrap')}
                               suffix={
                                 <ChevronDown
                                   size={13}
@@ -522,7 +533,7 @@ export function EditDialogShell<TValues extends FieldValues>({
                             </TabsTrigger>
                           )}
                           {hasChildren && groupExpanded ? (
-                            <div className="grid gap-1">
+                            <div className="grid gap-1 max-sm:contents">
                               {tab.children?.map((child) => (
                                 <TabsTrigger key={child.id} value={child.id} asChild>
                                   <MenuItem
@@ -545,7 +556,10 @@ export function EditDialogShell<TValues extends FieldValues>({
                 <ScrollArea
                   viewportProps={{ ref: scrollContainerRef }}
                   contentProps={{
-                    className: cn('px-6 pt-5 pb-3', (activeTab === 'prompt' || activeTab === 'memory') && 'h-full')
+                    className: cn(
+                      'px-6 pt-5 pb-3 max-sm:px-4 max-sm:pt-4',
+                      (activeTab === 'prompt' || activeTab === 'memory') && 'h-full'
+                    )
                   }}
                   className="min-h-0 min-w-0 flex-1">
                   {children}
@@ -553,7 +567,9 @@ export function EditDialogShell<TValues extends FieldValues>({
                 {/* Always-present bottom band: insets scrolling lists from the dialog's
                     rounded-3xl corners so content never clips into them mid-scroll, and
                     surfaces the save error inline when present. */}
-                <div className="flex min-h-6 shrink-0 items-center px-6 pb-4" aria-live="polite">
+                <div
+                  className="flex min-h-6 shrink-0 items-center px-6 pb-4 max-sm:px-4 max-sm:pb-[max(1rem,env(safe-area-inset-bottom))]"
+                  aria-live="polite">
                   {rootError ? <p className="text-destructive text-xs">{rootError}</p> : null}
                 </div>
               </div>

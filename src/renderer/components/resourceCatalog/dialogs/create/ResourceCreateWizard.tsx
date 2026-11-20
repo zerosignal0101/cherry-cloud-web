@@ -99,7 +99,7 @@ function WizardFooter({
   const canProceed = stepIndex !== 0 || basicValid
 
   return (
-    <div className="flex shrink-0 items-center justify-end gap-2 border-border-subtle border-t px-6 py-3">
+    <div className="flex shrink-0 items-center justify-end gap-2 border-border-subtle border-t px-6 py-3 max-sm:px-4 max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {rootError ? <span className="mr-auto text-destructive text-xs">{rootError}</span> : null}
       <Button type="button" variant="ghost" disabled={submitting} className="text-muted-foreground" onClick={onCancel}>
         {t('common.cancel')}
@@ -340,7 +340,13 @@ export function ResourceCreateWizard({
         ref={setDialogContentElement}
         closeOnOverlayClick={!submitting}
         size="xl"
-        className={cn('flex h-[min(600px,76vh)] flex-col gap-0 p-0', resourceDialogCloseButtonClassName)}
+        className={cn(
+          'flex h-[min(600px,76vh)] flex-col gap-0 p-0',
+          // Same phone shape as the edit dialog: a full-height sheet, so the step
+          // rail and the form both fit once the keyboard is open.
+          'max-sm:top-0 max-sm:left-0 max-sm:h-dvh max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none',
+          resourceDialogCloseButtonClassName
+        )}
         onPointerDownOutside={(event) => submitting && event.preventDefault()}>
         {/* Header — title */}
         <div className={resourceDialogHeaderClassName}>
@@ -351,14 +357,15 @@ export function ResourceCreateWizard({
 
         <Form {...form}>
           <form onSubmit={(event) => event.preventDefault()} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <div className="flex min-h-0 flex-1">
-              {/* Step rail */}
-              <ol className="w-48 shrink-0 space-y-1 border-border border-r-[0.5px] bg-background-subtle p-3">
+            <div className="flex min-h-0 flex-1 max-sm:flex-col">
+              {/* Step rail — a horizontal strip on phones, where a fixed column
+                  would eat half the form's width. */}
+              <ol className="w-48 shrink-0 space-y-1 border-border border-r-[0.5px] bg-background-subtle p-3 max-sm:flex max-sm:w-full max-sm:items-center max-sm:gap-1.5 max-sm:space-y-0 max-sm:overflow-x-auto max-sm:border-r-0 max-sm:border-b-[0.5px] max-sm:p-2">
                 {steps.map((step, index) => {
                   const active = index === stepIndex
                   const done = index < stepIndex
                   return (
-                    <li key={step.id}>
+                    <li key={step.id} className="max-sm:shrink-0">
                       <MenuItem
                         icon={
                           <span
@@ -387,7 +394,9 @@ export function ResourceCreateWizard({
 
               {/* Active step */}
               <ScrollArea
-                contentProps={{ className: cn('px-6 py-5', currentStep.id === 'system-prompt' && 'h-full') }}
+                contentProps={{
+                  className: cn('px-6 py-5 max-sm:px-4 max-sm:py-4', currentStep.id === 'system-prompt' && 'h-full')
+                }}
                 className="min-w-0 flex-1">
                 {currentStep.id === 'basic' ? (
                   <BasicInfoStep
