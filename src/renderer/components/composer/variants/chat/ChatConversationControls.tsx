@@ -130,23 +130,11 @@ export function ChatConversationControls({
     </Button>
   )
 
+  // Model first, assistant second: the composer toolbar reads left-to-right and
+  // the model is the choice people change most, so it stays closest to the
+  // writing area even when the row overflows into icon-only buttons.
   return (
     <>
-      {assistantTriggerAction === 'edit' ? (
-        assistantTrigger
-      ) : (
-        <AssistantSelector
-          multi={false}
-          value={assistantId}
-          onChange={onAssistantChange}
-          autoSelectOnCreate={shouldAutoSelectCreatedAssistant}
-          side={side}
-          align="start"
-          mountStrategy="lazy-keep"
-          onDialogCloseAutoFocus={onDialogCloseAutoFocus}
-          trigger={assistantTrigger}
-        />
-      )}
       {useMentionedModelSelector && isMentionedModelSelectorLocked ? (
         <SelectedModelsTrigger
           className={mentionedModelTriggerClassName}
@@ -214,6 +202,21 @@ export function ChatConversationControls({
               />
             </Button>
           }
+        />
+      )}
+      {assistantTriggerAction === 'edit' ? (
+        assistantTrigger
+      ) : (
+        <AssistantSelector
+          multi={false}
+          value={assistantId}
+          onChange={onAssistantChange}
+          autoSelectOnCreate={shouldAutoSelectCreatedAssistant}
+          side={side}
+          align="start"
+          mountStrategy="lazy-keep"
+          onDialogCloseAutoFocus={onDialogCloseAutoFocus}
+          trigger={assistantTrigger}
         />
       )}
     </>

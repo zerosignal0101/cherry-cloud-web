@@ -355,8 +355,8 @@ function WorkspaceControl({
 export function AgentConversationControls(props: AgentConversationControlsProps) {
   return (
     <>
-      <AgentControl {...props} />
       <ModelControl {...props} />
+      <AgentControl {...props} />
       <WorkspaceControl {...props} />
     </>
   )
