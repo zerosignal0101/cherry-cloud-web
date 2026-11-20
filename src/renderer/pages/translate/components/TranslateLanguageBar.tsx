@@ -28,7 +28,7 @@ type Props = {
 
 const AUTO_EMOJI = '🌐'
 const UNKNOWN_EMOJI = '🏳️'
-const LANGUAGE_SELECT_MIN_WIDTH = 150
+const LANGUAGE_SELECT_MIN_WIDTH = 120
 const LANGUAGE_SELECT_MAX_WIDTH = 260
 const LANGUAGE_SELECT_CHROME_WIDTH = 72
 
@@ -145,7 +145,7 @@ const TranslateLanguageBar: FC<Props> = ({
   const targetSelectWidth = useMemo(() => getLanguageSelectWidth(targetOptions), [targetOptions])
 
   return (
-    <div className={cn('flex shrink-0 items-center gap-3 px-4 py-4 lg:px-6', className)}>
+    <div className={cn('flex min-w-0 flex-wrap items-center gap-3 px-4 py-4 lg:px-6', className)}>
       {!isBidirectional && showSourceControls && (
         <>
           <Combobox

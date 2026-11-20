@@ -9,7 +9,7 @@ import { useIcon } from '@cherrystudio/ui/icons'
 import { useCache } from '@data/hooks/useCache'
 import { usePreference } from '@data/hooks/usePreference'
 import { loggerService } from '@logger'
-import { CherryCloudModelSelector as ModelSelector } from '@renderer/components/cherryCloud/CherryCloudModelSelector'
+import { ModelSelector } from '@renderer/components/ModelSelector'
 import { type ModelSelectorFilter } from '@renderer/components/ModelSelector'
 import { ModelSpeedControl } from '@renderer/components/ModelSpeedControl'
 import { Navbar } from '@renderer/components/Navbar'
@@ -900,9 +900,9 @@ const TranslatePage: FC = () => {
       <Navbar />
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex shrink-0 items-center gap-3 border-border-subtle border-b p-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-border-subtle border-b p-3 sm:gap-3">
           <TranslateLanguageBar
-            className="px-0 py-0 lg:px-0"
+            className="min-w-0 flex-1 px-0 py-0 sm:flex-none lg:px-0"
             sourceLanguage={sourceLanguage}
             onSourceChange={(language) => void safePersist(setSourceLanguage(language), 'translate source language')}
             targetLanguage={targetLanguage}
@@ -912,30 +912,32 @@ const TranslatePage: FC = () => {
             showSourceControls={isPdfMode}
             bidirectionalPair={bidirectionalPair}
           />
-          {isTranslationRunning ? (
-            <button
-              type="button"
-              onClick={onAbort}
-              className="flex h-8 items-center gap-1.5 rounded-md bg-secondary px-3 text-secondary-foreground text-sm transition-all hover:bg-secondary-hover focus-visible:bg-secondary-hover focus-visible:outline-none">
-              <CirclePause size={14} className="lucide-custom" />
-              <span>{t('common.stop')}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onTranslate}
-              disabled={!couldTranslate}
-              className={cn(
-                'flex h-8 items-center gap-1.5 rounded-md px-3 text-sm transition-all focus-visible:outline-none',
-                couldTranslate
-                  ? 'bg-emerald-600 text-white hover:opacity-90'
-                  : 'cursor-not-allowed bg-muted text-foreground-disabled'
-              )}>
-              <Languages size={14} className="lucide-custom" />
-              <span>{t('translate.button.translate')}</span>
-            </button>
-          )}
-          <span className="flex-1" />
+          <div className="order-last flex w-full items-center sm:order-none sm:w-auto">
+            {isTranslationRunning ? (
+              <button
+                type="button"
+                onClick={onAbort}
+                className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md bg-secondary px-3 text-secondary-foreground text-sm transition-all hover:bg-secondary-hover focus-visible:bg-secondary-hover focus-visible:outline-none sm:flex-none">
+                <CirclePause size={14} className="lucide-custom" />
+                <span>{t('common.stop')}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onTranslate}
+                disabled={!couldTranslate}
+                className={cn(
+                  'flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md px-3 text-sm transition-all focus-visible:outline-none sm:flex-none',
+                  couldTranslate
+                    ? 'bg-emerald-600 text-white hover:opacity-90'
+                    : 'cursor-not-allowed bg-muted text-foreground-disabled'
+                )}>
+                <Languages size={14} className="lucide-custom" />
+                <span>{t('translate.button.translate')}</span>
+              </button>
+            )}
+          </div>
+          <span className="hidden flex-1 sm:block" />
           <div className="flex items-center gap-1">
             <ModelSelector
               multiple={false}
@@ -1057,8 +1059,8 @@ const TranslatePage: FC = () => {
             />
           </Suspense>
         ) : (
-          <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-1">
-            <section className="flex min-h-0 min-w-0 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-2 md:grid-rows-1">
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-none">
               <TranslateInputPane
                 ref={inputScrollRef}
                 text={translateInput}
@@ -1081,7 +1083,7 @@ const TranslatePage: FC = () => {
                 selecting={selecting}
               />
             </section>
-            <section className="flex min-h-0 min-w-0 flex-col border-border-subtle border-l">
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col border-border-subtle border-t md:flex-none md:border-t-0 md:border-l">
               <TranslateOutputPane
                 key={outputRevision}
                 ref={outputTextRef}
