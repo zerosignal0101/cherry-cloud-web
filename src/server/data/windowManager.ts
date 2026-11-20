@@ -19,11 +19,45 @@ import type { ConnectionRegistry, WebContentsLike } from '../transport/connectio
 export interface WindowManagerBridge {
   broadcast(channel: string, ...args: unknown[]): void
   broadcastToType(_type: string, channel: string, ...args: unknown[]): void
-  getWindow(windowId: string): { id: string; webContents: WebContentsLike; isFocused(): boolean; isDestroyed(): boolean } | undefined
+  getWindow(
+    windowId: string
+  ): { id: string; webContents: WebContentsLike; isFocused(): boolean; isDestroyed(): boolean } | undefined
   getWindowIdByWebContents(webContents: WebContentsLike): string | undefined
+  /** Fires when the socket for a tab actually goes away (not on reconnect replacement). */
+  onWindowDestroyed(callback: (window: { id: string }) => void): () => void
 }
 
 export function createWindowManagerBridge(connections: ConnectionRegistry): WindowManagerBridge {
+  /**
+   * A tab reload closes the socket and reconnects with the same client id.
+   * Treating that as a window destruction would permanently close file-edit
+   * leases for the tab, so teardown waits out the reconnect window; any new
+   * socket or RPC from the same client cancels it.
+   */
+  const DESTROY_GRACE_MS = 15_000
+  const destroyTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const destroyedListeners = new Set<(window: { id: string }) => void>()
+
+  connections.onDetach((clientId) => {
+    const existing = destroyTimers.get(clientId)
+    if (existing) clearTimeout(existing)
+    destroyTimers.set(
+      clientId,
+      setTimeout(() => {
+        destroyTimers.delete(clientId)
+        if (connections.hasIdentity(clientId)) return
+        connections.markDestroyed(clientId)
+        for (const listener of destroyedListeners) listener({ id: clientId })
+      }, DESTROY_GRACE_MS)
+    )
+  })
+  connections.onAttach((clientId) => {
+    const timer = destroyTimers.get(clientId)
+    if (!timer) return
+    clearTimeout(timer)
+    destroyTimers.delete(clientId)
+  })
+
   const broadcast = (channel: string, ...args: unknown[]): void => {
     if (channel === IpcChannel.IpcApi_Event && typeof args[0] === 'string') {
       connections.broadcast(args[0], args[1])
@@ -36,15 +70,21 @@ export function createWindowManagerBridge(connections: ConnectionRegistry): Wind
     broadcast,
     broadcastToType: (_type, channel, ...args) => broadcast(channel, ...args),
     getWindow: (windowId) => {
-      if (!connections.resolve(windowId)) return undefined
+      if (!connections.hasIdentity(windowId)) return undefined
       return {
         id: windowId,
         webContents: connections.webContents(windowId),
         isFocused: () => true,
-        isDestroyed: () => !connections.resolve(windowId)
+        isDestroyed: () => !connections.hasIdentity(windowId)
       }
     },
-    getWindowIdByWebContents: (webContents) => (webContents.isDestroyed() ? undefined : webContents.id)
+    getWindowIdByWebContents: (webContents) => (webContents.isDestroyed() ? undefined : webContents.id),
+    onWindowDestroyed: (callback) => {
+      destroyedListeners.add(callback)
+      return () => {
+        destroyedListeners.delete(callback)
+      }
+    }
   }
 }
 

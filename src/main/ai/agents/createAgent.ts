@@ -30,6 +30,7 @@ export async function createAgent(request: CreateAgentCommand) {
     }
     return agent
   } catch (error) {
+    logger.error('Failed to create agent', error as Error, { agentId })
     try {
       await removeAgentDataDirectory(agentsDataRoot, agentId)
     } catch (cleanupError) {

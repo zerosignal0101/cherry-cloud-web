@@ -1,4 +1,4 @@
-import { FolderOpen, FolderOutput, SaveIcon } from 'lucide-react'
+import { FolderOutput } from 'lucide-react'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -36,7 +36,6 @@ import type { CacheCleanupSizeSnapshot } from '@shared/types/cacheCleanupIpc'
 import { LOG_RETENTION_DAYS } from '@shared/types/logger'
 import type { UserDataRelocationValidationReason } from '@shared/types/userDataRelocation'
 
-import BackupPopup from './BackupPopup'
 import ClearCachePopup from './ClearCachePopup'
 import {
   beginLegacyV1Cleanup,
@@ -44,7 +43,6 @@ import {
   finalizeLegacyV1Cleanup,
   mergeLegacyV1CleanupResults
 } from './legacyV1BrowserData'
-import RestorePopup from './RestorePopup'
 
 const DATA_SETTINGS_SUBTLE_TEXT_COLOR = 'var(--foreground-tertiary)'
 const logger = loggerService.withContext('BasicDataSettings')
@@ -55,7 +53,6 @@ const BasicDataSettings: React.FC = () => {
   const [cacheSize, setCacheSize] = useState<CacheCleanupSizeSnapshot | null>()
   const [clearingCache, setClearingCache] = useState(false)
   const { theme } = useTheme()
-  const [skipBackupFile, setSkipBackupFile] = usePreference('data.backup.general.skip_backup_file')
   const [enableDataCollection, setEnableDataCollection] = usePreference('app.privacy.data_collection.enabled')
   const [logRetentionDays, setLogRetentionDays] = usePreference('app.logs.retention_days')
   const refreshCacheSize = useCallback(async () => {
@@ -257,53 +254,8 @@ const BasicDataSettings: React.FC = () => {
     })
   }
 
-  const handleDataReset = async () => {
-    const confirmed = await popup.confirm({
-      title: t('settings.data.data_reset.confirm_title'),
-      content: t('settings.data.data_reset.confirm_content'),
-      okText: t('common.confirm'),
-      cancelText: t('common.cancel'),
-      centered: true,
-      okButtonProps: {
-        danger: true
-      }
-    })
-    if (!confirmed) return
-
-    try {
-      await ipcApi.request('app.data_reset.request')
-    } catch (error) {
-      toast.error(t('settings.data.data_reset.error'))
-    }
-  }
-
   return (
     <>
-      <SettingGroup theme={theme}>
-        <SettingTitle>{t('settings.data.title')}</SettingTitle>
-        <SettingDivider />
-        <SettingRow id="setting-data-data-backup-restore" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.general.backup.title')}</SettingRowTitle>
-          <RowFlex className="justify-between gap-1.25">
-            <Button onClick={() => BackupPopup.show()} variant="outline">
-              <SaveIcon size={14} />
-              {t('settings.general.backup.button')}
-            </Button>
-            <Button onClick={() => RestorePopup.show()} variant="outline">
-              <FolderOpen size={14} />
-              {t('settings.general.restore.button')}
-            </Button>
-          </RowFlex>
-        </SettingRow>
-        <SettingDivider />
-        <SettingRow id="setting-data-data-skip-file-data" className="scroll-mt-6">
-          <SettingRowTitle className="flex items-center gap-1.5">
-            {t('settings.data.backup.skip_file_data_title')}{' '}
-            <HelpTooltip content={t('settings.data.backup.skip_file_data_help')} />
-          </SettingRowTitle>
-          <Switch checked={skipBackupFile} onCheckedChange={(value) => void setSkipBackupFile(value)} />
-        </SettingRow>
-      </SettingGroup>
       <SettingGroup theme={theme}>
         <SettingTitle>{t('settings.data.data.title')}</SettingTitle>
         <SettingDivider />
@@ -392,14 +344,6 @@ const BasicDataSettings: React.FC = () => {
           </RowFlex>
         </SettingRow>
         <SettingDivider />
-        <SettingRow id="setting-data-data-reset" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.data.data_reset.title')}</SettingRowTitle>
-          <RowFlex className="gap-1.25">
-            <Button onClick={handleDataReset} variant="destructive">
-              {t('settings.data.data_reset.button')}
-            </Button>
-          </RowFlex>
-        </SettingRow>
       </SettingGroup>
       <SettingGroup theme={theme}>
         <SettingTitle>{t('settings.privacy.title')}</SettingTitle>

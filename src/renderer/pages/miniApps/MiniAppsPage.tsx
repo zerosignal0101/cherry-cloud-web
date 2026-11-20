@@ -2,7 +2,7 @@ import { Menu, PackagePlus, Plus } from 'lucide-react'
 import type { FC } from 'react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import BeatLoader from 'react-spinners/BeatLoader'
+import { BeatLoader } from 'react-spinners'
 
 import { ScrollArea } from '@cherrystudio/ui'
 import { Button, EmptyState, SearchInput, Tooltip, useDropzone } from '@cherrystudio/ui'
@@ -96,7 +96,7 @@ const MiniAppsPage: FC = () => {
   const visibility = useMiniAppVisibility()
   const droppedInstall = useMiniAppInstallPreview(() => undefined)
   const droppedPreview = useExitPresence(droppedInstall.preview)
-  const packageDropzone = useMiniAppPackageDrop(droppedInstall.settle)
+  const packageDropzone = useMiniAppPackageDrop(droppedInstall.previewUpload)
   const hasOpenDialog =
     settingsOpen || newAppOpen || editingApp !== null || install !== null || droppedInstall.preview !== null
   const pageDropDisabled = hasOpenDialog || droppedInstall.busy

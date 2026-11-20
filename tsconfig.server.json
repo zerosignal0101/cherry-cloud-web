@@ -3,10 +3,7 @@
     "target": "esnext",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "lib": [
-      "ESNext",
-      "DOM"
-    ],
+    "lib": ["ESNext", "DOM"],
     "sourceMap": false,
     "strict": true,
     "noImplicitAny": false,
@@ -21,71 +18,28 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": true,
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "paths": {
-      "@application": [
-        "./src/platform/application"
-      ],
-      "@data/*": [
-        "./src/main/data/*"
-      ],
-      "@logger": [
-        "./src/main/core/logger/LoggerService"
-      ],
-      "@main/*": [
-        "./src/main/*"
-      ],
-      "@platform/*": [
-        "./src/platform/*"
-      ],
-      "@shared/*": [
-        "./src/shared/*"
-      ],
-      "@cherrystudio/agent-runtime": [
-        "./packages/agent-runtime/src/index.ts"
-      ],
-      "@cherrystudio/agent-behavior": [
-        "./packages/agent-behavior/src/index.ts"
-      ],
-      "@cherrystudio/agent-runtime-claude-code": [
-        "./packages/agent-runtime-claude-code/src/index.ts"
-      ],
-      "@cherrystudio/agent-runtime-pi": [
-        "./packages/agent-runtime-pi/src/index.ts"
-      ],
-      "@cherrystudio/agent-runtime-pi-durable": [
-        "./packages/agent-runtime-pi-durable/src/index.ts"
-      ],
-      "@cherrystudio/ai-core": [
-        "./vendor/ai-core/src/index.ts"
-      ],
-      "@cherrystudio/ai-core/provider": [
-        "./vendor/ai-core/src/core/providers"
-      ],
-      "@cherrystudio/ai-core/built-in/plugins": [
-        "./vendor/ai-core/src/core/plugins/built-in"
-      ],
-      "@cherrystudio/ai-core/*": [
-        "./vendor/ai-core/src/*"
-      ],
-      "@cherrystudio/ai-sdk-provider": [
-        "./vendor/ai-sdk-provider/src/index.ts"
-      ],
-      "@cherrystudio/ai-sdk-provider/*": [
-        "./vendor/ai-sdk-provider/src/*"
-      ]
+      "@application": ["./src/platform/application"],
+      "@data/*": ["./src/main/data/*"],
+      "@logger": ["./src/main/core/logger/LoggerService"],
+      "@main/*": ["./src/main/*"],
+      "@platform/*": ["./src/platform/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@cherrystudio/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@cherrystudio/agent-behavior": ["./packages/agent-behavior/src/index.ts"],
+      "@cherrystudio/agent-runtime-claude-code": ["./packages/agent-runtime-claude-code/src/index.ts"],
+      "@cherrystudio/ai-core": ["./vendor/ai-core/src/index.ts"],
+      "@cherrystudio/ai-core/provider": ["./vendor/ai-core/src/core/providers"],
+      "@cherrystudio/ai-core/built-in/plugins": ["./vendor/ai-core/src/core/plugins/built-in"],
+      "@cherrystudio/ai-core/*": ["./vendor/ai-core/src/*"],
+      "@cherrystudio/ai-sdk-provider": ["./vendor/ai-sdk-provider/src/index.ts"],
+      "@cherrystudio/ai-sdk-provider/*": ["./vendor/ai-sdk-provider/src/*"],
+      "@earendil-works/*": ["./src/server/types/pi-packages.d.ts"],
+      "@cherrystudio/agent-runtime-pi": ["./src/server/types/pi-packages.d.ts"],
+      "@cherrystudio/agent-runtime-pi-durable": ["./src/server/types/pi-packages.d.ts"]
     }
   },
-  "include": [
-    "src/server/**/*",
-    "src/platform/**/*",
-    "src/shared/**/*",
-    "src/main/env.d.ts"
-  ],
-  "exclude": [
-    "**/__tests__/**",
-    "**/*.test.ts"
-  ]
+  "include": ["src/server/**/*", "src/platform/**/*", "src/shared/**/*", "src/main/env.d.ts"],
+  "exclude": ["**/__tests__/**", "**/*.test.ts"]
 }

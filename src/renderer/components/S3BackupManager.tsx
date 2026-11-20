@@ -47,34 +47,24 @@ export function S3BackupManager({ visible, onClose, s3Config, restoreMethod }: S
   const [currentPage, setCurrentPage] = useState(1)
   const { t } = useTranslation()
 
-  const { endpoint, region, bucket, accessKeyId, secretAccessKey } = s3Config
+  const { endpoint, region, bucket, accessKeyId } = s3Config
 
   const fetchBackupFiles = useCallback(async () => {
-    if (!endpoint || !region || !bucket || !accessKeyId || !secretAccessKey) {
+    if (!endpoint || !region || !bucket || !accessKeyId) {
       toast.error(t('settings.data.s3.manager.config.incomplete'))
       return
     }
 
     setLoading(true)
     try {
-      const files = await window.api.backup.listS3Files({
-        ...s3Config,
-        endpoint,
-        region,
-        bucket,
-        accessKeyId,
-        secretAccessKey,
-        autoSync: false,
-        syncInterval: 0,
-        maxBackups: 0
-      })
+      const files = await window.api.backup.listS3Files(s3Config)
       setBackupFiles(files)
     } catch {
       toast.error(t('settings.data.s3.manager.files.fetch.error', { message: t('error.unknown') }))
     } finally {
       setLoading(false)
     }
-  }, [endpoint, region, bucket, accessKeyId, secretAccessKey, t, s3Config])
+  }, [endpoint, region, bucket, accessKeyId, t, s3Config])
 
   useEffect(() => {
     if (visible) {
@@ -117,7 +107,7 @@ export function S3BackupManager({ visible, onClose, s3Config, restoreMethod }: S
       return
     }
 
-    if (!endpoint || !region || !bucket || !accessKeyId || !secretAccessKey) {
+    if (!endpoint || !region || !bucket || !accessKeyId) {
       toast.error(t('settings.data.s3.manager.config.incomplete'))
       return
     }
@@ -136,17 +126,7 @@ export function S3BackupManager({ visible, onClose, s3Config, restoreMethod }: S
     try {
       // 依次删除选中的文件
       for (const key of selectedRowKeys) {
-        await window.api.backup.deleteS3File(key.toString(), {
-          ...s3Config,
-          endpoint,
-          region,
-          bucket,
-          accessKeyId,
-          secretAccessKey,
-          autoSync: false,
-          syncInterval: 0,
-          maxBackups: 0
-        })
+        await window.api.backup.deleteS3File(key.toString())
       }
       toast.success(t('settings.data.s3.manager.delete.success.multiple', { count: selectedRowKeys.length }))
       setSelectedRowKeys([])
@@ -159,7 +139,7 @@ export function S3BackupManager({ visible, onClose, s3Config, restoreMethod }: S
   }
 
   const handleDeleteSingle = async (fileName: string) => {
-    if (!endpoint || !region || !bucket || !accessKeyId || !secretAccessKey) {
+    if (!endpoint || !region || !bucket || !accessKeyId) {
       toast.error(t('settings.data.s3.manager.config.incomplete'))
       return
     }
@@ -176,17 +156,7 @@ export function S3BackupManager({ visible, onClose, s3Config, restoreMethod }: S
 
     setDeleting(true)
     try {
-      await window.api.backup.deleteS3File(fileName, {
-        ...s3Config,
-        endpoint,
-        region,
-        bucket,
-        accessKeyId,
-        secretAccessKey,
-        autoSync: false,
-        syncInterval: 0,
-        maxBackups: 0
-      })
+      await window.api.backup.deleteS3File(fileName)
       toast.success(t('settings.data.s3.manager.delete.success.single'))
       await fetchBackupFiles()
     } catch {
@@ -197,7 +167,7 @@ export function S3BackupManager({ visible, onClose, s3Config, restoreMethod }: S
   }
 
   const handleRestore = async (fileName: string) => {
-    if (!endpoint || !region || !bucket || !accessKeyId || !secretAccessKey) {
+    if (!endpoint || !region || !bucket || !accessKeyId) {
       toast.error(t('settings.data.s3.manager.config.incomplete'))
       return
     }

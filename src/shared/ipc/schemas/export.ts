@@ -13,6 +13,15 @@ export const exportRequestSchemas = {
     input: z.object({ markdown: z.string(), fileName: z.string() }),
     output: z.boolean()
   }),
+  /** Web build: server generates the document and the browser downloads the bytes. */
+  'export.word.download': defineRoute({
+    input: z.object({ markdown: z.string().max(10 * 1024 * 1024), fileName: z.string().max(255) }),
+    output: z.object({
+      fileName: z.string(),
+      base64: z.string(),
+      mimeType: z.literal('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    })
+  }),
   'export.obsidian.get_vaults': defineRoute({
     input: z.void(),
     output: z.array(z.object({ path: z.string(), name: z.string() }))

@@ -1,6 +1,6 @@
+import { ThemeMode } from '@shared/data/preference/preferenceTypes'
 import type { RouteDef } from '@shared/ipc/define'
 import { systemRequestSchemas } from '@shared/ipc/schemas/system'
-import { ThemeMode } from '@shared/data/preference/preferenceTypes'
 import type { IpcHandlersFor } from '@shared/ipc/types'
 
 import type { RpcRegistry } from '../transport/registry'

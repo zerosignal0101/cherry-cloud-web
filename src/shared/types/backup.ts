@@ -42,6 +42,56 @@ export type BackupResult<T> = {
   cleanupFailed: boolean
 }
 
+/** Remote backup targets supported by the web build (local folders and Nutstore are removed). */
+export const BACKUP_REMOTE_TYPES = ['webdav', 's3'] as const
+export type BackupRemoteType = (typeof BACKUP_REMOTE_TYPES)[number]
+
+/** One server-generated backup archive listed in a remote provider. */
+export type BackupFileInfo = {
+  fileName: string
+  modifiedTime: string
+  size: number
+}
+
+/** Progress fan-out for manual/automatic backup and restore. */
+export type BackupProgress = {
+  operation: 'backup' | 'restore'
+  stage:
+    | 'preparing'
+    | 'snapshot'
+    | 'copying_files'
+    | 'compressing'
+    | 'uploading'
+    | 'downloading'
+    | 'extracting'
+    | 'validating'
+    | 'completed'
+  progress: number
+  total: number
+}
+
+/** Result of staging a restore; the process must restart before it is promoted. */
+export type BackupRestoreResult = {
+  restoreId: string
+  fileName: string
+  createdAt: string
+  requiresRestart: true
+}
+
+/** Whether an encrypted credential is present; plaintext never crosses the RPC boundary. */
+export type BackupSecretStatus = {
+  webdavPassword: boolean
+  s3SecretAccessKey: boolean
+}
+
+/** Both credentials remain server-side and may be rotated/cleared independently. */
+export type BackupSecretKey = 'webdav.password' | 's3.secret_access_key'
+
+export type ManualRemoteBackupResult = {
+  fileName: string
+  cleanupFailed: boolean
+}
+
 export const AUTO_BACKUP_TYPES = ['webdav', 's3', 'local', 'nutstore'] as const
 export type AutoBackupType = (typeof AUTO_BACKUP_TYPES)[number]
 

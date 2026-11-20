@@ -2,60 +2,24 @@
   "files": [],
   "compilerOptions": {
     "paths": {
-      "@application": [
-        "./src/platform/application"
-      ],
-      "@data/*": [
-        "./src/main/data/*"
-      ],
-      "@logger": [
-        "./src/main/core/logger/LoggerService"
-      ],
-      "@main/*": [
-        "./src/main/*"
-      ],
-      "@platform/*": [
-        "./src/platform/*"
-      ],
-      "@renderer/*": [
-        "./src/renderer/*"
-      ],
-      "@server/*": [
-        "./src/server/*"
-      ],
-      "@shared/*": [
-        "./src/shared/*"
-      ],
-      "@cherrystudio/ui": [
-        "./packages/ui/src/index.ts"
-      ],
-      "@cherrystudio/ui/*": [
-        "./packages/ui/src/*"
-      ],
-      "@cherrystudio/agent-runtime": [
-        "./packages/agent-runtime/src/index.ts"
-      ],
-      "@cherrystudio/agent-behavior": [
-        "./packages/agent-behavior/src/index.ts"
-      ],
-      "@cherrystudio/agent-runtime-claude-code": [
-        "./packages/agent-runtime-claude-code/src/index.ts"
-      ],
-      "@cherrystudio/agent-runtime-pi": [
-        "./packages/agent-runtime-pi/src/index.ts"
-      ],
-      "@cherrystudio/agent-runtime-pi-durable": [
-        "./packages/agent-runtime-pi-durable/src/index.ts"
-      ],
-      "@cherrystudio/ai-core": [
-        "./vendor/ai-core/src/index.ts"
-      ],
-      "@cherrystudio/ai-core/*": [
-        "./vendor/ai-core/src/*"
-      ],
-      "@cherrystudio/ai-sdk-provider": [
-        "./vendor/ai-sdk-provider/src/index.ts"
-      ]
+      "@application": ["./src/platform/application"],
+      "@data/*": ["./src/main/data/*"],
+      "@logger": ["./src/main/core/logger/LoggerService"],
+      "@main/*": ["./src/main/*"],
+      "@platform/*": ["./src/platform/*"],
+      "@renderer/*": ["./src/renderer/*"],
+      "@server/*": ["./src/server/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@cherrystudio/ui": ["./packages/ui/src/index.ts"],
+      "@cherrystudio/ui/*": ["./packages/ui/src/*"],
+      "@cherrystudio/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@cherrystudio/agent-behavior": ["./packages/agent-behavior/src/index.ts"],
+      "@cherrystudio/agent-runtime-claude-code": ["./packages/agent-runtime-claude-code/src/index.ts"],
+      "@cherrystudio/agent-runtime-pi": ["./packages/agent-runtime-pi/src/index.ts"],
+      "@cherrystudio/agent-runtime-pi-durable": ["./packages/agent-runtime-pi-durable/src/index.ts"],
+      "@cherrystudio/ai-core": ["./vendor/ai-core/src/index.ts"],
+      "@cherrystudio/ai-core/*": ["./vendor/ai-core/src/*"],
+      "@cherrystudio/ai-sdk-provider": ["./vendor/ai-sdk-provider/src/index.ts"]
     },
     "experimentalDecorators": true,
     "useDefineForClassFields": true

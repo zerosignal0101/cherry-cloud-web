@@ -1,0 +1,36 @@
+[Unit]
+Description=cherry-cloud-web
+Documentation=file:///opt/cherry-cloud-web/docs/deployment.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cherry
+Group=cherry
+WorkingDirectory=/opt/cherry-cloud-web
+EnvironmentFile=/opt/cherry-cloud-web/.env
+Environment=NODE_ENV=production
+Environment=DATA_DIR=/var/lib/cherry-cloud-web
+ExecStart=/usr/bin/node /opt/cherry-cloud-web/dist/server/main.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+KillSignal=SIGTERM
+# Data is read/written only under DATA_DIR; the code tree is read-only.
+ReadWritePaths=/var/lib/cherry-cloud-web
+
+# Hardening. The server needs to execute provider calls and (optionally) PTYs,
+# so keep PrivateTmp and NoNewPrivileges; drop the rest only if a feature needs it.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

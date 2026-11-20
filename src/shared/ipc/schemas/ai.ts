@@ -46,7 +46,7 @@ import {
 } from '@shared/data/types/model'
 import { TopicSchema } from '@shared/data/types/topic'
 import { ReasoningEffortOptionSchema } from '@shared/types/aiSdk'
-import { AbsoluteFilePathSchema, FileVersionSchema } from '@shared/types/file'
+import { FileVersionSchema } from '@shared/types/file'
 
 import { defineRoute } from '../define'
 import { ImageBytesSchema } from './entityImage'
@@ -487,7 +487,13 @@ export const aiRequestSchemas = {
   }),
   'ai.agent.workspace.register': defineRoute({
     input: z.strictObject({
-      path: z.string().trim().pipe(AbsoluteFilePathSchema),
+      // Browser callers address server-owned workspaces by their logical id.
+      // The server resolves the physical directory; a host path never crosses
+      // the transport in either direction.
+      path: z
+        .string()
+        .trim()
+        .regex(/^\/workspaces\/[A-Za-z0-9_-]{8,64}$/, 'Workspace paths must be logical /workspaces/<id> paths'),
       name: AgentWorkspaceNameSchema.optional()
     }),
     output: AgentWorkspaceEntitySchema

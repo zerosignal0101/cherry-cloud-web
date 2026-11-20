@@ -197,7 +197,7 @@ const DictationComposerRuntime = ({ context }: { context: DictationContext }) =>
           error === 'model_required' ? 'settings.dependencies.localModels.title' : 'settings.voice.action.open_settings'
         ),
         icon: <Settings />,
-        action: () => openSettingsTab(error === 'model_required' ? '/settings/local-models' : '/settings/voice')
+        action: () => openSettingsTab('/settings/general')
       })
     }
 

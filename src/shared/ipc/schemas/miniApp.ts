@@ -8,6 +8,7 @@ import type { QuotaUsageWithLimits } from '@shared/types/miniAppQuota'
 
 import { defineRoute } from '../define'
 import { LogoImageIntentSchema } from './entityImage'
+import type { BridgeResult } from './miniAppBridge'
 
 /** Whole locale tables, as `MiniAppIdentityChange` pins them at check time. */
 const IdentityChangeSchema = z.object({
@@ -225,6 +226,25 @@ export const miniAppRequestSchemas = {
   'mini_app.runtime.set_visible': defineRoute({
     input: z.object({ appId: MiniAppIdSchema, visible: z.boolean() }),
     output: z.void()
+  }),
+
+  /**
+   * One capability call from a sandboxed mini-app iframe.
+   *
+   * The browser host relays the guest's postMessage here. The guest never holds
+   * the session cookie, and the server re-checks grants on every call; the app id
+   * is part of the route rather than inferred from a webContents because there is
+   * no webContents in a browser tab.
+   */
+  'mini_app.bridge.invoke': defineRoute({
+    input: z.strictObject({
+      appId: MiniAppIdSchema,
+      method: z.string().min(1).max(100),
+      params: z.unknown().optional(),
+      requestId: z.string().max(64).optional(),
+      callId: z.string().max(64).optional()
+    }),
+    output: z.custom<BridgeResult>()
   }),
 
   // Activity log: the detail panel's "what did this app do" — newest first, no payloads.

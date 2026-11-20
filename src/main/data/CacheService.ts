@@ -576,6 +576,11 @@ export class CacheService extends BaseService {
     return result
   }
 
+  /** Public snapshot for the web cache bridge (renderer mirrors initialize from this). */
+  getAllSharedSnapshot(): Record<string, CacheEntry> {
+    return this.getAllShared()
+  }
+
   // ============ Persist Cache (Main-authoritative, JSON-backed) ============
   //
   // Independent from the renderer persist cache: this tier is stored in a JSON
@@ -801,6 +806,16 @@ export class CacheService extends BaseService {
    */
   private broadcastSync(message: CacheSyncMessage, senderWindowId?: number): void {
     const windows = BrowserWindow.getAllWindows()
+    if (windows.length === 0) {
+      // The web host has no BrowserWindow list; tabs are IpcApi connections.
+      // Keep the same event name so the renderer CacheService mirror is unchanged.
+      try {
+        application.get('IpcApiService').broadcast(IpcChannel.Cache_Sync, message)
+      } catch (error) {
+        logger.warn('Failed to broadcast shared cache change', { error })
+      }
+      return
+    }
     for (const window of windows) {
       if (!window.isDestroyed() && window.id !== senderWindowId) {
         window.webContents.send(IpcChannel.Cache_Sync, message)

@@ -1,9 +1,9 @@
-import type { ISeeder } from '@data/db/types'
 import { ConversationListSortSeeder } from '@data/db/seeding/seeders/conversationListSortSeeder'
 import { KnowledgeBaseOrderSeeder } from '@data/db/seeding/seeders/knowledgeBaseOrderSeeder'
 import { PreferenceSeeder } from '@data/db/seeding/seeders/preferenceSeeder'
 import { PresetProviderSeeder } from '@data/db/seeding/seeders/presetProviderSeeder'
 import { TranslateLanguageSeeder } from '@data/db/seeding/seeders/translateLanguageSeeder'
+import type { ISeeder } from '@data/db/types'
 
 import { WebDefaultAssistantSeeder } from './seeders/webDefaultAssistantSeeder'
 import { WebDefaultsSeeder } from './seeders/webDefaultsSeeder'

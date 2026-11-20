@@ -465,21 +465,24 @@ export const useRichEditor = (options: UseRichEditorOptions = {}): UseRichEditor
           name: 'Pasted Image',
           ext: extension.replace(/^\./, ''),
           // `manual`, unlike the chat/painting paste paths that use
-          // `delete_when_unreferenced`. The reference here is a `file://` URL
-          // written into the note's markdown — user-owned text in a user-chosen
-          // folder (`feature.notes.path`), which Cherry is not the only writer of.
-          // A ref row could therefore never be released soundly: removing the
-          // image from the note never reaches us, and copying the markdown into
-          // a second note creates a reference we never saw. So the entry is
-          // pinned instead, and reclaiming note images stays a question for a
-          // content scan over the notes tree, not a ref table.
+          // `delete_when_unreferenced`. The reference here is a `/media/:id` URL
+          // (or `file://` on the desktop) written into the note's markdown —
+          // user-owned text the server does not parse. Removing the image from
+          // the note never reaches us, and copying the markdown into a second
+          // note creates a reference we never saw. So the entry is pinned
+          // instead, and reclaiming note images stays a question for a content
+          // scan over the notes tree, not a ref table.
           cleanupPolicy: 'manual'
         })
-        const physicalPath = await window.api.file.getPhysicalPath({ id: entry.id })
+        // Notes live in the server-owned sandbox, so the browser renders them
+        // through `/media/:id`. The desktop host can still address the physical
+        // file directly.
+        const isWeb = window.electron?.process?.platform === 'web'
+        const physicalPath = isWeb ? undefined : await window.api.file.getPhysicalPath({ id: entry.id })
 
-        // Insert image into editor using local file path
+        // Insert image into editor using a same-origin media URL in the browser.
         if (editor && !editor.isDestroyed) {
-          const imageUrl = `file://${physicalPath}`
+          const imageUrl = physicalPath ? `file://${physicalPath}` : `/media/${entry.id}`
           const alt = `${entry.name}${entry.ext ? `.${entry.ext}` : ''}`
           editor.chain().focus().setImage({ src: imageUrl, alt }).run()
         }

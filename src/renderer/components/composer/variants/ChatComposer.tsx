@@ -42,7 +42,6 @@ import { useChatWrite } from '@renderer/hooks/chat/ChatWriteContext'
 import { useCommandHandler } from '@renderer/hooks/command'
 import { useIsActiveTab } from '@renderer/hooks/tab'
 import { useAssistant } from '@renderer/hooks/useAssistant'
-import { useCherryCloudQuotaExhaustion } from '@renderer/hooks/useCherryCloudQuotaExhaustion'
 import { useKnowledgeBases } from '@renderer/hooks/useKnowledgeBase'
 import { useLatest } from '@renderer/hooks/useLatest'
 import { useModelById, useModels } from '@renderer/hooks/useModel'
@@ -79,7 +78,6 @@ import { getKnowledgeBaseIdsFromParts, withKnowledgeScopePart } from '@shared/da
 import type { ReasoningEffortOption } from '@shared/types/aiSdk'
 import { imageExts } from '@shared/utils/file'
 
-import { CherryCloudQuotaNotice } from '../CherryCloudQuotaNotice'
 import { createComposerUserMessageParts, trimComposerDraftBoundaryBlankLines } from '../composerDraft'
 import type { InputHistoryDirection } from '../inputHistoryNavigation'
 import { QueuedFollowupsDock } from '../QueuedFollowupsDock'
@@ -904,8 +902,6 @@ const ChatComposerInner = ({
     useMentionedModelSelector && !isMentionedModelSelectorLocked && mentionedModelSelectorValue.length === 0
       ? t('code.model_required')
       : undefined
-  const quotaExhaustion = useCherryCloudQuotaExhaustion(effectiveSubmittedModel)
-  const quotaBlocksSend = !!quotaExhaustion && quotaExhaustion.reason !== 'unknown'
   const isModelUnavailable =
     !missingAssistantMessage &&
     !runtimeModelPending &&
@@ -1705,8 +1701,6 @@ const ChatComposerInner = ({
       }
 
       if (editingMessageForCurrentTopic) {
-        // Save-only edits stay available out of quota; only the resend is held.
-        if (quotaBlocksSend) return
         await commitEditedMessage(draft, true)
         return
       }
@@ -1767,7 +1761,6 @@ const ChatComposerInner = ({
       loading,
       missingAssistantMessage,
       missingSelectedModelMessage,
-      quotaBlocksSend,
       runtimeModel,
       runtimeModelPending,
       selectedModelForMissingAssistantDefault,
@@ -1919,8 +1912,7 @@ const ChatComposerInner = ({
             hasPendingReference ||
             !!missingAssistantMessage ||
             !!missingModelMessage ||
-            !!missingSelectedModelMessage ||
-            (quotaBlocksSend && !editingMessageForCurrentTopic)
+            !!missingSelectedModelMessage
           }
           sendBlockedReason={
             isSavingEdit || isDirectSending || sendDisabled || hasPendingReference
@@ -1955,16 +1947,7 @@ const ChatComposerInner = ({
               : undefined
           }
           onPause={onPause}
-          queueContent={
-            quotaExhaustion ? (
-              <>
-                <CherryCloudQuotaNotice exhaustion={quotaExhaustion} />
-                {followupsDock}
-              </>
-            ) : (
-              followupsDock
-            )
-          }
+          queueContent={followupsDock}
           supportedExts={supportedExts}
           setFiles={setFiles}
           previewInputFile={previewInputFile}

@@ -6,7 +6,6 @@ import { Button, Drawer, DrawerContent, DrawerTitle, ScrollArea } from '@cherrys
 import { useDataChange, useInfiniteFlatItems, useInfiniteQuery, useMutation, useQuery } from '@data/hooks/useDataApi'
 import { loggerService } from '@logger'
 import { useOptionalTabsContext } from '@renderer/hooks/tab'
-import { useAppUpdateState } from '@renderer/hooks/useAppUpdateState'
 import { ipcApi, useIpcOn } from '@renderer/ipc'
 import { toast } from '@renderer/services/toast'
 import type { NotificationRecord } from '@shared/data/types/notification'
@@ -45,10 +44,6 @@ function NotificationItem({
   const unreadDescriptionId = useId()
   const [expanded, setExpanded] = useState(initiallyExpanded)
   const [activating, setActivating] = useState(false)
-  const { appUpdateState, checkForUpdate } = useAppUpdateState(async (releaseInfo) => {
-    const { default: UpdateDialogPopup } = await import('./UpdateDialogPopup')
-    return UpdateDialogPopup.show({ releaseInfo })
-  })
   const { trigger: markRead } = useMutation('PATCH', '/notifications/:id', {
     refresh: ['/notifications', '/notifications/unread-count']
   })
@@ -83,7 +78,6 @@ function NotificationItem({
     ...(created.toDateString() === new Date().toDateString() ? {} : { dateStyle: 'short' as const }),
     timeStyle: 'short'
   })
-  const canUpdate = release && appUpdateState.available && appUpdateState.info?.version === release.version
 
   const activate = async () => {
     setActivating(true)
@@ -192,22 +186,6 @@ function NotificationItem({
                   .catch((error) => logger.error('Failed to open announcement link', error as Error))
               }>
               {t('common.open')}
-            </Button>
-          )}
-          {canUpdate && appUpdateState.lastErrorKey && (
-            <p role="alert" className="text-sm text-destructive">
-              {t(appUpdateState.lastErrorKey)}
-            </p>
-          )}
-          {canUpdate && (
-            <Button
-              onClick={() => void checkForUpdate()}
-              disabled={appUpdateState.checking || appUpdateState.downloading}>
-              {appUpdateState.downloading
-                ? `${t('settings.about.downloading')} ${Math.round(appUpdateState.downloadProgress)}%`
-                : appUpdateState.downloaded
-                  ? t('update.install')
-                  : t('notification.center.update_now')}
             </Button>
           )}
         </div>

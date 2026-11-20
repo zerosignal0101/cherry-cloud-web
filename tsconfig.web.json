@@ -4,11 +4,7 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "lib": [
-      "ESNext",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "sourceMap": false,
     "strict": true,
     "noImplicitAny": false,
@@ -23,49 +19,21 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": true,
-    "types": [
-      "vite/client"
-    ],
+    "types": ["vite/client"],
     "paths": {
-      "@cherrystudio/ui": [
-        "./packages/ui/src/index.ts"
-      ],
-      "@cherrystudio/ui/*": [
-        "./packages/ui/src/*"
-      ],
-      "@cherrystudio/ui/icons": [
-        "./packages/ui/src/components/icons/index.ts"
-      ],
-      "@cherrystudio/ui/icons/providers": [
-        "./packages/ui/src/components/icons/providers/index.ts"
-      ],
-      "@data/*": [
-        "./src/renderer/data/*"
-      ],
-      "@logger": [
-        "./src/renderer/services/LoggerService"
-      ],
-      "@renderer/*": [
-        "./src/renderer/*"
-      ],
-      "@shared/*": [
-        "./src/shared/*"
-      ],
-      "@cherrystudio/file-preview/core": [
-        "./packages/file-preview/src/core.ts"
-      ],
-      "@cherrystudio/file-preview/react": [
-        "./packages/file-preview/src/react.ts"
-      ],
-      "@cherrystudio/agent-runtime": [
-        "./packages/agent-runtime/src/index.ts"
-      ],
-      "@cherrystudio/ai-core": [
-        "./vendor/ai-core/src/index.ts"
-      ],
-      "@cherrystudio/ai-core/*": [
-        "./vendor/ai-core/src/*"
-      ]
+      "@cherrystudio/ui": ["./packages/ui/src/index.ts"],
+      "@cherrystudio/ui/*": ["./packages/ui/src/*"],
+      "@cherrystudio/ui/icons": ["./packages/ui/src/components/icons/index.ts"],
+      "@cherrystudio/ui/icons/providers": ["./packages/ui/src/components/icons/providers/index.ts"],
+      "@data/*": ["./src/renderer/data/*"],
+      "@logger": ["./src/renderer/services/LoggerService"],
+      "@renderer/*": ["./src/renderer/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@cherrystudio/file-preview/core": ["./packages/file-preview/src/core.ts"],
+      "@cherrystudio/file-preview/react": ["./packages/file-preview/src/react.ts"],
+      "@cherrystudio/agent-runtime": ["./packages/agent-runtime/src/index.ts"],
+      "@cherrystudio/ai-core": ["./vendor/ai-core/src/index.ts"],
+      "@cherrystudio/ai-core/*": ["./vendor/ai-core/src/*"]
     }
   },
   "include": [
@@ -75,12 +43,5 @@
     "src/renderer/types/**/*",
     "packages/file-preview/src/**/*"
   ],
-  "exclude": [
-    "**/__tests__/**",
-    "**/*.test.ts",
-    "**/*.test.tsx",
-    "**/*.spec.ts",
-    "**/*.spec.tsx",
-    "src/main/**"
-  ]
+  "exclude": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx", "src/main/**"]
 }

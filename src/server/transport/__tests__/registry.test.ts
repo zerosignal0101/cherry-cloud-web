@@ -26,7 +26,10 @@ describe('RpcRegistry', () => {
     const registry = new RpcRegistry()
     registry.register(schemas, handlers)
 
-    await expect(registry.dispatch('test.echo', { value: 21 }, ctx)).resolves.toEqual({ ok: true, data: { doubled: 42 } })
+    await expect(registry.dispatch('test.echo', { value: 21 }, ctx)).resolves.toEqual({
+      ok: true,
+      data: { doubled: 42 }
+    })
   })
 
   it('rejects unknown routes', async () => {

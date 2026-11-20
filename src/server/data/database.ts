@@ -6,6 +6,8 @@ import { drizzle } from 'drizzle-orm/better-sqlite3'
 
 import { applyMigrations } from '@data/db/applyMigrations'
 import { registerKnowledgeFunctions } from '@data/db/knowledgeFunctions'
+import { checkpointTruncateAssert } from '@data/db/restore/checkpoint'
+import { snapshotTo } from '@data/db/restore/snapshot'
 import { SeedRunner } from '@data/db/seeding/SeedRunner'
 import type { DbOrTx, DbType, ISeeder } from '@data/db/types'
 import { loggerService } from '@logger'
@@ -27,6 +29,14 @@ export interface DatabaseHandle {
   getDb(): DbType
   /** Atomic multi-statement writes; see the invariant note in `DbService.withWriteTx`. */
   withWriteTx<T>(fn: (tx: DbOrTx) => T): T
+  /**
+   * Transaction-consistent snapshot via SQLite `VACUUM INTO`. The target must
+   * not exist. Safe while writes continue, but backup callers still quiesce
+   * writers so the file resources copied alongside are from the same instant.
+   */
+  createSnapshot(targetPath: string): void
+  /** Fold the WAL into the main file before hashing/archiving it. */
+  checkpointTruncate(): void
   close(): void
 }
 
@@ -72,6 +82,8 @@ export function openDatabase({ databasePath, migrationsDir, seeders = [] }: Open
     isReady: true,
     getDb: () => db,
     withWriteTx: <T>(fn: (tx: DbOrTx) => T): T => db.transaction(fn, { behavior: 'immediate' }),
+    createSnapshot: (targetPath: string) => snapshotTo(sqlite, targetPath),
+    checkpointTruncate: () => checkpointTruncateAssert(sqlite),
     close: () => sqlite.close()
   }
 }

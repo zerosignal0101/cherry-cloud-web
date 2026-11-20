@@ -194,6 +194,12 @@ export interface SkillToggleOptions {
 
 export interface SkillInstallFromZipOptions {
   zipFilePath: string
+  /**
+   * Provenance recorded instead of the ZIP file URL. The web upload route
+   * stages bytes under a throwaway temp directory, so it passes a stable
+   * content-addressed URL to keep re-uploads of the same archive idempotent.
+   */
+  sourceUrl?: string
 }
 
 export interface SkillInstallFromDirectoryOptions {

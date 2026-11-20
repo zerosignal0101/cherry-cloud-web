@@ -1,22 +1,18 @@
 import FileCode from 'lucide-react/dist/esm/icons/file-code'
 import FileWarning from 'lucide-react/dist/esm/icons/file-warning'
 import LoaderCircle from 'lucide-react/dist/esm/icons/loader-circle'
-import { lazy, type ReactNode, Suspense, useLayoutEffect, useMemo, useState } from 'react'
+import { lazy, type ReactNode, Suspense, useLayoutEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { FilePreviewLayout } from '@cherrystudio/file-preview/react'
 import { EmptyState } from '@cherrystudio/ui'
 import { loggerService } from '@logger'
 import HtmlPreviewFrame, {
+  HTML_PREVIEW_INTERACTIVE_SANDBOX,
   HTML_PREVIEW_RESTRICTED_CSP,
   HTML_PREVIEW_RESTRICTED_SANDBOX
 } from '@renderer/components/CodeBlockView/HtmlPreviewFrame'
-import { WebviewBrowser } from '@renderer/components/WebviewBrowser'
-import { getFilePreviewExtension } from '@renderer/utils/filePreview'
 import { FILE_EDIT_MAX_SIZE_BYTES } from '@shared/types/file'
-import { WEBVIEW_ANNOTATION_LIMITS } from '@shared/types/webviewAnnotation'
-import { toSafeFileUrl } from '@shared/utils/file'
-import { WebviewSecurityProfile } from '@shared/utils/webviewSecurity'
 
 import type { FilePreviewPluginProps } from '../../types'
 import { type HtmlFilePreviewMode, HtmlFilePreviewToolbar } from './HtmlFilePreviewToolbar'
@@ -88,11 +84,11 @@ interface HtmlPreviewContentProps {
   location?: FilePreviewPluginProps['location']
   loadState: HtmlFileLoadState
   fileName: string
-  baseUrl: string
   mode: HtmlFilePreviewMode
+  interactive: boolean
 }
 
-function HtmlPreviewContent({ loadState, fileName, baseUrl, mode, location }: HtmlPreviewContentProps): ReactNode {
+function HtmlPreviewContent({ loadState, fileName, mode, location, interactive }: HtmlPreviewContentProps): ReactNode {
   if (loadState.status === 'loading') return <HtmlPreviewLoading />
   if (loadState.status === 'error') return <HtmlPreviewError />
   if (loadState.status === 'too_large') return <HtmlPreviewTooLarge />
@@ -123,9 +119,8 @@ function HtmlPreviewContent({ loadState, fileName, baseUrl, mode, location }: Ht
         key={loadState.refreshKey}
         html={loadState.content}
         title={fileName}
-        baseUrl={baseUrl}
-        csp={HTML_PREVIEW_RESTRICTED_CSP}
-        sandbox={HTML_PREVIEW_RESTRICTED_SANDBOX}
+        csp={interactive ? undefined : HTML_PREVIEW_RESTRICTED_CSP}
+        sandbox={interactive ? HTML_PREVIEW_INTERACTIVE_SANDBOX : HTML_PREVIEW_RESTRICTED_SANDBOX}
       />
     </div>
   )
@@ -143,27 +138,18 @@ export default function HtmlFilePreview({
   const [mode, setMode] = useState<HtmlFilePreviewMode>(location ? 'source' : 'preview')
   const [loadState, setLoadState] = useState<HtmlFileLoadState>({ status: 'loading' })
   const sourceMetadata = metadataRequest ?? metadata.size
-  const baseUrl = useMemo(() => toSafeFileUrl(filePath, getFilePreviewExtension(filePath)), [filePath])
   const [previousLocation, setPreviousLocation] = useState(location)
   if (previousLocation !== location) {
     setPreviousLocation(location)
     setMode(location ? 'source' : 'preview')
   }
-  const effectiveMode = type === 'artifact' ? (location ? 'source' : 'preview') : mode
-  const renderArtifact = type === 'artifact' && !location
-  const artifactTarget = useMemo(() => {
-    const prefix = 'artifact-file:'
-    const pathSuffix = filePath.slice(-(WEBVIEW_ANNOTATION_LIMITS.targetId - prefix.length))
-    return {
-      id: `${prefix}${pathSuffix}`,
-      label: fileName.slice(0, WEBVIEW_ANNOTATION_LIMITS.targetLabel)
-    }
-  }, [fileName, filePath])
+  // Artifact HTML is model-generated and may legitimately contain scripts. It runs in an
+  // opaque-origin iframe (no `allow-same-origin`), so it still cannot reach `window.api`.
+  const interactive = type === 'artifact'
 
   // Layout cleanup invalidates reads before promise callbacks can beat passive cleanup.
   // Read metadata after ancestor layout setup, including Activity reconnections.
   useLayoutEffect(() => {
-    if (renderArtifact) return
     let cancelled = false
     setLoadState((current) => (current.status === 'ready' ? current : { status: 'loading' }))
 
@@ -193,23 +179,7 @@ export default function HtmlFilePreview({
     return () => {
       cancelled = true
     }
-  }, [filePath, sourceMetadata, refreshKey, renderArtifact])
-
-  if (renderArtifact) {
-    return (
-      <FilePreviewLayout.Frame>
-        <div className="min-h-0 flex-1">
-          <WebviewBrowser
-            initialUrl={baseUrl}
-            securityProfile={WebviewSecurityProfile.AgentHtmlArtifact}
-            reloadKey={refreshKey}
-            isHostActive
-            target={artifactTarget}
-          />
-        </div>
-      </FilePreviewLayout.Frame>
-    )
-  }
+  }, [filePath, sourceMetadata, refreshKey])
 
   return (
     <FilePreviewLayout.Frame>
@@ -221,8 +191,8 @@ export default function HtmlFilePreview({
           location={location}
           loadState={loadState}
           fileName={fileName}
-          baseUrl={baseUrl}
-          mode={effectiveMode}
+          mode={mode}
+          interactive={interactive}
         />
       </FilePreviewLayout.Content>
     </FilePreviewLayout.Frame>

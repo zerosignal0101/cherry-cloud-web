@@ -272,11 +272,7 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
     if (files.length && !lstatSync(application.getPath('feature.agents.pi.sessions', files[0])).isFile())
       throw new Error('Pi session must be a regular file')
     const manager = files.length
-      ? pi.SessionManager.openExisting(
-          application.getPath('feature.agents.pi.sessions', files[0]),
-          nativeId,
-          workspacePath
-        )
+      ? pi.SessionManager.open(application.getPath('feature.agents.pi.sessions', files[0]), undefined, workspacePath)
       : pi.SessionManager.create(workspacePath, sessionDir, { id: nativeId })
     const binding = await createPiGatewayModelBinding(
       this.input,
@@ -289,7 +285,10 @@ export class PiRuntimeConnection implements AgentRuntimeConnection {
         }
       },
       undefined,
-      (event, sessionId) => this.onModelRetry(event, sessionId)
+      (event, sessionId) => this.onModelRetry(event, sessionId),
+      // The pinned Pi release does not understand in-process object transports;
+      // route through the loopback API gateway instead (see the binding option).
+      { transport: 'http' }
     )
     const managedBashTool = pi.createBashToolDefinition(workspacePath, {
       commandPrefix: loginPathPrefix,

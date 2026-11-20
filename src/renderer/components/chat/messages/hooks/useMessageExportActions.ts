@@ -2,7 +2,6 @@ import { useCallback, useMemo } from 'react'
 
 import type { MessageListActions } from '@renderer/components/chat/messages/types'
 import { useNotesSettings } from '@renderer/hooks/useNotesSettings'
-import { ipcApi } from '@renderer/ipc'
 import { chooseImageExportMode } from '@renderer/services/imageExportModeChooser'
 import type {
   ExportMessages,
@@ -10,6 +9,7 @@ import type {
   MessageExportTarget,
   MessageExportView
 } from '@renderer/types/messageExport'
+import { exportWordFromMarkdown } from '@renderer/utils/exportWord'
 
 type MessageExportActions = Pick<
   MessageListActions,
@@ -63,7 +63,7 @@ export function useMessageExportActions({
   }, [])
 
   const exportToWord = useCallback(async (markdown: string, title: string) => {
-    await ipcApi.request('export.word.from_markdown', { markdown, fileName: title })
+    await exportWordFromMarkdown(markdown, title)
   }, [])
 
   const saveToKnowledge = useCallback(async (message: MessageExportView) => {

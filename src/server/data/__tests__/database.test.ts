@@ -24,9 +24,7 @@ function tempDatabasePath(): string {
 
 function listTables(): string[] {
   const db = handle!.getDb()
-  return db
-    .all<{ name: string }>(sql`select name from sqlite_master where type = 'table'`)
-    .map((row) => row.name)
+  return db.all<{ name: string }>(sql`select name from sqlite_master where type = 'table'`).map((row) => row.name)
 }
 
 function countPreferences(): number {

@@ -47,6 +47,8 @@ export interface CacheServiceLike {
   setShared<T = unknown>(key: string, value: T, ttlMs?: number): void
   hasShared(key: string): boolean
   deleteShared(key: string): boolean
+  /** Web bridge snapshot; the desktop service keeps this private to its IPC handler. */
+  getAllSharedSnapshot(): Record<string, { value: unknown; expireAt?: number }>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getPersist(key: string): any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,6 +165,46 @@ export class WebApplication {
       'sys.home': process.cwd(),
       'feature.files.data': this.dataPaths.files,
       'feature.files.trash': path.join(this.dataPaths.files, '.trash'),
+      'feature.notes.data': this.dataPaths.notes,
+      // Agent + skill data lives under DATA_DIR, matching the desktop layout
+      // (`Data/Agents`, `Data/Skills`) without ever pointing at a user home.
+      'feature.agents.data': path.join(this.dataPaths.root, 'Agents'),
+      'feature.agents.system_workspaces': path.join(this.dataPaths.root, 'Agents', 'system'),
+      'feature.agents.pi.root': path.join(this.dataPaths.root, 'Agents', '.pi'),
+      'feature.agents.pi.sessions': path.join(this.dataPaths.root, 'Agents', '.pi', 'sessions'),
+      'feature.agents.outputs': path.join(this.dataPaths.root, 'Agents', '.outputs'),
+      'feature.agents.durable.stores': path.join(this.dataPaths.root, 'Agents', '.durable'),
+      'feature.agents.forks': path.join(this.dataPaths.root, 'Agents', '.forks'),
+      'feature.agents.claude.root': path.join(this.dataPaths.root, 'Agents', '.claude'),
+      'feature.agents.claude.skills': path.join(this.dataPaths.root, 'Agents', '.claude', 'skills'),
+      'feature.agents.claude.projects': path.join(this.dataPaths.root, 'Agents', '.claude', 'projects'),
+      'feature.agents.channels': path.join(this.dataPaths.root, 'Channels'),
+      'feature.agents.skills': path.join(this.dataPaths.root, 'Skills'),
+      'feature.agents.skills.install.temp': path.join(this.dataPaths.root, 'tmp', 'skill-install'),
+      'feature.agents.skills.builtin': path.join(process.cwd(), 'resources', 'skills'),
+      'feature.agents.builtin': path.join(process.cwd(), 'resources', 'builtin-agents'),
+      'feature.agents.command_parser_assets': path.join(process.cwd(), 'resources', 'command-parsers'),
+      // Mini apps live under DATA_DIR like every other server-owned feature. The
+      // package tree is what the asset route serves; data/snapshots/journals are
+      // the same layout the desktop installer uses, so its crash recovery works
+      // unchanged here.
+      'feature.mini_app.packages': path.join(this.dataPaths.root, 'miniapps', 'packages'),
+      'feature.mini_app.data': path.join(this.dataPaths.root, 'miniapps', 'data'),
+      'feature.mini_app.snapshots': path.join(this.dataPaths.root, 'miniapps', 'snapshots'),
+      'feature.mini_app.publish_journal': path.join(this.dataPaths.root, 'miniapps', 'publish-journal'),
+      'feature.mini_app.logs': path.join(this.dataPaths.logs, 'mini-apps'),
+      'feature.mini_app.builtin': path.join(process.cwd(), 'resources', 'builtin-mini-apps'),
+      'feature.agents.assistant.manifest.file': path.join(
+        process.cwd(),
+        'resources',
+        'builtin-agents',
+        'cherry-assistant',
+        'product-manifest.json'
+      ),
+      // Desktop exports skills into `~/.agents/skills`; the server keeps that
+      // projection inside DATA_DIR so no feature writes to a user home.
+      'external.agents.skills': path.join(this.dataPaths.root, 'exports', 'agents-skills'),
+      'external.pi.settings_file': path.join(this.dataPaths.root, 'external', 'pi', 'settings.json'),
       // The catalog ships inside the npm package; the desktop build points at the
       // workspace copy instead.
       'feature.provider_registry.data': resolveProviderRegistryData(),

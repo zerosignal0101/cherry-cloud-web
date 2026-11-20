@@ -6,8 +6,6 @@ const useDataChangeMock = vi.hoisted(() => vi.fn())
 const invalidateMock = vi.hoisted(() => vi.fn())
 const refetchMock = vi.hoisted(() => vi.fn())
 const installSkillMock = vi.hoisted(() => vi.fn())
-const installSkillFromZipMock = vi.hoisted(() => vi.fn())
-const installSkillFromDirectoryMock = vi.hoisted(() => vi.fn())
 const listLocalSkillsMock = vi.hoisted(() => vi.fn())
 const discoverSystemSkillsMock = vi.hoisted(() => vi.fn())
 const importSystemSkillMock = vi.hoisted(() => vi.fn())
@@ -28,10 +26,6 @@ function stubSkillRoutes() {
         return listLocalSkillsMock(input)
       case 'skill.install':
         return installSkillMock(input)
-      case 'skill.install_from_zip':
-        return installSkillFromZipMock(input)
-      case 'skill.install_from_directory':
-        return installSkillFromDirectoryMock(input)
       case 'skill.discover_system':
         return discoverSystemSkillsMock(input)
       case 'skill.import_system':
@@ -239,8 +233,11 @@ describe('useInstalledSkills', () => {
 })
 
 describe('useSkillInstall', () => {
+  const fetchMock = vi.fn()
+
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal('fetch', fetchMock)
 
     useQueryMock.mockReturnValue({
       data: [],
@@ -252,10 +249,17 @@ describe('useSkillInstall', () => {
     })
     invalidateMock.mockResolvedValue(undefined)
     installSkillMock.mockResolvedValue({ success: true, data: createSkill({ id: 'skill-installed' }) })
-    installSkillFromZipMock.mockResolvedValue({ success: true, data: createSkill({ id: 'skill-zip' }) })
-    installSkillFromDirectoryMock.mockResolvedValue({ success: true, data: createSkill({ id: 'skill-directory' }) })
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: async () => ({ skill: createSkill({ id: 'skill-zip' }) })
+    })
 
     stubSkillRoutes()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('installs remote skills through IPC with installSource', async () => {
@@ -331,32 +335,36 @@ describe('useSkillInstall', () => {
     expect(invalidateMock).toHaveBeenCalledWith('/skills')
   })
 
-  it('installs local ZIP and directory skills through IPC', async () => {
+  it('uploads a local ZIP instead of sending a host path', async () => {
     const { result } = renderHook(() => useSkillInstall())
+    const file = new File(['zip'], 'my-skill.zip', { type: 'application/zip' })
 
     await act(async () => {
-      await result.current.installFromZip('/tmp/my-skill.zip')
-      await result.current.installFromDirectory('/tmp/my-skill')
+      const skill = await result.current.installFromZip(file)
+      expect(skill?.id).toBe('skill-zip')
     })
 
-    expect(skillMocks.request).toHaveBeenCalledWith('skill.install_from_zip', { zipFilePath: '/tmp/my-skill.zip' })
-    expect(skillMocks.request).toHaveBeenCalledWith('skill.install_from_directory', { directoryPath: '/tmp/my-skill' })
-    expect(invalidateMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/skills/install',
+      expect.objectContaining({ method: 'POST', credentials: 'same-origin' })
+    )
+    const body = fetchMock.mock.calls[0]?.[1]?.body
+    expect(body).toBeInstanceOf(FormData)
+    expect((body as FormData).get('file')).toBe(file)
+    expect(skillMocks.request).not.toHaveBeenCalledWith('skill.install_from_zip', expect.anything())
     expect(invalidateMock).toHaveBeenCalledWith('/skills')
   })
 
-  it('logs and rethrows local ZIP and directory install failures without duplicate toasts', async () => {
+  it('logs and rethrows upload failures without duplicate toasts', async () => {
     const { result } = renderHook(() => useSkillInstall())
 
-    installSkillFromZipMock.mockRejectedValueOnce(new Error('zip failed'))
-    await act(async () => {
-      await expect(result.current.installFromZip('/tmp/bad.zip')).rejects.toThrow('zip failed')
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: 'zip failed' })
     })
-    expect(toast.error).not.toHaveBeenCalled()
-
-    installSkillFromDirectoryMock.mockResolvedValueOnce({ success: false, error: 'directory failed' })
     await act(async () => {
-      await expect(result.current.installFromDirectory('/tmp/bad-dir')).rejects.toThrow('directory failed')
+      await expect(result.current.installFromZip(new File(['zip'], 'bad.zip'))).rejects.toThrow('zip failed')
     })
     expect(toast.error).not.toHaveBeenCalled()
   })

@@ -8,18 +8,6 @@ export const route = '/settings/data'
 
 export const entries: SettingsSearchEntry[] = [
   {
-    anchorId: 'data-backup-restore',
-    titleKey: 'settings.general.backup.title',
-    panel: 'data',
-    groupKey: 'settings.data.title'
-  },
-  {
-    anchorId: 'data-skip-file-data',
-    titleKey: 'settings.data.backup.skip_file_data_title',
-    panel: 'data',
-    groupKey: 'settings.data.title'
-  },
-  {
     anchorId: 'data-app-data',
     titleKey: 'settings.data.app_data.label',
     panel: 'data',
@@ -41,23 +29,10 @@ export const entries: SettingsSearchEntry[] = [
     aliases: ['cache', '缓存']
   },
   {
-    anchorId: 'data-reset',
-    titleKey: 'settings.data.data_reset.title',
-    panel: 'data',
-    groupKey: 'settings.data.data.title',
-    aliases: ['reset', '恢复出厂', '清空数据']
-  },
-  {
     anchorId: 'data-privacy-mode',
     titleKey: 'settings.privacy.enable_privacy_mode',
     panel: 'data',
     groupKey: 'settings.privacy.title'
-  },
-  {
-    anchorId: 'local-backup-directory',
-    titleKey: 'settings.data.local.directory.label',
-    panel: 'local_backup',
-    groupKey: 'settings.data.local.title'
   },
   {
     anchorId: 'webdav-host',
@@ -231,13 +206,6 @@ export const entries: SettingsSearchEntry[] = [
     titleKey: 'settings.data.joplin.token',
     panel: 'joplin',
     groupKey: 'settings.data.joplin.title'
-  },
-  {
-    anchorId: 'obsidian-default-vault',
-    titleKey: 'settings.data.obsidian.default_vault',
-    panel: 'obsidian',
-    groupKey: 'settings.data.obsidian.title',
-    aliases: ['obsidian']
   },
   {
     anchorId: 'siyuan-api-url',

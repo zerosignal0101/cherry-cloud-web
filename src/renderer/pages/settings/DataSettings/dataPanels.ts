@@ -3,9 +3,7 @@ import * as z from 'zod'
 /** Menu keys of the data settings submenu panels (order = menu order) */
 export const DATA_PANEL_KEYS = [
   'data',
-  'local_backup',
   'webdav',
-  'nutstore',
   's3',
   'import_settings',
   'export_menu',
@@ -13,7 +11,6 @@ export const DATA_PANEL_KEYS = [
   'notion',
   'yuque',
   'joplin',
-  'obsidian',
   'siyuan'
 ] as const
 

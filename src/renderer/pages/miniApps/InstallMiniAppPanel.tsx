@@ -19,6 +19,7 @@ import { InstallConsentDialog } from '@renderer/components/MiniApp/InstallConsen
 import { useExitPresence } from '@renderer/hooks/useExitPresence'
 import { useMiniAppInstallPreview } from '@renderer/hooks/useMiniAppInstallPreview'
 import { ipcApi } from '@renderer/ipc'
+import { pickBrowserFiles } from '@renderer/ipc/webFile'
 import { toast } from '@renderer/services/toast'
 
 import { useMiniAppPackageDrop } from './useMiniAppPackageDrop'
@@ -40,12 +41,14 @@ const looksLikeUrl = (value: string): boolean => {
 export const InstallMiniAppPicker: FC<{ open?: boolean; onClose: () => void }> = ({ open = true, onClose }) => {
   const { t } = useTranslation()
   const [manifestUrl, setManifestUrl] = useState('')
-  const { preview, busy, error, settle, cancelPreview, confirm } = useMiniAppInstallPreview(onClose)
+  const { preview, busy, error, settle, previewUpload, cancelPreview, confirm } = useMiniAppInstallPreview(onClose)
   const previewDialog = useExitPresence(open ? preview : null)
-  const packageDropzone = useMiniAppPackageDrop(settle)
+  const packageDropzone = useMiniAppPackageDrop(previewUpload)
 
-  const handlePick = () =>
-    settle(() => ipcApi.request('mini_app.install.pick_and_preview'), 'miniApp.install.preview_error')
+  const handlePick = async () => {
+    const [file] = await pickBrowserFiles({ accept: '.miniapp,application/zip', multiple: false })
+    if (file) await previewUpload(file)
+  }
 
   // One address: the user types whichever mirror they can reach, and the manifest itself
   // names the pair every later fetch chooses between.

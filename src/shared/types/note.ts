@@ -1,4 +1,13 @@
 /**
+ * Logical notes root exposed to the renderer.
+ *
+ * The server maps this prefix to `DATA_DIR/notes`; no host path ever crosses the
+ * transport. Keeping the constant in the shared type module (which has no zod
+ * dependency) lets the renderer and the server agree on the namespace.
+ */
+export const NOTES_ROOT_PATH = '/notes'
+
+/**
  * @interface
  * @description 笔记树节点接口
  *

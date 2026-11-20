@@ -1,5 +1,6 @@
 import type { FileHandle } from '@shared/data/types/file'
 import type { CreateInternalEntryInput } from '@shared/ipc/schemas/file'
+import { NOTES_ROOT_PATH } from '@shared/types/note'
 import { getFileTypeByExt } from '@shared/utils/file'
 
 import { ipcApi } from './ipcApi'
@@ -48,6 +49,24 @@ export interface UploadedFileMetadata {
 
 const UNSUPPORTED = (method: string): never => {
   throw new Error(`window.api.file.${method} is not available in the web build`)
+}
+
+/**
+ * Notes are the one path-shaped surface the browser may address. Everything
+ * under the server's logical `/notes` namespace goes to the sandboxed notes
+ * RPCs; any other path is rejected here instead of reaching host `fs` code.
+ */
+function notesPath(rawPath: string): string {
+  const normalized = rawPath.replace(/\\/g, '/')
+  if (!isNotesPath(normalized)) {
+    throw new Error(`window.api.file received a non-notes path: ${rawPath}`)
+  }
+  return normalized
+}
+
+function isNotesPath(rawPath: string): boolean {
+  const normalized = rawPath.replace(/\\/g, '/')
+  return normalized === NOTES_ROOT_PATH || normalized.startsWith(`${NOTES_ROOT_PATH}/`)
 }
 
 function splitName(filename: string): { name: string; ext: string | null } {
@@ -226,26 +245,61 @@ export const fileApi = {
     ipcApi.request('file.batch_create_internal_entries', { items }),
   batchTrash: (ids: string[]) => ipcApi.request('file.batch_trash', { ids }),
   batchRestore: (ids: string[]) => ipcApi.request('file.batch_restore', { ids }),
-  batchPermanentDeleteFromTrash: (ids: string[]) =>
-    ipcApi.request('file.batch_permanent_delete_from_trash', { ids }),
+  batchPermanentDeleteFromTrash: (ids: string[]) => ipcApi.request('file.batch_permanent_delete_from_trash', { ids }),
   batchRemoveFromLibrary: (ids: string[]) => ipcApi.request('file.batch_remove_from_library', { ids }),
-  rename: (id: string, newName: string) => ipcApi.request('file.rename', { id, newName }),
+  /**
+   * The desktop preload exposed both `file.rename` (FileEntry id) and the notes
+   * path rename under the same name. The first argument disambiguates: the
+   * virtual notes namespace goes to the sandboxed notes route.
+   */
+  rename: (idOrPath: string, newName: string) =>
+    isNotesPath(idOrPath)
+      ? ipcApi.request('notes.rename', { path: notesPath(idOrPath), newName })
+      : ipcApi.request('file.rename', { id: idOrPath, newName }),
 
-  /** Path-based reads/writes are not part of the web model. */
+  /** Path-based reads/writes target the server-owned notes sandbox. */
   get: async (): Promise<null> => null,
   createTempFile: async (): Promise<string> => UNSUPPORTED('createTempFile'),
-  write: async (): Promise<never> => UNSUPPORTED('write'),
-  readExternal: async (): Promise<never> => UNSUPPORTED('readExternal'),
-  checkFileName: async (): Promise<boolean> => true,
-  mkdir: async (): Promise<never> => UNSUPPORTED('mkdir'),
-  move: async (): Promise<never> => UNSUPPORTED('move'),
-  moveDir: async (): Promise<never> => UNSUPPORTED('moveDir'),
-  renameDir: async (): Promise<never> => UNSUPPORTED('renameDir'),
-  listDirectory: async (): Promise<string[]> => [],
+  write: async (path: string, content: string): Promise<void> => {
+    await ipcApi.request('notes.write', { path: notesPath(path), content })
+  },
+  readExternal: async (path: string): Promise<string> => {
+    const result = await ipcApi.request('notes.read', { path: notesPath(path) })
+    return result.content
+  },
+  checkFileName: (parentPath: string, name: string, isFile: boolean) =>
+    ipcApi.request('notes.check_name', { parentPath: notesPath(parentPath), name, isFile }),
+  mkdir: async (path: string): Promise<void> => {
+    await ipcApi.request('notes.mkdir', { path: notesPath(path) })
+  },
+  move: async (fromPath: string, toPath: string): Promise<void> => {
+    await ipcApi.request('notes.move', { fromPath: notesPath(fromPath), toPath: notesPath(toPath) })
+  },
+  moveDir: async (fromPath: string, toPath: string): Promise<void> => {
+    await ipcApi.request('notes.move', { fromPath: notesPath(fromPath), toPath: notesPath(toPath) })
+  },
+  renameDir: (path: string, newName: string) => ipcApi.request('notes.rename', { path: notesPath(path), newName }),
+  listDirectory: async (path: string, options?: { recursive?: boolean }): Promise<string[]> => {
+    const result = await ipcApi.request('notes.list', {
+      path: notesPath(path),
+      recursive: options?.recursive
+    })
+    return result.entries.map((entry) => entry.path)
+  },
   listDirectoryEntries: async (): Promise<[]> => [],
-  deleteExternalFile: async (): Promise<never> => UNSUPPORTED('deleteExternalFile'),
-  deleteExternalDir: async (): Promise<never> => UNSUPPORTED('deleteExternalDir'),
-  validateNotesDirectory: async (): Promise<boolean> => false,
+  deleteExternalFile: async (path: string): Promise<void> => {
+    await ipcApi.request('notes.delete', { path: notesPath(path), recursive: false })
+  },
+  deleteExternalDir: async (path: string): Promise<void> => {
+    await ipcApi.request('notes.delete', { path: notesPath(path), recursive: true })
+  },
+  validateNotesDirectory: async (path: string): Promise<boolean> => {
+    try {
+      return await ipcApi.request('notes.validate_directory', { path: notesPath(path) })
+    } catch {
+      return false
+    }
+  },
   batchUploadMarkdown: async (): Promise<[]> => [],
   binaryImage: async (): Promise<never> => UNSUPPORTED('binaryImage'),
   open: async (): Promise<void> => undefined,

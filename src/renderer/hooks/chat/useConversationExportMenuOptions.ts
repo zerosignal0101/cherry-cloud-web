@@ -15,5 +15,6 @@ const CONVERSATION_EXPORT_MENU_PREFERENCE_KEYS = {
 
 export function useConversationExportMenuOptions() {
   const [exportMenuOptions] = useMultiplePreferences(CONVERSATION_EXPORT_MENU_PREFERENCE_KEYS)
-  return exportMenuOptions
+  // Obsidian export depends on a local vault picker, which the server cannot access.
+  return { ...exportMenuOptions, obsidian: false }
 }

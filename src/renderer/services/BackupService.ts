@@ -104,59 +104,22 @@ export async function restore() {
 export async function backupToWebdav({ customFileName = '' }: ManualBackupOptions = {}) {
   setWebDAVSyncState({ syncing: true, lastSyncError: null })
 
-  const {
-    webdavHost,
-    webdavUser,
-    webdavPass,
-    webdavPath,
-    webdavMaxBackups,
-    webdavSkipBackupFile,
-    webdavDisableStream,
-    webdavAllowSelfSignedTls
-  } = await preferenceService.getMultiple({
-    webdavHost: 'data.backup.webdav.host',
-    webdavUser: 'data.backup.webdav.user',
-    webdavPass: 'data.backup.webdav.pass',
-    webdavPath: 'data.backup.webdav.path',
-    webdavMaxBackups: 'data.backup.webdav.max_backups',
-    webdavSkipBackupFile: 'data.backup.webdav.skip_backup_file',
-    webdavDisableStream: 'data.backup.webdav.disable_stream',
-    webdavAllowSelfSignedTls: 'data.backup.webdav.allow_self_signed_tls'
-  })
-
   const finalFileName = customFileName
     ? customFileName.endsWith('.zip')
       ? customFileName
       : `${customFileName}.zip`
     : undefined
 
-  // 上传文件 - Use direct backup method (copy IndexedDB/LocalStorage directories)
   try {
-    const { result: success, cleanupFailed } = await window.api.backup.backupToWebdav({
-      webdavHost,
-      webdavUser,
-      webdavPass,
-      webdavPath,
-      fileName: finalFileName,
-      maxBackups: webdavMaxBackups,
-      skipBackupFile: webdavSkipBackupFile,
-      disableStream: webdavDisableStream,
-      allowSelfSignedTls: webdavAllowSelfSignedTls
-    })
-    if (success) {
-      await recordManualBackupCompletion('webdav')
-      if (cleanupFailed) {
-        const message = i18n.t('message.backup.cleanup_failed')
-        setWebDAVSyncState({ lastSyncError: message })
-        toast.warning(message)
-      } else {
-        setWebDAVSyncState({ lastSyncError: null })
-        toast.success(i18n.t('message.backup.success'))
-      }
-    } else {
-      const message = i18n.t('message.backup.failed')
+    const { cleanupFailed } = await window.api.backup.backupToWebdav({ fileName: finalFileName })
+    await recordManualBackupCompletion('webdav')
+    if (cleanupFailed) {
+      const message = i18n.t('message.backup.cleanup_failed')
       setWebDAVSyncState({ lastSyncError: message })
-      toast.error(message)
+      toast.warning(message)
+    } else {
+      setWebDAVSyncState({ lastSyncError: null })
+      toast.success(i18n.t('message.backup.success'))
     }
   } catch (error: any) {
     const message = getLocalizedBackupErrorMessage(error, 'message.backup.failed', { tlsCertificateHint: true })
@@ -170,40 +133,15 @@ export async function backupToWebdav({ customFileName = '' }: ManualBackupOption
 
 // 从 webdav 恢复
 export async function restoreFromWebdav(fileName?: string) {
-  const { webdavHost, webdavUser, webdavPass, webdavPath, webdavAllowSelfSignedTls } =
-    await preferenceService.getMultiple({
-      webdavHost: 'data.backup.webdav.host',
-      webdavUser: 'data.backup.webdav.user',
-      webdavPass: 'data.backup.webdav.pass',
-      webdavPath: 'data.backup.webdav.path',
-      webdavAllowSelfSignedTls: 'data.backup.webdav.allow_self_signed_tls'
-    })
-  await window.api.backup.restoreFromWebdav({
-    webdavHost,
-    webdavUser,
-    webdavPass,
-    webdavPath,
-    allowSelfSignedTls: webdavAllowSelfSignedTls,
-    fileName
-  })
-  logger.info('[WebDAVBackup] Backup restore staged, app will restart')
+  if (!fileName) throw new Error('A backup file name is required')
+  await window.api.backup.restoreFromWebdav({ fileName })
+  toast.warning(i18n.t('message.restore.restart_required'))
+  logger.info('[WebDAVBackup] Restore staged; server restart required')
 }
 
 export async function backupToS3({ customFileName = '' }: ManualBackupOptions = {}) {
   setS3SyncState({ syncing: true, lastSyncError: null })
 
-  const s3Config = await preferenceService.getMultiple({
-    autoSync: 'data.backup.s3.auto_sync',
-    accessKeyId: 'data.backup.s3.access_key_id',
-    secretAccessKey: 'data.backup.s3.secret_access_key',
-    endpoint: 'data.backup.s3.endpoint',
-    bucket: 'data.backup.s3.bucket',
-    region: 'data.backup.s3.region',
-    root: 'data.backup.s3.root',
-    maxBackups: 'data.backup.s3.max_backups',
-    skipBackupFile: 'data.backup.s3.skip_backup_file',
-    syncInterval: 'data.backup.s3.sync_interval'
-  })
   const finalFileName = customFileName
     ? customFileName.endsWith('.zip')
       ? customFileName
@@ -211,26 +149,16 @@ export async function backupToS3({ customFileName = '' }: ManualBackupOptions = 
     : undefined
 
   try {
-    // Use the direct backup method with the configured full or slim resource set.
-    const { result: success, cleanupFailed } = await window.api.backup.backupToS3({
-      ...s3Config,
-      fileName: finalFileName
-    })
+    const { cleanupFailed } = await window.api.backup.backupToS3({ fileName: finalFileName })
 
-    if (success) {
-      await recordManualBackupCompletion('s3')
-      if (cleanupFailed) {
-        const message = i18n.t('message.backup.cleanup_failed')
-        setS3SyncState({ lastSyncError: message })
-        toast.warning(message)
-      } else {
-        setS3SyncState({ lastSyncError: null })
-        toast.success(i18n.t('message.backup.success'))
-      }
-    } else {
-      const message = i18n.t('message.backup.failed')
+    await recordManualBackupCompletion('s3')
+    if (cleanupFailed) {
+      const message = i18n.t('message.backup.cleanup_failed')
       setS3SyncState({ lastSyncError: message })
-      toast.error(message)
+      toast.warning(message)
+    } else {
+      setS3SyncState({ lastSyncError: null })
+      toast.success(i18n.t('message.backup.success'))
     }
   } catch (error: any) {
     const message = getLocalizedBackupErrorMessage(error)
@@ -244,31 +172,15 @@ export async function backupToS3({ customFileName = '' }: ManualBackupOptions = 
 
 // 从 S3 恢复
 export async function restoreFromS3(fileName?: string) {
-  const s3Config = await preferenceService.getMultiple({
-    autoSync: 'data.backup.s3.auto_sync',
-    accessKeyId: 'data.backup.s3.access_key_id',
-    secretAccessKey: 'data.backup.s3.secret_access_key',
-    endpoint: 'data.backup.s3.endpoint',
-    bucket: 'data.backup.s3.bucket',
-    region: 'data.backup.s3.region',
-    root: 'data.backup.s3.root',
-    maxBackups: 'data.backup.s3.max_backups',
-    syncInterval: 'data.backup.s3.sync_interval'
-  })
-
   if (!fileName) {
-    const files = await window.api.backup.listS3Files(s3Config)
-    if (files.length > 0) {
-      fileName = files[0].fileName
-    }
+    const files = await window.api.backup.listS3Files()
+    fileName = files[0]?.fileName
   }
 
   if (fileName) {
-    await window.api.backup.restoreFromS3({
-      ...s3Config,
-      fileName
-    })
-    logger.info('[S3Backup] Backup restore staged, app will restart')
+    await window.api.backup.restoreFromS3({ fileName })
+    toast.warning(i18n.t('message.restore.restart_required'))
+    logger.info('[S3Backup] Restore staged; server restart required')
   }
 }
 

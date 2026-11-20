@@ -46,7 +46,6 @@ export const DOCTOR_STATUS_LABEL_KEYS = {
 export const DOCTOR_NAVIGATION_LABEL_KEYS = {
   '/settings/about': 'settings.doctor.actions.open_about',
   '/settings/data': 'settings.doctor.actions.open_data',
-  '/settings/dependencies': 'settings.doctor.actions.open_dependencies',
   '/settings/general': 'settings.doctor.actions.open_general',
   '/settings/mcp': 'settings.doctor.actions.open_mcp',
   '/settings/provider': 'settings.doctor.actions.open_provider',

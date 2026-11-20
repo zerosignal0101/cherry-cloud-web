@@ -2,12 +2,7 @@ import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { DropzoneProps } from '@cherrystudio/ui'
-import type { InstallPreview } from '@renderer/hooks/useMiniAppInstallPreview'
-import { ipcApi } from '@renderer/ipc'
 import { toast } from '@renderer/services/toast'
-import { AbsoluteFilePathSchema } from '@shared/types/file'
-
-type SettlePreview = (run: () => Promise<InstallPreview | null>, errorKey: string) => Promise<void>
 
 type MiniAppPackageDropOptions = Pick<
   DropzoneProps,
@@ -29,7 +24,8 @@ const validateMiniAppPackage: NonNullable<DropzoneProps['validator']> = (file) =
     ? null
     : { code: 'file-invalid-type', message: 'Expected a .miniapp package' }
 
-export function useMiniAppPackageDrop(settle: SettlePreview): MiniAppPackageDropOptions {
+/** Dropping a package uploads it for preview; there is no host path in the browser. */
+export function useMiniAppPackageDrop(previewUpload: (file: File) => Promise<void>): MiniAppPackageDropOptions {
   const { t } = useTranslation()
 
   const previewPackage = useCallback(
@@ -39,19 +35,9 @@ export function useMiniAppPackageDrop(settle: SettlePreview): MiniAppPackageDrop
         toast.error(t('miniApp.install.drop_invalid'))
         return
       }
-
-      const filePath = AbsoluteFilePathSchema.safeParse(window.api.file.getPathForFile(file))
-      if (!filePath.success) {
-        toast.error(t('miniApp.install.drop_invalid'))
-        return
-      }
-
-      void settle(
-        () => ipcApi.request('mini_app.install.preview_file', { filePath: filePath.data }),
-        'miniApp.install.preview_error'
-      )
+      void previewUpload(file)
     },
-    [settle, t]
+    [previewUpload, t]
   )
 
   const rejectPackage = useCallback(() => toast.error(t('miniApp.install.drop_invalid')), [t])

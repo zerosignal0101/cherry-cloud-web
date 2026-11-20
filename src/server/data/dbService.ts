@@ -34,4 +34,12 @@ export class WebDbService extends BaseService {
   withWriteTx<T>(fn: (tx: DbOrTx) => T): T {
     return requireHandle().withWriteTx(fn)
   }
+
+  createSnapshot(targetPath: string): void {
+    requireHandle().createSnapshot(targetPath)
+  }
+
+  checkpointTruncate(): void {
+    requireHandle().checkpointTruncate()
+  }
 }

@@ -15,7 +15,6 @@ import {
   HelpTooltip
 } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
-import { BrowserImportDialog } from '@renderer/components/BrowserImportDialog'
 import {
   SettingDescription,
   SettingDivider,
@@ -33,12 +32,6 @@ import { BrowserClearDialog } from './BrowserSettings/BrowserClearDialog'
 import { BrowserHistoryDialog } from './BrowserSettings/BrowserHistoryDialog'
 
 const sections = [
-  {
-    kind: 'import',
-    title: 'settings.browser.import',
-    help: 'settings.browser.importHelp',
-    action: 'settings.browser.importAction'
-  },
   {
     kind: 'history',
     title: 'settings.browser.history',
@@ -59,7 +52,7 @@ export function BrowserSettings() {
   const customUrlSaving = useRef(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(false)
-  const [dialog, setDialog] = useState<'import' | 'history' | 'clear' | null>(null)
+  const [dialog, setDialog] = useState<'history' | 'clear' | null>(null)
 
   useEffect(() => {
     setCustomUrlDraft(typeof customUrl === 'string' ? customUrl : '')
@@ -239,7 +232,7 @@ export function BrowserSettings() {
       <SettingGroup>
         {sections.map(({ kind, title, help, action }) => (
           <Dialog key={kind} open={dialog === kind} onOpenChange={(open) => setDialog(open ? kind : null)}>
-            {kind !== 'import' && <SettingDivider />}
+            <SettingDivider />
             <SettingRow id={`setting-browser-${kind}`} className="scroll-mt-6 flex-nowrap">
               <div className="min-w-0 flex-1">
                 <SettingRowTitle className="flex items-center gap-1.5">
@@ -252,9 +245,7 @@ export function BrowserSettings() {
                 </Button>
               </DialogTrigger>
             </SettingRow>
-            {kind === 'import' ? (
-              <BrowserImportDialog onDone={() => setDialog(null)} />
-            ) : kind === 'history' ? (
+            {kind === 'history' ? (
               <BrowserHistoryDialog onOpenPage={() => setDialog(null)} />
             ) : (
               <BrowserClearDialog onDone={() => setDialog(null)} />

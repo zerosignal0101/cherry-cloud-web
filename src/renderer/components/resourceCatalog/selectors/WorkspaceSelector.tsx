@@ -17,7 +17,6 @@ import { useExitPresence } from '@renderer/hooks/useExitPresence'
 import { ipcApi } from '@renderer/ipc'
 import { toast } from '@renderer/services/toast'
 import type { AgentWorkspaceEntity } from '@shared/data/api/schemas/agentWorkspaces'
-import { AbsoluteFilePathSchema } from '@shared/types/file'
 
 const logger = loggerService.withContext('WorkspaceSelector')
 const DEFAULT_MIN_LIST_HEIGHT = 144
@@ -131,26 +130,22 @@ export function WorkspaceSelector({
   const handleCreateWorkspace = useCallback(async () => {
     handleOpenChange(false)
 
-    let folderPath: string | null
-    try {
-      folderPath = await window.api.file.selectFolder({ properties: ['openDirectory', 'createDirectory'] })
-    } catch (error) {
-      logger.error('Failed to select workspace folder', error as Error)
-      toast.error(t('agent.session.workspace_selector.select_failed'))
-      return
-    }
-
-    if (!folderPath) return
+    // A browser cannot pick a host directory; workspaces are created inside the
+    // server sandbox and attached to the agent by their logical id.
+    const name = window.prompt(t('agent.session.workspace_selector.create_new'))?.trim()
+    if (!name) return
 
     setIsCreatingWorkspace(true)
     try {
+      const created = await ipcApi.request('workspace.create', { name })
       const workspace = await ipcApi.request('ai.agent.workspace.register', {
-        path: AbsoluteFilePathSchema.parse(folderPath)
+        path: `/workspaces/${created.id}`,
+        name
       })
       await invalidate('/agent-workspaces')
       await onChange(workspace.id)
     } catch (error) {
-      logger.error('Failed to create workspace from folder', error as Error, { folderPath })
+      logger.error('Failed to create workspace', error as Error, { name })
       toast.error(t('agent.session.workspace_selector.create_failed'))
     } finally {
       setIsCreatingWorkspace(false)

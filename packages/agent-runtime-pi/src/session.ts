@@ -192,7 +192,8 @@ export async function createAgentRuntimeSession(
   try {
     // Before extensions bind, so every loadout from here on (extension, MCP, activated tools) goes through it.
     const intent = createToolIntent()
-    session.setToolTransform((tool) => intent(tool, offerIntent))
+    const toolTransformHost = session as { setToolTransform?: (transform: (tool: unknown) => unknown) => void }
+    toolTransformHost.setToolTransform?.((tool) => intent(tool, offerIntent))
     beforeStart?.(session)
     await session.bindExtensions({})
     const baseTools = session.getActiveToolNames()

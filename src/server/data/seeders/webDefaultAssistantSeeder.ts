@@ -3,11 +3,11 @@ import { and, eq, isNull } from 'drizzle-orm'
 import { assistantTable } from '@data/db/schemas/assistant'
 import { messageTable } from '@data/db/schemas/message'
 import { topicTable } from '@data/db/schemas/topic'
+import type { DbType, ISeeder } from '@data/db/types'
 import { messageService } from '@data/services/MessageService'
 import { insertWithOrderKey } from '@data/services/utils/orderKey'
-import type { DbType, ISeeder } from '@data/db/types'
-import { DEFAULT_ASSISTANT_SETTINGS } from '@shared/data/types/assistant'
 import { getDefaultAssistantNameForLocale } from '@shared/data/presets/defaultAssistant'
+import { DEFAULT_ASSISTANT_SETTINGS } from '@shared/data/types/assistant'
 
 /**
  * Upstream's `DefaultAssistantSeeder` seeds a CherryIN model into

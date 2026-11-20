@@ -1,19 +1,5 @@
-import type { WebviewTag } from 'electron'
-import {
-  ArrowLeft,
-  ArrowRight,
-  Code,
-  Columns2,
-  Ellipsis,
-  ExternalLink,
-  Info,
-  LayoutGrid,
-  Link,
-  Power,
-  RotateCw,
-  X
-} from 'lucide-react'
-import type { FC, RefObject } from 'react'
+import { Columns2, Ellipsis, ExternalLink, Info, LayoutGrid, Link, Power, RotateCw, X } from 'lucide-react'
+import type { FC } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -29,15 +15,12 @@ import {
 import { cn } from '@cherrystudio/ui/lib/utils'
 import { usePreference } from '@data/hooks/usePreference'
 import { loggerService } from '@logger'
-import { MiniAppDebuggingIndicator } from '@renderer/components/MiniApp/MiniAppDebuggingIndicator'
 import MiniAppDetailPanel from '@renderer/components/MiniApp/MiniAppDetailPanel'
 import { useExitPresence } from '@renderer/hooks/useExitPresence'
 import { useMiniApps } from '@renderer/hooks/useMiniApps'
-import { useWebviewNavigation } from '@renderer/hooks/useWebviewNavigation'
 import { ipcApi } from '@renderer/ipc'
 import { toast } from '@renderer/services/toast'
 import { normalizeWebviewAddress } from '@renderer/utils/normalizeWebviewAddress'
-import { isDev } from '@renderer/utils/platform'
 import { isDataApiError, toDataApiError } from '@shared/data/api/errors'
 import type { MiniApp } from '@shared/data/types/miniApp'
 import { isHttpUrl } from '@shared/utils/url'
@@ -49,67 +32,52 @@ export type SplitMode = 'open' | 'close'
 
 interface Props {
   app: MiniApp
-  webviewRef: RefObject<WebviewTag | null>
-  webviewRevision: number
-  currentUrl: string | null
-  isWebviewReady: boolean
+  currentUrl: string
+  isReady: boolean
   onReload: () => void
   onRestart: () => void
-  onOpenDevTools: () => void
+  onNavigate: (url: string) => void
   splitMode: SplitMode
-  /** Whether the view is currently split, so the control reads as engaged. */
   splitActive?: boolean
   onSplit: () => void
 }
 
+/**
+ * Web mini app toolbar.
+ *
+ * The desktop version drove WebView navigation and DevTools. A sandboxed iframe
+ * exposes neither cross-origin history nor a debugger, so the toolbar keeps the
+ * actions the browser can honour: address, reload, external open, split, pin and
+ * the app detail panel.
+ */
 const MinimalToolbar: FC<Props> = ({
   app,
-  webviewRef,
-  webviewRevision,
   currentUrl,
-  isWebviewReady,
+  isReady,
   onReload,
   onRestart,
-  onOpenDevTools,
+  onNavigate,
   splitMode,
   splitActive = false,
   onSplit
 }) => {
-  const webview = webviewRef.current
   const { t } = useTranslation()
   const { pinned, updateAppStatus, allApps } = useMiniApps()
   const [openLinkExternal, setOpenLinkExternal] = usePreference('feature.mini_app.open_link_external')
   const [detailOpen, setDetailOpen] = useState(false)
   const detailDialog = useExitPresence(detailOpen ? true : null)
-  const {
-    canGoBack,
-    canGoForward,
-    currentPageUrl,
-    addressValue,
-    setAddressValue,
-    isAddressEditingRef,
-    restoreCurrentPageUrl,
-    goBack: handleGoBack,
-    goForward: handleGoForward
-  } = useWebviewNavigation({ webview, revision: webviewRevision, targetId: app.appId, url: currentUrl || app.url })
-  // While split, the primary pane's control closes the split rather than being
-  // a dead "open it again" button.
+  const [address, setAddress] = useState(currentUrl)
+  const [editing, setEditing] = useState(false)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!editing) setAddress(currentUrl)
+  }, [currentUrl, editing])
+
   const splitLabelKey = splitMode === 'close' || splitActive ? 'miniApp.split.close' : 'miniApp.split.open'
   const canPinned = allApps.some((item) => item.appId === app.appId)
   const isPinned = pinned.some((item) => item.appId === app.appId)
-  const canOpenExternalLink = isHttpUrl(currentPageUrl)
-
-  const addressInputRef = useRef<HTMLInputElement | null>(null)
-  const addressLoadGenerationRef = useRef(0)
-  const addressLoadOwnerRef = useRef({ appId: app.appId, webview, webviewRevision })
-  addressLoadOwnerRef.current = { appId: app.appId, webview, webviewRevision }
-
-  useEffect(
-    () => () => {
-      addressLoadGenerationRef.current += 1
-    },
-    []
-  )
+  const canOpenExternalLink = isHttpUrl(currentUrl)
 
   const handleTogglePin = useCallback(() => {
     const fallbackKey = isPinned ? 'miniApp.unpin_failed' : 'miniApp.pin_failed'
@@ -125,127 +93,66 @@ const MinimalToolbar: FC<Props> = ({
     })
   }, [app.appId, isPinned, updateAppStatus, t])
 
-  const handleToggleOpenExternal = useCallback(() => {
-    void setOpenLinkExternal(!openLinkExternal)
-  }, [setOpenLinkExternal, openLinkExternal])
-
   const handleOpenLink = useCallback(() => {
-    void ipcApi.request('system.shell.open_external_website', currentPageUrl)
-  }, [currentPageUrl])
+    void ipcApi.request('system.shell.open_external_website', currentUrl)
+  }, [currentUrl])
 
   const handleAddressSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault()
-      const normalizedAddress = normalizeWebviewAddress(addressValue)
-      if (!normalizedAddress) {
+      const normalized = normalizeWebviewAddress(address)
+      if (!normalized || !isHttpUrl(normalized)) {
         toast.error(t('settings.miniApps.custom.url_invalid'))
-        restoreCurrentPageUrl()
+        setAddress(currentUrl)
         return
       }
-
-      if (!webview) {
-        toast.error(t('miniApp.error.load_failed'))
-        restoreCurrentPageUrl()
-        return
-      }
-
-      isAddressEditingRef.current = false
-      setAddressValue(normalizedAddress)
-      addressInputRef.current?.blur()
-
-      const loadGeneration = ++addressLoadGenerationRef.current
-      const loadOwner = { appId: app.appId, webview, webviewRevision }
-      const handleLoadFailure = (error: unknown) => {
-        const currentOwner = addressLoadOwnerRef.current
-        if (
-          addressLoadGenerationRef.current !== loadGeneration ||
-          webviewRef.current !== webview ||
-          currentOwner.appId !== loadOwner.appId ||
-          currentOwner.webview !== loadOwner.webview ||
-          currentOwner.webviewRevision !== loadOwner.webviewRevision
-        ) {
-          return
-        }
-        restoreCurrentPageUrl()
-        if (error instanceof Error && /ERR_ABORTED/.test(error.message)) return
-        logger.error('Failed to navigate WebView from address bar', error as Error)
-        toast.error(t('miniApp.error.load_failed'))
-      }
-
-      try {
-        void webview.loadURL(normalizedAddress).catch(handleLoadFailure)
-      } catch (error) {
-        handleLoadFailure(error)
-      }
+      setEditing(false)
+      inputRef.current?.blur()
+      onNavigate(normalized)
     },
-    [
-      addressValue,
-      app.appId,
-      isAddressEditingRef,
-      restoreCurrentPageUrl,
-      setAddressValue,
-      t,
-      webview,
-      webviewRef,
-      webviewRevision
-    ]
-  )
-
-  const handleAddressFocus = useCallback(
-    (event: React.FocusEvent<HTMLInputElement>) => {
-      isAddressEditingRef.current = true
-      event.currentTarget.select()
-    },
-    [isAddressEditingRef]
-  )
-
-  const handleAddressBlur = useCallback(() => {
-    if (!isAddressEditingRef.current) return
-    isAddressEditingRef.current = false
-    restoreCurrentPageUrl()
-  }, [isAddressEditingRef, restoreCurrentPageUrl])
-
-  const handleAddressKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      isAddressEditingRef.current = false
-      restoreCurrentPageUrl()
-      event.currentTarget.blur()
-    },
-    [isAddressEditingRef, restoreCurrentPageUrl]
+    [address, currentUrl, onNavigate, t]
   )
 
   return (
     <div className="flex h-8.75 shrink-0 items-center gap-2 bg-background px-3">
-      <div className="flex shrink-0 items-center gap-2">
+      {app.kind === 'site' && (
+        <form className="mx-1 min-w-0 flex-1" onSubmit={handleAddressSubmit}>
+          <Input
+            ref={inputRef}
+            type="text"
+            inputMode="url"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            onFocus={(event) => {
+              setEditing(true)
+              event.currentTarget.select()
+            }}
+            onBlur={() => {
+              setEditing(false)
+              setAddress(currentUrl)
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== 'Escape') return
+              event.preventDefault()
+              setEditing(false)
+              setAddress(currentUrl)
+              event.currentTarget.blur()
+            }}
+            disabled={!isReady}
+            aria-label={t('settings.miniApps.custom.url')}
+            title={currentUrl}
+            placeholder={t('settings.miniApps.custom.url_placeholder')}
+            autoCapitalize="none"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="text-muted-foreground h-7 rounded-md border-input bg-background px-2.5 text-xs shadow-none focus-visible:text-foreground"
+          />
+        </form>
+      )}
+
+      <div className="ml-auto flex shrink-0 items-center">
         <div className="flex items-center gap-0.5">
-          <Tooltip content={t('miniApp.popup.goBack')} placement="bottom">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleGoBack}
-              className={toolbarButtonClassName({ disabled: !canGoBack })}
-              aria-label={t('miniApp.popup.goBack')}
-              aria-disabled={!canGoBack}>
-              <ArrowLeft size={14} />
-            </Button>
-          </Tooltip>
-
-          <Tooltip content={t('miniApp.popup.goForward')} placement="bottom">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={handleGoForward}
-              className={toolbarButtonClassName({ disabled: !canGoForward })}
-              aria-label={t('miniApp.popup.goForward')}
-              aria-disabled={!canGoForward}>
-              <ArrowRight size={14} />
-            </Button>
-          </Tooltip>
-
           <Tooltip content={t('miniApp.popup.refresh')} placement="bottom">
             <Button
               type="button"
@@ -257,36 +164,7 @@ const MinimalToolbar: FC<Props> = ({
               <RotateCw size={14} />
             </Button>
           </Tooltip>
-        </div>
-      </div>
 
-      {app.kind === 'site' && (
-        <form className="mx-1 min-w-0 flex-1" onSubmit={handleAddressSubmit}>
-          <Input
-            ref={addressInputRef}
-            type="text"
-            inputMode="url"
-            value={addressValue}
-            onChange={(event) => setAddressValue(event.target.value)}
-            onFocus={handleAddressFocus}
-            onBlur={handleAddressBlur}
-            onKeyDown={handleAddressKeyDown}
-            disabled={!isWebviewReady}
-            aria-label={t('settings.miniApps.custom.url')}
-            title={currentPageUrl}
-            placeholder={t('settings.miniApps.custom.url_placeholder')}
-            autoCapitalize="none"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            className="text-muted-foreground h-7 rounded-md border-input bg-background px-2.5 text-xs shadow-none focus-visible:text-foreground"
-          />
-        </form>
-      )}
-
-      <MiniAppDebuggingIndicator appId={app.appId} />
-      <div className="ml-auto flex shrink-0 items-center">
-        <div className="flex items-center gap-0.5">
           <Tooltip content={t(splitLabelKey)} placement="bottom">
             <Button
               type="button"
@@ -331,7 +209,6 @@ const MinimalToolbar: FC<Props> = ({
             </Tooltip>
           )}
 
-          {/* Sites only: a local app can open nothing outside itself, so the switch would lie. */}
           {app.kind === 'site' && (
             <Tooltip
               content={
@@ -342,7 +219,7 @@ const MinimalToolbar: FC<Props> = ({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                onClick={handleToggleOpenExternal}
+                onClick={() => void setOpenLinkExternal(!openLinkExternal)}
                 className={toolbarButtonClassName({ active: openLinkExternal })}
                 aria-label={
                   openLinkExternal
@@ -355,7 +232,6 @@ const MinimalToolbar: FC<Props> = ({
             </Tooltip>
           )}
 
-          {/* The same panel the launcher tile's context menu opens; sites have no package to describe. */}
           {app.kind === 'app' && (
             <Tooltip content={t('miniApp.detail.open')} placement="bottom">
               <Button
@@ -366,20 +242,6 @@ const MinimalToolbar: FC<Props> = ({
                 className={toolbarButtonClassName()}
                 aria-label={t('miniApp.detail.open')}>
                 <Info size={14} />
-              </Button>
-            </Tooltip>
-          )}
-
-          {isDev && (
-            <Tooltip content={t('miniApp.popup.devtools')} placement="bottom">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={onOpenDevTools}
-                className={toolbarButtonClassName()}
-                aria-label={t('miniApp.popup.devtools')}>
-                <Code size={14} />
               </Button>
             </Tooltip>
           )}
@@ -413,14 +275,10 @@ const MinimalToolbar: FC<Props> = ({
   )
 }
 
-const toolbarButtonClassName = ({ disabled = false, active = false }: { disabled?: boolean; active?: boolean } = {}) =>
+const toolbarButtonClassName = ({ active = false }: { active?: boolean } = {}) =>
   cn(
     'rounded shadow-none active:scale-95',
-    disabled
-      ? 'text-foreground-disabled hover:text-foreground-disabled cursor-default hover:bg-transparent active:scale-100'
-      : active
-        ? 'text-primary hover:text-primary'
-        : 'text-muted-foreground hover:text-foreground'
+    active ? 'text-primary hover:text-primary' : 'text-muted-foreground hover:text-foreground'
   )
 
 export default MinimalToolbar

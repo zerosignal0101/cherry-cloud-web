@@ -1,204 +1,44 @@
-# Routing System Developer Guide
+# Routing System
 
-This project uses **TanStack Router + Multi MemoryRouter** architecture, where each Tab has its own independent router instance, enabling native KeepAlive behavior.
+The Web build uses **TanStack Router with one URL-backed router**. A URL is the page: `/app/*` and `/settings/*` live inside the shared navigation shell, browser back/forward works, and a reload restores the page.
 
-## Quick Start
+The desktop app's per-tab `MemoryRouter` and webview tabs were removed in M16. The `TabsContext` shim above the router still exposes the subset of the tab API that upstream components call (`openTab`, `closeTab`, active tab), but each tab is a URL route, not an independent router.
 
-### 1. Adding a New Page
+## Adding a Page
 
-Create a file in the `src/renderer/routes/` directory:
+Create a file under `src/renderer/routes/`. The path becomes the URL.
 
-```typescript
-// routes/knowledge.tsx
+```tsx
+// src/renderer/routes/app/notes.tsx
 import { createFileRoute } from '@tanstack/react-router'
+import NotesPage from '@renderer/pages/notes/NotesPage'
 
-export const Route = createFileRoute('/knowledge')({
-  component: KnowledgePage
+export const Route = createFileRoute('/app/notes')({
+  component: NotesPage
 })
-
-function KnowledgePage() {
-  return <div>Knowledge Page</div>
-}
 ```
 
-After running `yarn dev`, TanStack Router will automatically update `routeTree.gen.ts`.
+Run `pnpm dev` (or any Vite build); the router plugin regenerates `routeTree.gen.ts`. Do not edit the generated file by hand.
 
-### 2. Routes with Parameters
+## Navigation
 
-```typescript
-// routes/chat/$topicId.tsx
-import { createFileRoute } from '@tanstack/react-router'
+Inside a page, use TanStack Router:
 
-export const Route = createFileRoute('/chat/$topicId')({
-  component: ChatPage
-})
-
-function ChatPage() {
-  const { topicId } = Route.useParams()
-  return <div>Chat: {topicId}</div>
-}
+```tsx
+const navigate = useNavigate()
+navigate({ to: '/settings/provider' })
+navigate({ to: '/app/mini-app/$appId', params: { appId } })
 ```
 
-### 3. Nested Routes
+From non-route runtime code (popups, message actions), use `openTab`/`openSettingsTab` from the renderer services. These ultimately change the URL; `forceNew` is only meaningful for detached desktop windows and is not used by the Web shell.
 
-```text
-routes/
-├── settings.tsx        # /settings (layout)
-├── settings/
-│   ├── general.tsx     # /settings/general
-│   └── provider.tsx    # /settings/provider
-```
+## Layout
 
-```typescript
-// routes/settings.tsx
-import { createFileRoute, Outlet } from '@tanstack/react-router'
+- `src/renderer/routes/app.tsx` wraps `/app/*` in `WebShell`.
+- `src/renderer/routes/settings.tsx` wraps `/settings/*` in the same shell.
+- Desktop shows a 56px icon rail; phones show a bottom bar and a settings drawer.
+- Only Web-scoped routes are registered. Removed desktop pages (knowledge, paintings, launchpad, subscription, channels, selection/quick assistant, screenshot, shortcuts, local models, dependencies and device pairing) are not in the tree and are rejected by `isKnownNavigationPath`.
 
-export const Route = createFileRoute('/settings')({
-  component: SettingsLayout
-})
+## Generated Tree
 
-function SettingsLayout() {
-  return (
-    <div className="flex">
-      <aside>Settings Menu</aside>
-      <main><Outlet /></main>
-    </div>
-  )
-}
-```
-
-## Navigation API
-
-This project provides two navigation methods:
-
-### 1. Tab-Level Navigation - `openTab`
-
-Open a new Tab or switch to an existing Tab using the `useTabs` hook:
-
-```typescript
-import { useTabs } from '@renderer/hooks/tab'
-
-function MyComponent() {
-  const { openTab, closeTab } = useTabs()
-
-  // Basic usage - reuse existing Tab or create new one
-  openTab('/settings')
-
-  // With title
-  openTab('/chat/123', { title: 'Chat with Alice' })
-
-  // Force new Tab (even if same URL exists)
-  openTab('/settings', { forceNew: true })
-
-  // Open Webview Tab
-  openTab('https://example.com', {
-    type: 'webview',
-    title: 'Example Site'
-  })
-
-  // Close Tab
-  closeTab(tabId)
-}
-```
-
-### 2. In-Tab Navigation - `useNavigate`
-
-Navigate within the same Tab (won't create a new Tab) using TanStack Router's `useNavigate`:
-
-```typescript
-import { useNavigate } from '@tanstack/react-router'
-
-function SettingsPage() {
-  const navigate = useNavigate()
-
-  // Navigate to sub-page within current Tab
-  navigate({ to: '/settings/provider' })
-
-  // Navigate with parameters
-  navigate({ to: '/chat/$topicId', params: { topicId: '123' } })
-}
-```
-
-### Comparison
-
-| Scenario | Method | Result |
-|----------|--------|--------|
-| Open new feature module | `openTab('/knowledge')` | Creates new Tab |
-| Switch sub-page in settings | `navigate({ to: '/settings/provider' })` | Navigates within current Tab |
-| Open detail from list | `openTab('/chat/123', { title: '...' })` | Creates new Tab |
-| Go back to previous page | `navigate({ to: '..' })` | Goes back within current Tab |
-
-### API Reference
-
-#### `useTabs()` Return Value
-
-| Property/Method | Type | Description |
-|-----------------|------|-------------|
-| `tabs` | `Tab[]` | List of all Tabs |
-| `activeTabId` | `string` | Currently active Tab ID |
-| `activeTab` | `Tab \| undefined` | Currently active Tab object |
-| `openTab(url, options?)` | `(url: string, options?: OpenTabOptions) => string` | Open Tab, returns Tab ID |
-| `closeTab(id)` | `(id: string) => void` | Close specified Tab |
-| `setActiveTab(id)` | `(id: string) => void` | Switch to specified Tab |
-| `updateTab(id, updates)` | `(id: string, updates: Partial<Tab>) => void` | Update Tab properties |
-
-#### `OpenTabOptions`
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `forceNew` | `boolean` | `false` | Force create new Tab |
-| `title` | `string` | URL path | Tab title |
-| `type` | `'route' \| 'webview'` | `'route'` | Tab type |
-| `id` | `string` | Auto-generated | Custom Tab ID |
-
-## Architecture Overview
-
-```text
-AppShell
-├── Sidebar
-├── TabBar
-└── Content Area
-    ├── TabRouter #1 (Home)
-    │   └── Activity(visible) → MemoryRouter → RouterProvider
-    ├── TabRouter #2 (Settings)
-    │   └── Activity(hidden) → MemoryRouter → RouterProvider
-    └── WebviewContainer (for webview tabs)
-```
-
-- Each Tab has its own independent `MemoryRouter` instance
-- Uses React 19 `<Activity>` component to control visibility
-- Components are not unmounted on Tab switch, state is fully preserved (KeepAlive)
-
-## Error Handling
-
-| Layer | Mechanism | Scope |
-|---|---|---|
-| Route render error | `defaultErrorComponent: RouteErrorFallback` on every per-tab router (`TabRouter.tsx`) | Contained to the throwing tab; themed error card with retry/reload |
-| Provider render error | Window-level `<ErrorBoundary fallbackComponent={WindowFatalFallback}>` in each window App | Whole window falls back to a context-free fatal page instead of a white screen |
-
-- A specific route can override the default with its own `errorComponent` route option
-- Without `defaultErrorComponent`, TanStack wraps matches in a pass-through fragment: a route render error would bubble to the window-level boundary and tear down the whole window
-
-## File Structure
-
-```text
-src/renderer/
-├── routes/                    # Route pages (TanStack Router file-based routing)
-│   ├── __root.tsx            # Root route (renders Outlet)
-│   ├── settings.tsx          # /settings
-│   ├── settings.index.tsx    # /settings/ index route (flat dot form — never a bare index.tsx)
-│   └── README.md             # This document
-├── components/layout/
-│   ├── AppShell.tsx          # Main layout (Sidebar + TabBar + Content)
-│   └── TabRouter.tsx         # Tab router container (MemoryRouter + Activity)
-├── hooks/
-│   └── useTabs.ts            # Tab state management hook
-└── routeTree.gen.ts          # Auto-generated route tree (do not edit manually)
-```
-
-## Important Notes
-
-1. **Do not manually edit `routeTree.gen.ts`** - It is automatically generated by TanStack Router
-2. **File name determines route path** - `routes/settings.tsx` → `/settings`
-3. **Dynamic parameters use `$`** - `routes/chat/$topicId.tsx` → `/chat/:topicId`
-4. **Page state is automatically preserved** - Tab switching won't lose `useState`, scroll position, etc.
+`routeTree.gen.ts` is produced by `@tanstack/router-plugin` from the files under `src/renderer/routes/`. Adding or deleting a route file requires a Vite dev run or build so the tree and type registrations stay in sync.

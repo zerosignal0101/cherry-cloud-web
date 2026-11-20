@@ -22,6 +22,7 @@ import {
 } from '@main/features/miniApp/management'
 import { setMiniAppLogo } from '@main/services/entityLogo'
 import type { miniAppRequestSchemas } from '@shared/ipc/schemas/miniApp'
+import type { BridgeResult } from '@shared/ipc/schemas/miniAppBridge'
 import type { IpcHandlersFor, WindowId } from '@shared/ipc/types'
 
 function senderWebContents(senderId: WindowId | null): Electron.WebContents | undefined {
@@ -80,5 +81,11 @@ export const miniAppHandlers: IpcHandlersFor<typeof miniAppRequestSchemas> = {
   'mini_app.update.check': async ({ appId }) => checkForUpdate(appId),
   'mini_app.update.check_on_open': async ({ appId }) => checkUpdateOnOpen(appId),
   'mini_app.update.apply': async (input) => applyUpdate(input.appId, input),
-  'mini_app.update.rollback': async ({ appId }) => rollbackUpdate(appId)
+  'mini_app.update.rollback': async ({ appId }) => rollbackUpdate(appId),
+  // The desktop guest reaches the bridge over its preload channel; the web build
+  // overrides this route with the authenticated HTTP/WS relay.
+  'mini_app.bridge.invoke': async (): Promise<BridgeResult> => ({
+    ok: false,
+    error: { name: 'Unavailable', message: 'The mini app bridge is not exposed over IpcApi in the desktop build' }
+  })
 }

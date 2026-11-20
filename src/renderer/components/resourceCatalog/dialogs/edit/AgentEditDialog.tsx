@@ -1230,12 +1230,7 @@ function AgentToolsFields({
             />
           </div>
           <div className="grid gap-2">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-muted-foreground text-xs">{t('settings.computerUse.title')}</span>
-              <Button variant="ghost" size="sm" onClick={() => openSettingsTab('/settings/computer-use')}>
-                {t('settings.title')}
-              </Button>
-            </div>
+            <span className="font-medium text-muted-foreground text-xs">{t('settings.computerUse.title')}</span>
             <CatalogToggleGrid
               items={[
                 {

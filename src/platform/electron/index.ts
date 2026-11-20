@@ -94,7 +94,12 @@ export const dialog = {
     checkboxChecked: false
   }),
   showMessageBoxSync: (): number => 0,
-  showErrorBox: (): void => {}
+  showErrorBox: (): void => {},
+  // The browser supplies files as multipart uploads; a native picker has no
+  // server-side equivalent. Answering "cancelled" is the honest shape for the
+  // desktop handlers that still mention one.
+  showOpenDialog: async (): Promise<{ canceled: true; filePaths: string[] }> => ({ canceled: true, filePaths: [] }),
+  showSaveDialog: async (): Promise<{ canceled: true; filePath?: string }> => ({ canceled: true })
 }
 
 export class ClipboardItem {
@@ -136,13 +141,88 @@ export const net = {
   }
 }
 
-export const session = {
-  defaultSession: {
+interface WebContentsStub {
+  readonly id: number
+  readonly hostWebContents?: WebContentsStub
+  send(_channel: string, ..._args: unknown[]): void
+  isDestroyed(): boolean
+  isFocused?(): boolean
+}
+
+/** No guest webContents exist server-side; only identity/liveness probes reach this. */
+export const webContents = {
+  getAllWebContents: (): WebContentsStub[] => [],
+  fromId: (_id: number): WebContentsStub | undefined => undefined,
+  on: (_event: string, _listener: (...args: unknown[]) => void): typeof webContents => webContents,
+  once: (_event: string, _listener: (...args: unknown[]) => void): typeof webContents => webContents,
+  off: (_event: string, _listener: (...args: unknown[]) => void): typeof webContents => webContents,
+  removeListener: (_event: string, _listener: (...args: unknown[]) => void): typeof webContents => webContents
+}
+
+/**
+ * Per-partition session stand-in. Mini-app installation only asks sessions to
+ * clear storage and install network handlers; with no Chromium here every policy
+ * is satisfied vacuously, and the actual browser-side isolation is the signed
+ * sandbox iframe served by `src/server/features/miniapps`.
+ */
+function createSessionStub(): {
+  protocol: { handle(_scheme: string, _handler: unknown): void; unhandle(_scheme: string): void }
+  webRequest: {
+    onBeforeRequest(_listener: unknown): void
+    onHeadersReceived(_listener: unknown): void
+    onBeforeSendHeaders(_listener: unknown): void
+  }
+  cookies: { flushStore(): Promise<void> }
+  clearStorageData(): Promise<void>
+  clearCache(): Promise<void>
+  clearCodeCaches(_options: unknown): Promise<void>
+  flushStorageData(): void
+  setProxy(_config: unknown): Promise<void>
+  setPermissionRequestHandler(_handler: unknown): void
+  setPermissionCheckHandler(_handler: unknown): void
+  setDisplayMediaRequestHandler(_handler: unknown): void
+  setDevicePermissionHandler(_handler: unknown): void
+  setBluetoothPairingHandler(_handler: unknown): void
+  removeAllListeners(_event: string): void
+  on(_event: string, _listener: (...args: unknown[]) => void): void
+  once(_event: string, _listener: (...args: unknown[]) => void): void
+} {
+  return {
+    protocol: { handle: (): void => {}, unhandle: (): void => {} },
     webRequest: {
-      onBeforeSendHeaders: (_listener: unknown): void => {}
-    }
-  },
-  fromPartition: (_partition: string): typeof session.defaultSession => session.defaultSession
+      onBeforeRequest: (): void => {},
+      onHeadersReceived: (): void => {},
+      onBeforeSendHeaders: (): void => {}
+    },
+    cookies: { flushStore: async (): Promise<void> => {} },
+    clearStorageData: async (): Promise<void> => {},
+    clearCache: async (): Promise<void> => {},
+    clearCodeCaches: async (): Promise<void> => {},
+    flushStorageData: (): void => {},
+    setProxy: async (): Promise<void> => {},
+    setPermissionRequestHandler: (): void => {},
+    setPermissionCheckHandler: (): void => {},
+    setDisplayMediaRequestHandler: (): void => {},
+    setDevicePermissionHandler: (): void => {},
+    setBluetoothPairingHandler: (): void => {},
+    removeAllListeners: (): void => {},
+    on: (): void => {},
+    once: (): void => {}
+  }
+}
+
+const partitionSessions = new Map<string, ReturnType<typeof createSessionStub>>()
+const defaultSession = createSessionStub()
+
+export const session = {
+  defaultSession,
+  fromPartition: (partition: string): ReturnType<typeof createSessionStub> => {
+    const existing = partitionSessions.get(partition)
+    if (existing) return existing
+    const created = createSessionStub()
+    partitionSessions.set(partition, created)
+    return created
+  }
 }
 
 /** The server has no OS keychain; encrypted-at-rest secrets are not supported. */
@@ -171,8 +251,7 @@ export const powerMonitor = {
   on: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor => powerMonitor,
   once: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor => powerMonitor,
   off: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor => powerMonitor,
-  removeListener: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor =>
-    powerMonitor,
+  removeListener: (_event: string, _listener: (...args: unknown[]) => void): typeof powerMonitor => powerMonitor,
   isOnBatteryPower: (): boolean => false,
   getSystemIdleTime: (): number => 0
 }
@@ -229,9 +308,9 @@ export default {
   nativeTheme,
   net,
   session,
+  webContents,
   safeStorage,
   powerMonitor,
   powerSaveBlocker,
   BrowserWindow
 }
-

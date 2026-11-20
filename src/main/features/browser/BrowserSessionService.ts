@@ -135,6 +135,24 @@ export class BrowserSessionService extends BaseService {
     return { createServer: () => server.createServer(), close: () => server.close() }
   }
 
+  /**
+   * Granular browser tools as a directly mountable MCP server.
+   *
+   * `createMcpEndpoint` is the legacy bridge; this is the same `BrowserServer`
+   * without the endpoint wrapper, for Agent runtimes that mount MCP servers
+   * themselves. Closing the protocol closes the browser control session.
+   */
+  createMcpServer() {
+    this.assertServing()
+    const server = new BrowserServer(this, () => this.servers.delete(server))
+    this.servers.add(server)
+    const protocol = server.createServer()
+    protocol.server.onclose = () => {
+      void server.close().catch((error) => logger.warn('Failed to close browser MCP server', { error }))
+    }
+    return protocol
+  }
+
   createControl(owner: { kind: 'agent' | 'topic'; sessionId: string; ownerId: string }): BrowserControlSession {
     this.assertServing()
     const context = { sessionId: owner.sessionId, ownerId: owner.ownerId }

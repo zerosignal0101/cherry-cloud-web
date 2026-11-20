@@ -6,20 +6,9 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type * as CherryStudioUi from '@cherrystudio/ui'
 
 const installFromZip = vi.fn()
-const installFromDirectory = vi.fn()
-const ipcApiRequest = vi.hoisted(() => vi.fn())
+const pickBrowserFiles = vi.hoisted(() => vi.fn())
 
-vi.mock('@renderer/ipc', () => ({ ipcApi: { request: ipcApiRequest } }))
-
-const fileMetadata = {
-  kind: 'file' as const,
-  type: 'other' as const,
-  size: 0,
-  createdAt: 0,
-  modifiedAt: 0,
-  mime: 'application/octet-stream'
-}
-const directoryMetadata = { kind: 'directory' as const, size: 0, createdAt: 0, modifiedAt: 0 }
+vi.mock('@renderer/ipc/webFile', () => ({ pickBrowserFiles }))
 
 vi.mock('@cherrystudio/ui', async (importOriginal) => {
   const actual = await importOriginal<typeof CherryStudioUi>()
@@ -41,12 +30,14 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('@renderer/hooks/useSkills', () => ({
-  useSkillInstall: () => ({ installFromZip, installFromDirectory })
+  useSkillInstall: () => ({ installFromZip })
 }))
 
 import { toast } from '@renderer/services/toast'
 
 import { ImportSkillDialog } from '../ImportSkillDialog'
+
+const zip = (name: string) => new File(['zip'], name, { type: 'application/zip' })
 
 const createDropData = (files: File[]) => ({
   dataTransfer: {
@@ -88,18 +79,8 @@ beforeAll(() => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ipcApiRequest.mockReset()
-  ipcApiRequest.mockResolvedValue(fileMetadata)
-  Object.assign(window, {
-    api: {
-      ...window.api,
-      file: {
-        ...window.api?.file,
-        getPathForFile: vi.fn((file: File) => `/tmp/${file.name}`),
-        select: vi.fn(async () => [{ name: 'broken.zip', path: '/tmp/broken.zip' }])
-      }
-    }
-  })
+  pickBrowserFiles.mockReset()
+  pickBrowserFiles.mockResolvedValue([zip('broken.zip')])
 })
 
 afterEach(cleanup)
@@ -127,7 +108,7 @@ describe('ImportSkillDialog', () => {
     render(<ImportSkillDialog open onOpenChange={onOpenChange} />)
 
     await user.click(screen.getByRole('button', { name: 'settings.skills.installFromZip' }))
-    await waitFor(() => expect(installFromZip).toHaveBeenCalledWith('/tmp/broken.zip'))
+    await waitFor(() => expect(installFromZip).toHaveBeenCalledWith(expect.objectContaining({ name: 'broken.zip' })))
 
     const overlay = document.querySelector('[data-slot="dialog-overlay"]')
     expect(overlay).toBeInTheDocument()
@@ -140,7 +121,7 @@ describe('ImportSkillDialog', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'settings.skills.installFromZip' })).toBeEnabled())
   })
 
-  it('展示主进程返回的本地化 ZIP 原因', async () => {
+  it('展示服务端返回的本地化 ZIP 原因', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
     const originalError = '未找到可安装的技能。技能 ZIP 压缩包必须在根目录或某个子目录里包含 SKILL.md。'
@@ -163,27 +144,6 @@ describe('ImportSkillDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalled()
   })
 
-  it('展示主进程返回的本地化目录原因', async () => {
-    const user = userEvent.setup()
-    const originalError = '未在所选文件夹中找到 SKILL.md。请选择直接包含 SKILL.md 的文件夹。'
-    vi.mocked(window.api.file.select).mockResolvedValue([{ name: 'broken-skill', path: '/tmp/broken-skill' }] as any)
-    installFromDirectory.mockRejectedValue(new Error(originalError))
-
-    render(<ImportSkillDialog open onOpenChange={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: 'settings.skills.installFromDirectory' }))
-
-    expect(await screen.findByText(`settings.skills.installFailed:broken-skill: ${originalError}`)).toBeInTheDocument()
-    expect(screen.getByText(`settings.skills.installFailed:broken-skill: ${originalError}`)).toHaveAttribute(
-      'title',
-      `settings.skills.installFailed:broken-skill: ${originalError}`
-    )
-    expect(screen.getByTestId('skill-import-results')).not.toHaveTextContent(
-      /skill-install|zip[-_]install[-_]|[\\/]tmp[\\/]|[\\/]Temp[\\/]/
-    )
-    expect(toast.error).not.toHaveBeenCalled()
-  })
-
   it('closes after a successful install while keeping the marketplace success toast', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
@@ -203,11 +163,10 @@ describe('ImportSkillDialog', () => {
   it('closes only after every selected ZIP installs successfully', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
+    const one = zip('one.zip')
+    const two = zip('two.zip')
+    pickBrowserFiles.mockResolvedValue([one, two])
     let resolveSecondInstall: (skill: { id: string; name: string }) => void = () => {}
-    vi.mocked(window.api.file.select).mockResolvedValue([
-      { name: 'one.zip', path: '/tmp/one.zip' },
-      { name: 'two.zip', path: '/tmp/two.zip' }
-    ] as any)
     installFromZip
       .mockResolvedValueOnce({ id: 'skill-one', name: 'Skill One' })
       .mockReturnValueOnce(new Promise((resolve) => (resolveSecondInstall = resolve)))
@@ -222,43 +181,15 @@ describe('ImportSkillDialog', () => {
     resolveSecondInstall({ id: 'skill-two', name: 'Skill Two' })
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-    expect(window.api.file.select).toHaveBeenCalledWith(
-      expect.objectContaining({ properties: ['openFile', 'multiSelections'] })
-    )
-    expect(installFromZip).toHaveBeenNthCalledWith(1, '/tmp/one.zip')
-    expect(installFromZip).toHaveBeenNthCalledWith(2, '/tmp/two.zip')
+    expect(pickBrowserFiles).toHaveBeenCalledWith(expect.objectContaining({ multiple: true }))
+    expect(installFromZip).toHaveBeenNthCalledWith(1, one)
+    expect(installFromZip).toHaveBeenNthCalledWith(2, two)
     expect(toast.success).toHaveBeenCalledWith('settings.skills.batchInstallComplete:2')
     expect(screen.queryByText('settings.skills.batchInstallComplete:2')).not.toBeInTheDocument()
   })
 
-  it('installs every selected directory through the directory route', async () => {
-    const user = userEvent.setup()
-    vi.mocked(window.api.file.select).mockResolvedValue([
-      { name: 'skill-one', path: '/tmp/skill-one' },
-      { name: 'skill-two', path: '/tmp/skill-two' }
-    ] as any)
-    installFromDirectory
-      .mockResolvedValueOnce({ id: 'skill-one', name: 'Skill One' })
-      .mockResolvedValueOnce({ id: 'skill-two', name: 'Skill Two' })
-
-    render(<ImportSkillDialog open onOpenChange={vi.fn()} />)
-
-    await user.click(screen.getByRole('button', { name: 'settings.skills.installFromDirectory' }))
-
-    await waitFor(() => expect(installFromDirectory).toHaveBeenCalledTimes(2))
-    expect(window.api.file.select).toHaveBeenCalledWith(
-      expect.objectContaining({ properties: ['openDirectory', 'multiSelections'] })
-    )
-    expect(installFromDirectory).toHaveBeenNthCalledWith(1, '/tmp/skill-one')
-    expect(installFromDirectory).toHaveBeenNthCalledWith(2, '/tmp/skill-two')
-    expect(toast.success).toHaveBeenCalledWith('settings.skills.batchInstallComplete:2')
-  })
-
-  it('installs multiple dropped ZIP files through the dropzone', async () => {
-    const files = [
-      new File(['one'], 'one.zip', { type: 'application/zip' }),
-      new File(['two'], 'two.zip', { type: 'application/zip' })
-    ]
+  it('installs dropped ZIP files through the dropzone', async () => {
+    const files = [zip('one.zip'), zip('two.zip')]
     installFromZip
       .mockResolvedValueOnce({ id: 'skill-one', name: 'Skill One' })
       .mockResolvedValueOnce({ id: 'skill-two', name: 'Skill Two' })
@@ -268,42 +199,32 @@ describe('ImportSkillDialog', () => {
     await dropSkillFiles(files)
 
     await waitFor(() => expect(installFromZip).toHaveBeenCalledTimes(2))
-    expect(window.api.file.getPathForFile).toHaveBeenNthCalledWith(1, files[0])
-    expect(window.api.file.getPathForFile).toHaveBeenNthCalledWith(2, files[1])
-    expect(ipcApiRequest).toHaveBeenNthCalledWith(1, 'file.get_metadata', { kind: 'path', path: '/tmp/one.zip' })
-    expect(ipcApiRequest).toHaveBeenNthCalledWith(2, 'file.get_metadata', { kind: 'path', path: '/tmp/two.zip' })
-    expect(installFromZip).toHaveBeenNthCalledWith(1, '/tmp/one.zip')
-    expect(installFromZip).toHaveBeenNthCalledWith(2, '/tmp/two.zip')
-    expect(installFromDirectory).not.toHaveBeenCalled()
+    expect(installFromZip).toHaveBeenNthCalledWith(1, files[0])
+    expect(installFromZip).toHaveBeenNthCalledWith(2, files[1])
+    expect(pickBrowserFiles).not.toHaveBeenCalled()
     expect(toast.success).toHaveBeenCalledWith('settings.skills.batchInstallComplete:2')
   })
 
-  it('keeps per-file errors for invalid dropped files mixed with ZIPs and directories', async () => {
+  it('keeps per-file errors for invalid dropped files mixed with ZIPs', async () => {
     const onOpenChange = vi.fn()
     const files = [
-      new File(['skill'], 'skill-dir', { type: '' }),
-      new File(['zip'], 'plugin.zip', { type: 'application/zip' }),
-      new File(['readme'], 'readme.txt', { type: 'text/plain' })
+      zip('plugin.zip'),
+      new File(['readme'], 'readme.txt', { type: 'text/plain' }),
+      new File(['dir'], 'skill-dir', { type: '' })
     ]
-    ipcApiRequest.mockImplementation(async (_route: string, handle: { path: string }) =>
-      handle.path === '/tmp/skill-dir' ? directoryMetadata : fileMetadata
-    )
-    installFromDirectory.mockResolvedValueOnce({ id: 'skill-dir', name: 'Directory Skill' })
     installFromZip.mockResolvedValueOnce({ id: 'skill-zip', name: 'Zip Skill' })
 
     render(<ImportSkillDialog open onOpenChange={onOpenChange} />)
 
     await dropSkillFiles(files)
 
-    await waitFor(() => expect(installFromDirectory).toHaveBeenCalledWith('/tmp/skill-dir'))
-    await waitFor(() => expect(installFromZip).toHaveBeenCalledWith('/tmp/plugin.zip'))
+    await waitFor(() => expect(installFromZip).toHaveBeenCalledWith(files[0]))
     expect(installFromZip).toHaveBeenCalledTimes(1)
-    expect(installFromDirectory).toHaveBeenCalledTimes(1)
-    expect(screen.getByTestId('skill-import-results')).toHaveTextContent('Directory Skill')
     expect(screen.getByTestId('skill-import-results')).toHaveTextContent('Zip Skill')
     expect(screen.getByTestId('skill-import-results')).toHaveTextContent('readme.txt')
+    expect(screen.getByTestId('skill-import-results')).toHaveTextContent('skill-dir')
     expect(screen.getByTestId('skill-import-results')).toHaveTextContent('settings.skills.invalidFormat')
-    expect(screen.getByText('settings.skills.batchInstallPartialFailed:2:3:1')).toBeInTheDocument()
+    expect(screen.getByText('settings.skills.batchInstallPartialFailed:1:3:2')).toBeInTheDocument()
     expect(onOpenChange).not.toHaveBeenCalled()
   })
 
@@ -320,7 +241,6 @@ describe('ImportSkillDialog', () => {
 
     await waitFor(() => expect(screen.getByTestId('skill-import-results')).toHaveTextContent('one.txt'))
     expect(installFromZip).not.toHaveBeenCalled()
-    expect(installFromDirectory).not.toHaveBeenCalled()
     expect(screen.getByTestId('skill-import-results')).toHaveTextContent('two.txt')
     expect(screen.getByTestId('skill-import-results')).toHaveTextContent('three.txt')
     expect(screen.getAllByText('settings.skills.invalidFormat')).toHaveLength(3)

@@ -30,6 +30,7 @@ import type {
 import type { Topic } from '@renderer/types/topic'
 import { fetchMessagesSummary } from '@renderer/utils/aiGeneration'
 import { getTitleFromString, messagesToPlainText, processCitations } from '@renderer/utils/export'
+import { exportWordFromMarkdown } from '@renderer/utils/exportWord'
 import { removeSpecialCharactersForFileName } from '@renderer/utils/file'
 import {
   captureScrollableAsBlob as captureScrollableAsBlobUtil,
@@ -785,10 +786,7 @@ export async function exportMessagesToTarget(
   const title = options.title ?? (await getMessageTitle(messages[0]))
   switch (target) {
     case 'word':
-      return ipcApi.request('export.word.from_markdown', {
-        markdown: await messagesToMarkdown(messages),
-        fileName: removeSpecialCharactersForFileName(title)
-      })
+      return exportWordFromMarkdown(await messagesToMarkdown(messages), removeSpecialCharactersForFileName(title))
     case 'notion':
       return exportMessagesToNotion(title, messages)
     case 'yuque':
@@ -1666,10 +1664,7 @@ export const exportNote = async ({ node, platform }: NoteExportOptions): Promise
       case 'markdown':
         return await exportNoteAsMarkdown(node.name, content)
       case 'docx':
-        void ipcApi.request('export.word.from_markdown', {
-          markdown: `# ${node.name}\n\n${content}`,
-          fileName: removeSpecialCharactersForFileName(node.name)
-        })
+        void exportWordFromMarkdown(`# ${node.name}\n\n${content}`, removeSpecialCharactersForFileName(node.name))
         return
       case 'notion':
         await exportMessageToNotion(node.name, content)

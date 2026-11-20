@@ -177,8 +177,10 @@ export class PiDurableRuntimeConnection implements AgentRuntimeConnection {
       this.providerSessionId = await this.handle.durable.providerSessionId()
       const observed = await this.handle.durable.observe((batch) => this.onObservation(batch))
       if (observed.status !== 'confirmed') throw new Error(observed.error.message)
-      this.observation = observed.value
-      await this.observation.drain()
+      const observation = observed.value
+      if (!observation) throw new Error('Durable observation handle was not returned')
+      this.observation = observation
+      await observation.drain()
       await this.childResources()
       this.events.push({ type: 'resume-token', token: this.handle.thread.id })
       root.attached()

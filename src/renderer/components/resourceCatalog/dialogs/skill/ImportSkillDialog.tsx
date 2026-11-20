@@ -5,12 +5,10 @@ import { useTranslation } from 'react-i18next'
 
 import { Alert, Button, Dialog, DialogContent, Dropzone, DropzoneEmptyState, ScrollArea } from '@cherrystudio/ui'
 import { useSkillInstall } from '@renderer/hooks/useSkills'
-import { ipcApi } from '@renderer/ipc'
+import { pickBrowserFiles } from '@renderer/ipc/webFile'
 import { toast } from '@renderer/services/toast'
 import { formatErrorMessageWithPrefix } from '@renderer/utils/error'
-import { AbsoluteFilePathSchema } from '@shared/types/file'
 import type { InstalledSkill } from '@shared/types/skill'
-import { createFilePathHandle } from '@shared/utils/file'
 
 interface Props {
   open: boolean
@@ -18,42 +16,38 @@ interface Props {
 }
 
 type ImportStatus = { kind: 'idle' } | { kind: 'error'; message: string }
-type InstallingKey = null | 'zip' | 'directory'
-type ImportKind = 'zip' | 'directory'
 type ImportItemStatus = 'pending' | 'installing' | 'success' | 'error'
 type ImportItem = {
   id: string
-  kind: ImportKind
+  file: File
   name: string
-  path: string
   status: ImportItemStatus
   skillName?: string
   error?: string
 }
 
 /**
- * Skill import dialog — local install only (ZIP file or directory
- * containing `SKILL.md`). Online registry search stays in the sibling
- * `SkillMarketplaceDialog`, keeping local and remote install flows separate.
+ * Skill import dialog for the web build.
  *
- * Drop-zone + explicit picker buttons share the same pipeline through
- * `useSkillInstall.installFromZip` / `installFromDirectory`. Cache
- * invalidation for `/skills` is handled inside the hook, so the library
- * grid refreshes automatically after each successful install.
+ * The desktop version accepted host paths for ZIPs and directories. A browser
+ * cannot produce either: the archive is picked or dropped as a `File`, and
+ * `useSkillInstall.installFromZip` uploads its bytes to `POST /api/skills/install`.
+ * Only ZIP archives are supported here — directory installs are a server-side
+ * path operation and have no browser equivalent.
  */
 export function ImportSkillDialog({ open, onOpenChange }: Props) {
   const { t } = useTranslation()
-  const { installFromZip, installFromDirectory } = useSkillInstall()
+  const { installFromZip } = useSkillInstall()
 
   const [status, setStatus] = useState<ImportStatus>({ kind: 'idle' })
-  const [installing, setInstalling] = useState<InstallingKey>(null)
+  const [installing, setInstalling] = useState(false)
   const [items, setItems] = useState<ImportItem[]>([])
 
   // Reset transient state on open / close.
   useEffect(() => {
     if (!open) {
       setStatus({ kind: 'idle' })
-      setInstalling(null)
+      setInstalling(false)
       setItems([])
     }
   }, [open])
@@ -76,9 +70,9 @@ export function ImportSkillDialog({ open, onOpenChange }: Props) {
   }, [])
 
   const runImportQueue = useCallback(
-    async (nextItems: ImportItem[], installingKey: Exclude<InstallingKey, null>) => {
+    async (nextItems: ImportItem[]) => {
       if (installing) return
-      setInstalling(installingKey)
+      setInstalling(true)
       setStatus({ kind: 'idle' })
       setItems(nextItems)
 
@@ -93,7 +87,7 @@ export function ImportSkillDialog({ open, onOpenChange }: Props) {
           updateItem(item.id, { status: 'installing', error: undefined })
 
           try {
-            const skill = item.kind === 'zip' ? await installFromZip(item.path) : await installFromDirectory(item.path)
+            const skill = await installFromZip(item.file)
             if (!skill) {
               failedCount += 1
               updateItem(item.id, { status: 'error', error: getInstallErrorMessage(undefined, item.name) })
@@ -132,114 +126,63 @@ export function ImportSkillDialog({ open, onOpenChange }: Props) {
         toast.success(message)
         onOpenChange(false)
       } finally {
-        setInstalling(null)
+        setInstalling(false)
       }
     },
-    [getInstallErrorMessage, installFromDirectory, installFromZip, installing, onOpenChange, t, updateItem]
+    [getInstallErrorMessage, installFromZip, installing, onOpenChange, t, updateItem]
   )
 
   const createImportItem = useCallback(
-    (
-      kind: ImportKind,
-      filePath: string,
-      name: string,
-      index: number,
-      itemStatus: ImportItemStatus = 'pending'
-    ): ImportItem => ({
-      id: `${Date.now()}-${index}-${filePath}`,
-      kind,
-      name,
-      path: filePath,
+    (file: File, index: number, itemStatus: ImportItemStatus = 'pending'): ImportItem => ({
+      id: `${Date.now()}-${index}-${file.name}`,
+      file,
+      name: file.name,
       status: itemStatus
     }),
     []
   )
 
-  const getNameFromPath = (filePath: string) => {
-    const name = filePath.split(/[/\\]/).pop()
-    return name || filePath
-  }
+  const isZip = (file: File) => file.name.toLowerCase().endsWith('.zip')
 
   const handleZipPick = async () => {
     if (installing) return
     try {
-      const selected = await window.api.file.select({
-        filters: [{ name: 'ZIP', extensions: ['zip'] }],
-        properties: ['openFile', 'multiSelections']
-      })
-      if (!selected || selected.length === 0) return
+      const selected = await pickBrowserFiles({ accept: '.zip,application/zip', multiple: true })
+      if (selected.length === 0) return
       const zipItems = selected.map((file, index) =>
-        createImportItem('zip', file.path, file.name ?? getNameFromPath(file.path), index)
+        isZip(file)
+          ? createImportItem(file, index)
+          : {
+              ...createImportItem(file, index, 'error'),
+              error: t('settings.skills.invalidFormat')
+            }
       )
-      await runImportQueue(zipItems, 'zip')
-    } catch (e) {
-      setStatus({ kind: 'error', message: getInstallErrorMessage(e) })
-    }
-  }
-
-  const handleDirPick = async () => {
-    if (installing) return
-    try {
-      const selected = await window.api.file.select({
-        properties: ['openDirectory', 'multiSelections']
-      })
-      if (!selected || selected.length === 0) return
-      const directoryItems = selected.map((directory, index) =>
-        createImportItem('directory', directory.path, directory.name ?? getNameFromPath(directory.path), index)
-      )
-      await runImportQueue(directoryItems, 'directory')
+      await runImportQueue(zipItems)
     } catch (e) {
       setStatus({ kind: 'error', message: getInstallErrorMessage(e) })
     }
   }
 
   /**
-   * Drag-and-drop accepts ZIP files and directories. Settings
-   * page uses the same probe (`file.get_metadata`'s `kind`) since dropped
-   * directories show up as `File` entries on Electron.
+   * Drag-and-drop accepts ZIP files. Browsers expose dropped directories as
+   * zero-entry `File` objects, which cannot be read as an archive, so anything
+   * without a `.zip` name is reported as an invalid format instead of being
+   * sent to the server.
    */
   const handleDroppedEntries = async (files: File[]) => {
     if (installing) return
     if (files.length === 0) return
 
-    try {
-      const droppedItems: ImportItem[] = []
+    const droppedItems = files.map((file, index) =>
+      isZip(file)
+        ? createImportItem(file, index)
+        : {
+            ...createImportItem(file, index, 'error'),
+            error: t('settings.skills.invalidFormat')
+          }
+    )
 
-      for (const [index, file] of files.entries()) {
-        const filePath = window.api.file.getPathForFile(file)
-        if (!filePath) continue
-
-        const meta = await ipcApi.request(
-          'file.get_metadata',
-          createFilePathHandle(AbsoluteFilePathSchema.parse(filePath))
-        )
-        // A `null` metadata (path unreadable / vanished — near-nil since dropped
-        // paths resolve) folds into "not a directory": it falls through to the
-        // filename-based zip/invalid classification below, and a genuine read
-        // failure still surfaces downstream when the item is actually imported.
-        if (meta?.kind === 'directory') {
-          droppedItems.push(createImportItem('directory', filePath, file.name || getNameFromPath(filePath), index))
-          continue
-        }
-
-        if (file.name.toLowerCase().endsWith('.zip')) {
-          droppedItems.push(createImportItem('zip', filePath, file.name || getNameFromPath(filePath), index))
-          continue
-        }
-
-        droppedItems.push({
-          ...createImportItem('zip', filePath, file.name || getNameFromPath(filePath), index, 'error'),
-          error: t('settings.skills.invalidFormat')
-        })
-      }
-
-      if (droppedItems.length === 0) return
-
-      const installingKey = droppedItems.some((item) => item.kind === 'zip') ? 'zip' : 'directory'
-      await runImportQueue(droppedItems, installingKey)
-    } catch (e) {
-      setStatus({ kind: 'error', message: getInstallErrorMessage(e) })
-    }
+    await runImportQueue(droppedItems)
   }
 
   return (
@@ -262,7 +205,7 @@ export function ImportSkillDialog({ open, onOpenChange }: Props) {
         {/* Body */}
         <div className="min-w-0">
           <Dropzone
-            disabled={Boolean(installing)}
+            disabled={installing}
             getFilesFromEvent={async (event) => {
               if ('dataTransfer' in event && event.dataTransfer) {
                 return Array.from(event.dataTransfer.files)
@@ -299,19 +242,10 @@ export function ImportSkillDialog({ open, onOpenChange }: Props) {
               variant="outline"
               size="sm"
               onClick={() => void handleZipPick()}
-              disabled={Boolean(installing)}
+              disabled={installing}
               className="shrink-0">
-              {installing === 'zip' ? <Loader2 size={12} className="animate-spin" /> : <Import size={12} />}
+              {installing ? <Loader2 size={12} className="animate-spin" /> : <Import size={12} />}
               <span>{t('settings.skills.installFromZip')}</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void handleDirPick()}
-              disabled={Boolean(installing)}
-              className="shrink-0">
-              {installing === 'directory' ? <Loader2 size={12} className="animate-spin" /> : <Import size={12} />}
-              <span>{t('settings.skills.installFromDirectory')}</span>
             </Button>
           </div>
 

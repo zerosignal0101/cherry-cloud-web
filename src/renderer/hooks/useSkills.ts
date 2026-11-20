@@ -424,32 +424,35 @@ export function useSkillInstall() {
   )
 
   const installFromZip = useCallback(
-    async (zipFilePath: string): Promise<InstalledSkill | null> => {
+    async (file: File): Promise<InstalledSkill | null> => {
       beginInstalling('zip')
       try {
-        const skill = unwrapSkillResult(await ipcApi.request('skill.install_from_zip', { zipFilePath }))
+        // The browser cannot hand a host path to the main process. The archive
+        // is uploaded as multipart and installed server-side under `DATA_DIR/Skills`.
+        const body = new FormData()
+        body.append('file', file, file.name)
+        const response = await fetch('/api/skills/install', {
+          method: 'POST',
+          body,
+          credentials: 'same-origin'
+        })
+        if (!response.ok) {
+          let message = `Skill install failed (HTTP ${response.status})`
+          try {
+            const payload = (await response.json()) as { error?: unknown }
+            if (typeof payload.error === 'string' && payload.error) message = payload.error
+          } catch {
+            // A non-JSON error body keeps the HTTP status message.
+          }
+          throw new Error(message)
+        }
+        const payload = (await response.json()) as { skill: InstalledSkill }
         await refreshSkillsBestEffort(invalidate)
-        return skill
+        return payload.skill
       } catch (error) {
         logAndRethrowSkillMutationError('install skill from zip', error)
       } finally {
         finishInstalling('zip')
-      }
-    },
-    [beginInstalling, finishInstalling, invalidate]
-  )
-
-  const installFromDirectory = useCallback(
-    async (directoryPath: string): Promise<InstalledSkill | null> => {
-      beginInstalling('directory')
-      try {
-        const skill = unwrapSkillResult(await ipcApi.request('skill.install_from_directory', { directoryPath }))
-        await refreshSkillsBestEffort(invalidate)
-        return skill
-      } catch (error) {
-        logAndRethrowSkillMutationError('install skill from directory', error)
-      } finally {
-        finishInstalling('directory')
       }
     },
     [beginInstalling, finishInstalling, invalidate]
@@ -463,5 +466,5 @@ export function useSkillInstall() {
     [installingCounts]
   )
 
-  return { installingKey, isInstalling, install, installFromZip, installFromDirectory }
+  return { installingKey, isInstalling, install, installFromZip }
 }

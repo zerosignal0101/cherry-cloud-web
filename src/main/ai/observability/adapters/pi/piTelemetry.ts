@@ -46,7 +46,10 @@ function attributes(values: SpanAttributes = {}) {
   return Object.fromEntries(
     Object.entries(values)
       .filter(([, value]) => value !== undefined)
-      .map(([key, value]) => [key, typeof value === 'object' ? value.slice() : value])
+      .map(([key, value]) => [
+        key,
+        value !== null && typeof value === 'object' && 'slice' in value ? (value as { slice(): any }).slice() : value
+      ])
   )
 }
 

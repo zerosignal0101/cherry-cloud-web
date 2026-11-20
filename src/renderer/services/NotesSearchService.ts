@@ -1,5 +1,5 @@
 import { loggerService } from '@logger'
-import { flattenTreeToFiles } from '@renderer/services/NotesTreeService'
+import { ipcApi } from '@renderer/ipc'
 import type { NotesTreeNode } from '@renderer/types/note'
 
 const logger = loggerService.withContext('NotesSearchService')
@@ -179,71 +179,48 @@ export function matchFileName(node: NotesTreeNode, keyword: string, caseSensitiv
 }
 
 /**
- * Search all files concurrently
+ * Search all notes through the server.
+ *
+ * The server owns the Markdown files, so it can scan them without the browser
+ * fetching every note. `nodes` is kept in the signature for callers that already
+ * hold the tree; the authoritative file list comes from `DATA_DIR/notes`.
  */
 export async function searchAllFiles(
-  nodes: NotesTreeNode[],
+  _nodes: NotesTreeNode[],
   keyword: string,
   options: SearchOptions = {},
   signal?: AbortSignal
 ): Promise<SearchResult[]> {
+  if (signal?.aborted) return []
   const startTime = performance.now()
-  const CONCURRENCY = 5
-  const results: SearchResult[] = []
 
-  const fileNodes = flattenTreeToFiles(nodes)
+  const { results } = await ipcApi.request('notes.search', {
+    keyword,
+    caseSensitive: options.caseSensitive,
+    useRegex: options.useRegex,
+    maxFileSize: options.maxFileSize,
+    maxMatchesPerFile: options.maxMatchesPerFile,
+    contextLength: options.contextLength,
+    maxResults: 100
+  })
+  if (signal?.aborted) return []
 
+  const mapped: SearchResult[] = results.map((result) => ({
+    id: result.path,
+    name: result.name,
+    type: 'file',
+    treePath: result.treePath,
+    externalPath: result.path,
+    createdAt: result.createdAt,
+    updatedAt: result.updatedAt,
+    matchType: result.matchType,
+    matches: result.matches,
+    score: result.score
+  }))
+
+  const duration = (performance.now() - startTime).toFixed(2)
   logger.debug(
-    `Starting full-text search: keyword="${keyword}", totalFiles=${fileNodes.length}, options=${JSON.stringify(options)}`
+    `Full-text search completed: keyword="${keyword}", duration=${duration}ms, resultsFound=${mapped.length}`
   )
-
-  const queue = [...fileNodes]
-
-  const worker = async () => {
-    while (queue.length > 0) {
-      if (signal?.aborted) {
-        break
-      }
-
-      const node = queue.shift()
-      if (!node) break
-
-      const nameMatch = matchFileName(node, keyword, options.caseSensitive)
-      const contentResult = await searchFileContent(node, keyword, options)
-
-      if (nameMatch && contentResult) {
-        results.push({
-          ...contentResult,
-          matchType: 'both',
-          score: contentResult.score + 100
-        })
-      } else if (nameMatch) {
-        results.push({
-          ...node,
-          matchType: 'filename',
-          matches: [],
-          score: 100
-        })
-      } else if (contentResult) {
-        results.push(contentResult)
-      }
-    }
-  }
-
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, fileNodes.length) }, () => worker()))
-
-  const sortedResults = results.sort((a, b) => b.score - a.score)
-
-  const endTime = performance.now()
-  const duration = (endTime - startTime).toFixed(2)
-
-  logger.debug(
-    `Full-text search completed: keyword="${keyword}", duration=${duration}ms, ` +
-      `totalFiles=${fileNodes.length}, resultsFound=${sortedResults.length}, ` +
-      `filenameMatches=${sortedResults.filter((r) => r.matchType === 'filename').length}, ` +
-      `contentMatches=${sortedResults.filter((r) => r.matchType === 'content').length}, ` +
-      `bothMatches=${sortedResults.filter((r) => r.matchType === 'both').length}`
-  )
-
-  return sortedResults
+  return mapped
 }

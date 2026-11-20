@@ -9,7 +9,6 @@ import type { SessionListItem } from '@renderer/utils/chat/sessionListHelpers'
 import { formatErrorMessageWithPrefix } from '@renderer/utils/error'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 import { AGENT_WORKSPACE_TYPE, type AgentSessionWorkspaceSource } from '@shared/data/api/schemas/agentWorkspaces'
-import { AbsoluteFilePathSchema } from '@shared/types/file'
 
 import type { CreateAgentSessionDefaults } from '../../types'
 import type { useOptionalAgentFileNavigation } from '../AgentRightPane'
@@ -43,9 +42,9 @@ export function useSessionCreation({
   const [creatingSession, setCreatingSession] = useState(false)
   const findOrCreateWorkspace = useCallback(
     async (workspacePath: string) => {
-      const workspace = await ipcApi.request('ai.agent.workspace.register', {
-        path: AbsoluteFilePathSchema.parse(workspacePath)
-      })
+      // Workspace paths arriving from a session are already logical
+      // (`/workspaces/<id>`); the server resolves them inside its sandbox.
+      const workspace = await ipcApi.request('ai.agent.workspace.register', { path: workspacePath })
       await invalidate('/agent-workspaces')
       return workspace
     },

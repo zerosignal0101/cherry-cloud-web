@@ -412,6 +412,57 @@ async function listDirectoryWithRipgrep(resolvedPath: string, options: ResolvedO
 }
 
 /**
+ * Filesystem fallback for hosts without the bundled ripgrep binary (the web
+ * server does not ship `cherry.bin`). It mirrors the list/search contract the
+ * ripgrep path implements so the notes and artifact trees keep working.
+ */
+async function listDirectoryWithNodeFs(resolvedPath: string, options: ResolvedOptions): Promise<string[]> {
+  const files: string[] = []
+  const directories: string[] = []
+
+  const walk = async (directory: string, depth: number): Promise<void> => {
+    if (files.length + directories.length >= options.maxEntries) return
+    if (!options.recursive && depth > 0) return
+    if (options.maxDepth > 0 && depth >= options.maxDepth) return
+
+    const entries = await fs.promises.readdir(directory, { withFileTypes: true })
+    for (const entry of entries) {
+      if (files.length + directories.length >= options.maxEntries) return
+      if (!options.includeHidden && entry.name.startsWith('.')) continue
+      if (EXCLUDED_DIRS.has(entry.name)) continue
+      const fullPath = path.join(directory, entry.name).replace(/\\/g, '/')
+      if (entry.isDirectory()) {
+        if (options.includeDirectories) directories.push(fullPath)
+        await walk(fullPath, depth + 1)
+      } else if (entry.isFile() && options.includeFiles) {
+        files.push(fullPath)
+      }
+    }
+  }
+
+  await walk(resolvedPath, 0)
+
+  const pattern = options.searchPattern
+  if (options.fuzzy && pattern && pattern !== '.') {
+    const [scoredFiles, scoredDirectories] = [
+      scoreFuzzyPaths(files, resolvedPath, pattern, false),
+      scoreFuzzyPaths(directories, resolvedPath, pattern, true)
+    ]
+    return [...scoredFiles, ...scoredDirectories]
+      .sort(compareScoredSearchEntries)
+      .slice(0, options.maxEntries)
+      .map((entry) => entry.path)
+  }
+
+  const sortNames = (a: string, b: string) => path.basename(a).localeCompare(path.basename(b))
+  const filter = (entry: string) =>
+    !pattern || pattern === '.' || path.basename(entry).toLowerCase().includes(pattern.toLowerCase())
+  const orderedDirectories = directories.filter(filter).sort(sortNames)
+  const orderedFiles = files.filter(filter).sort(sortNames)
+  return [...orderedDirectories, ...orderedFiles].slice(0, options.maxEntries)
+}
+
+/**
  * List contents of a directory, with optional fuzzy / glob search.
  *
  * Returns a flat array of forward-slash-normalized paths. In list mode the
@@ -439,7 +490,7 @@ export async function listDirectory(
   }
 
   if (mergedOptions.includeFiles && !(await resolveRipgrepBinary())) {
-    throw new Error('Ripgrep binary not available')
+    return listDirectoryWithNodeFs(resolvedPath, mergedOptions)
   }
 
   return listDirectoryWithRipgrep(resolvedPath, mergedOptions)

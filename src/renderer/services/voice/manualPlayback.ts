@@ -54,7 +54,7 @@ function showPlaybackError(error: unknown): void {
     title,
     action: {
       label: i18n.t('settings.voice.action.open_settings'),
-      onClick: () => openSettingsTab('/settings/voice')
+      onClick: () => openSettingsTab('/settings/general')
     }
   })
 }

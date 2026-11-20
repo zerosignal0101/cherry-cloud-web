@@ -138,7 +138,7 @@ vi.mock('react-i18next', () => ({
   })
 }))
 
-vi.mock('react-spinners/BeatLoader', () => ({
+vi.mock('react-spinners', () => ({
   default: () => <div data-testid="beat-loader" />
 }))
 

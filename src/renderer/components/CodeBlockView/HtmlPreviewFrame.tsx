@@ -4,9 +4,14 @@ import { memo, type Ref } from 'react'
 
 export const HTML_PREVIEW_DEFAULT_BASE_URL = 'about:srcdoc'
 
-// Interactive artifact sandbox — scripts run same-origin with the app. Only for surfaces
+// Interactive artifact sandbox — scripts run in an opaque origin. Only for surfaces
 // where running scripts is explicitly consented; pass it explicitly, never rely on defaults.
-// `allow-same-origin` keeps screenshot capture able to read the iframe's `contentDocument`.
+// `allow-same-origin` is deliberately absent: the web app exposes `window.api` on its own
+// origin, so a same-origin artifact could reach the authenticated RPC bridge. An opaque
+// origin still permits scripts, forms and self-contained network requests.
+export const HTML_PREVIEW_INTERACTIVE_SANDBOX = 'allow-scripts allow-forms allow-modals'
+
+/** @deprecated Desktop-only same-origin sandbox; kept for upstream copies that still reference it. */
 export const HTML_PREVIEW_IFRAME_SANDBOX = 'allow-scripts allow-same-origin allow-forms'
 
 // Fully-restricted sandbox, and the component default. An empty `sandbox`

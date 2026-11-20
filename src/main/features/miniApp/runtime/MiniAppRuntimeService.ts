@@ -7,6 +7,7 @@
  */
 
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 import { eq } from 'drizzle-orm'
 import { session, webContents } from 'electron'
@@ -258,7 +259,10 @@ export class MiniAppRuntimeService extends BaseService {
    */
   // `.js`, not `.mjs` — `will-attach-webview` compares this string for equality, so a
   // wrong extension is a webview that silently refuses to attach.
-  readonly bridgePreloadPath = path.join(__dirname, '../preload/miniAppBridge.js')
+  readonly bridgePreloadPath = path.join(
+    typeof __dirname === 'string' ? __dirname : path.dirname(fileURLToPath(import.meta.url)),
+    '../preload/miniAppBridge.js'
+  )
 
   /**
    * `did-attach-webview` fires before navigation, so `contents.getURL()` is empty

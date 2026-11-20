@@ -8,10 +8,7 @@ import type { ToolLauncherApi } from '@renderer/components/composer/tools/types'
 import { pickBrowserFiles } from '@renderer/ipc/webFile'
 import { toast } from '@renderer/services/toast'
 import { getFileExtension } from '@renderer/utils/file'
-import {
-  type ComposerAttachment,
-  toComposerAttachmentFromFile
-} from '@renderer/utils/message/composerAttachment'
+import { type ComposerAttachment, toComposerAttachmentFromFile } from '@renderer/utils/message/composerAttachment'
 
 interface Props {
   launcher: ToolLauncherApi
@@ -49,7 +46,10 @@ const useAttachmentToolController = ({ launcher, couldAddImageFile, extensions, 
         }
         const supportedFiles = _files.filter((file) => extensions.includes(getFileExtension(file.name)))
         if (supportedFiles.length > 0) {
-          setFiles((currentFiles) => [...currentFiles, ...supportedFiles.map((file) => toComposerAttachmentFromFile(file))])
+          setFiles((currentFiles) => [
+            ...currentFiles,
+            ...supportedFiles.map((file) => toComposerAttachmentFromFile(file))
+          ])
         }
 
         if (supportedFiles.length !== _files.length) {

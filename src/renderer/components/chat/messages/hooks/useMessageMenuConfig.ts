@@ -28,7 +28,9 @@ export function useMessageMenuConfig(): MessageMenuConfig {
       enableDeveloperMode,
       exportMenuOptions: {
         ...defaultMessageMenuExportOptions,
-        ...exportMenuOptions
+        ...exportMenuOptions,
+        // No local Obsidian vault is reachable from the server.
+        obsidian: false
       }
     }),
     [confirmDeleteMessage, enableDeveloperMode, exportMenuOptions]

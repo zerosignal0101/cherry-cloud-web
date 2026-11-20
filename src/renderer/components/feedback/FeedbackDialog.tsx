@@ -1,4 +1,4 @@
-import { Bot, ChevronRight, FileArchive, Github, Mail } from 'lucide-react'
+import { Bot, ChevronRight, Github, Mail } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -16,7 +16,6 @@ import {
   ItemTitle
 } from '@cherrystudio/ui'
 import { loggerService } from '@logger'
-import { DoctorPopup } from '@renderer/components/doctor'
 import { ipcApi } from '@renderer/ipc'
 import { openRoute } from '@renderer/services/mainWindowNavigation'
 import { toast } from '@renderer/services/toast'
@@ -113,16 +112,6 @@ export function FeedbackDialog({ open, onOpenChange }: FeedbackDialogProps) {
         </DialogHeader>
 
         <ItemGroup className="min-h-0 gap-3 overflow-y-auto px-2">
-          <FeedbackOption
-            icon={<FileArchive className="size-5" />}
-            title={t('settings.about.feedback.diagnostics.title')}
-            description={t('settings.about.feedback.diagnostics.description')}
-            onSelect={() =>
-              selectOption(async () => {
-                await DoctorPopup.show({ initialPanel: 'report' })
-              })
-            }
-          />
           <FeedbackOption
             icon={<Bot className="size-5" />}
             title={t('settings.about.feedback.agent.title')}

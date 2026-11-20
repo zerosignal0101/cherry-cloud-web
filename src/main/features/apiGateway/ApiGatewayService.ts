@@ -464,7 +464,7 @@ export class ApiGatewayService extends BaseService implements Activatable {
   }) {
     const headers = new Headers()
     for (const [name, value] of Object.entries(input.headers ?? {})) {
-      if (value !== null) headers.set(name, value)
+      if (typeof value === 'string') headers.set(name, value)
     }
     const sessionId = headers.get(AGENT_SESSION_ID_HEADER)?.trim() || input.sessionId
     const key = headers.get(AGENT_USAGE_CAPTURE_HEADER)

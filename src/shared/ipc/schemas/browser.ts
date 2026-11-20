@@ -5,6 +5,15 @@ import { defineRoute } from '../define'
 import { BrowserImportOptionsSchema, BrowserImportResultSchema, BrowserImportSourceSchema } from './browserImport'
 
 export const browserRequestSchemas = {
+  /** Record a visit from the standalone iframe browser (no Chromium webview history). */
+  'browser.visit.record': defineRoute({
+    input: z.strictObject({
+      url: z.url(),
+      title: z.string().max(1_000),
+      visitedAt: z.number().int().nonnegative()
+    }),
+    output: z.void()
+  }),
   'browser.import.sources': defineRoute({ input: z.void(), output: z.array(BrowserImportSourceSchema) }),
   'browser.import.run': defineRoute({ input: BrowserImportOptionsSchema, output: BrowserImportResultSchema }),
   'browser.data.clear': defineRoute({

@@ -190,10 +190,7 @@ export class ReadableContentService {
     })
   }
 
-  private async runInline(
-    input: ReadableContentWorkerInput,
-    signal: AbortSignal
-  ): Promise<ReadableContentResult> {
+  private async runInline(input: ReadableContentWorkerInput, signal: AbortSignal): Promise<ReadableContentResult> {
     if (signal.aborted) {
       throw getAbortReason(signal)
     }

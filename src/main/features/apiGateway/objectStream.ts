@@ -34,7 +34,7 @@ export function createGatewayObjectTransports(config: {
       )
       return {
         ...response,
-        events: mapEvents(response.events, (event) =>
+        events: mapEvents(response.events, (event: any) =>
           event.type === 'message_delta'
             ? {
                 ...event,
@@ -154,7 +154,7 @@ export function createGatewayObjectTransports(config: {
       )
       return {
         ...response,
-        events: mapEvents(response.events, (event) => Object.assign(new GenerateContentResponse(), event))
+        events: mapEvents(response.events, (event: any) => Object.assign(new GenerateContentResponse(), event))
       }
     }
   }

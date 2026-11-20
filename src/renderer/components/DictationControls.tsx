@@ -159,7 +159,7 @@ export function DictationControls({
             <Trash2 className="size-4" />
           </Button>
           {snapshot.error && SETTINGS_RECOVERY_ERRORS.has(snapshot.error) && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => openSettingsTab('/settings/voice')}>
+            <Button type="button" variant="ghost" size="sm" onClick={() => openSettingsTab('/settings/general')}>
               {t('settings.voice.action.open_settings')}
             </Button>
           )}

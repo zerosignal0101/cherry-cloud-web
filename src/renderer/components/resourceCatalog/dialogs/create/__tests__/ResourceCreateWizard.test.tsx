@@ -237,7 +237,7 @@ function expectDefaults(kind: ResourceCreateWizardKind, name = '') {
   expect(screen.getByTestId('draft-prompt')).toBeEmptyDOMElement()
   expect(screen.getByTestId('knowledge-ids').textContent).toBe('[]')
   expect(screen.getByTestId('knowledge-count')).toHaveTextContent('0')
-  expect(screen.getByTestId('agent-type')).toHaveTextContent(kind === 'agent' ? 'pi-durable' : 'claude-code')
+  expect(screen.getByTestId('agent-type')).toHaveTextContent(kind === 'agent' ? 'pi' : 'claude-code')
   expect(screen.getByTestId('permission-mode')).toHaveTextContent('auto')
 }
 
@@ -314,7 +314,7 @@ describe('ResourceCreateWizard', () => {
       avatar: '👨‍💼',
       description: 'Plan products',
       prompt: 'Keep this prompt\n{{language}}',
-      agentType: 'pi-durable',
+      agentType: 'pi',
       permissionMode: 'auto',
       modelId: 'provider::default',
       skillIds: [],
@@ -553,12 +553,12 @@ describe('ResourceCreateWizard', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
 
-  it.each(['pi-durable', 'pi', 'claude-code'] as const)('submits the selected %s agent runtime', async (runtime) => {
+  it.each(['pi', 'pi-durable', 'claude-code'] as const)('submits the selected %s agent runtime', async (runtime) => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     render(<ResourceCreateWizard kind="agent" open onOpenChange={vi.fn()} onSubmit={onSubmit} />)
 
-    if (runtime !== 'pi-durable') {
+    if (runtime !== 'pi') {
       await user.click(screen.getByRole('button', { name: `switch to ${runtime}` }))
     }
     await user.click(screen.getByRole('button', { name: 'fill basic' }))
@@ -570,7 +570,7 @@ describe('ResourceCreateWizard', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ agentType: runtime, permissionMode: 'auto' }))
   })
 
-  it('restores Pi Durable and its permission default after canceling and reopening', async () => {
+  it('restores the default Pi runtime and its permission default after canceling and reopening', async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn()
     const onOpenChange = vi.fn()
@@ -590,7 +590,7 @@ describe('ResourceCreateWizard', () => {
     await user.click(screen.getByRole('button', { name: NEXT }))
     await user.click(screen.getByRole('button', { name: CREATE }))
 
-    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ agentType: 'pi-durable', permissionMode: 'auto' }))
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ agentType: 'pi', permissionMode: 'auto' }))
   })
 
   it('does not render an invalid step when a closed agent wizard falls back to assistant kind', async () => {

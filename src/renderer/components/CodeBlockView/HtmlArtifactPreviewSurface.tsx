@@ -1,4 +1,3 @@
-import type { ConsoleMessageEvent, WebviewTag } from 'electron'
 import { memo, type RefObject, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import {
@@ -9,12 +8,12 @@ import {
   VERTICAL_SCROLLABLE_OVERFLOW_PATTERN_SOURCE
 } from '@renderer/components/chat/messages/list/ScrollOwnershipContext'
 import HtmlPreviewFrame, {
+  HTML_PREVIEW_INTERACTIVE_SANDBOX,
   HTML_PREVIEW_RESTRICTED_CSP,
   injectHtmlPreviewHeadElement,
   injectHtmlPreviewScrollbarGutter
 } from '@renderer/components/CodeBlockView/HtmlPreviewFrame'
 import { htmlArtifactRequiresUserConsent, stripMetaRefresh } from '@renderer/utils/htmlArtifact'
-import { HTML_ARTIFACT_PREVIEW_DATA_URL_PREFIX, HTML_ARTIFACT_PREVIEW_PARTITION } from '@shared/utils/htmlArtifact'
 
 export const SCROLL_ACTIVATION_DELAY_MS = 300
 const MAX_PREVIEW_VIEWPORT_HEIGHT_RATIO = 0.72
@@ -38,7 +37,11 @@ export function htmlArtifactPreviewRequiresInteractive(html: string): boolean {
 
 function getHtmlArtifactBridgeScript(messagePrefix: string, scrollActivationDelay: number): string {
   return `(() => {
-    const sendConsoleMessage = console.debug.bind(console)
+    const postToParent = (message) => {
+      try {
+        parent.postMessage(message, '*')
+      } catch {}
+    }
     document.currentScript?.remove()
     let scrollbarRoot = null
     const applyScrollbarGutter = () => {
@@ -56,7 +59,7 @@ function getHtmlArtifactBridgeScript(messagePrefix: string, scrollActivationDela
       applyScrollbarGutter()
     }
     const send = (type, value) => {
-      sendConsoleMessage(${JSON.stringify(messagePrefix)} + JSON.stringify({ type, value }))
+      postToParent(${JSON.stringify(messagePrefix)} + JSON.stringify({ type, value }))
     }
     let lastReportedHeight = -1
     const scrollableOverflowPattern = new RegExp(${JSON.stringify(
@@ -215,25 +218,26 @@ export const InteractiveHtmlPreview = memo(function InteractiveHtmlPreview({
   forwardBoundaryWheel?: boolean
 }) {
   const viewportRef = useRef<HTMLDivElement>(null)
-  const webviewRef = useRef<WebviewTag | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const contentHeightRef = useRef<number | null>(null)
   const scrollRuntime = useScrollRuntimeBoundary()
   const zoomScale = zoom / 100
   const [messagePrefix] = useState(() => `__cherry_html_artifact_${crypto.randomUUID()}:`)
-  const src = useMemo(() => {
+  const srcDoc = useMemo(() => {
     const scrollActivationDelay = forwardBoundaryWheel ? SCROLL_ACTIVATION_DELAY_MS : 0
     const bridgeScript = `<script>${getHtmlArtifactBridgeScript(messagePrefix, scrollActivationDelay)}</script>`
-    const instrumentedHtml = injectHtmlPreviewHeadElement(injectHtmlPreviewScrollbarGutter(html), bridgeScript)
-    return `${HTML_ARTIFACT_PREVIEW_DATA_URL_PREFIX}${encodeURIComponent(instrumentedHtml)}`
+    return injectHtmlPreviewHeadElement(injectHtmlPreviewScrollbarGutter(html), bridgeScript)
   }, [forwardBoundaryWheel, html, messagePrefix])
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current
-    const webview = webviewRef.current
-    if (!viewport || !webview) return
+    if (!viewport) return
 
-    const handleConsoleMessage = (event: ConsoleMessageEvent) => {
-      const message = parseHtmlArtifactBridgeMessage(event.message, messagePrefix)
+    const handleMessage = (event: MessageEvent) => {
+      // The artifact runs in an opaque origin, so `source` is the only reliable
+      // proof that the report came from our frame rather than another tab.
+      if (event.source !== iframeRef.current?.contentWindow || typeof event.data !== 'string') return
+      const message = parseHtmlArtifactBridgeMessage(event.data, messagePrefix)
       if (!message) return
 
       if (message.type === 'height') {
@@ -253,10 +257,10 @@ export const InteractiveHtmlPreview = memo(function InteractiveHtmlPreview({
       routeWheelScroll(viewport, scrollRuntime, message.value)
     }
 
-    webview.addEventListener('console-message', handleConsoleMessage)
+    window.addEventListener('message', handleMessage)
 
     return () => {
-      webview.removeEventListener('console-message', handleConsoleMessage)
+      window.removeEventListener('message', handleMessage)
     }
   }, [forwardBoundaryWheel, messagePrefix, onHeightChange, scrollRuntime, zoomScale])
 
@@ -282,13 +286,13 @@ export const InteractiveHtmlPreview = memo(function InteractiveHtmlPreview({
           height: `${100 / zoomScale}%`,
           transform: `scale(${zoomScale})`
         }}>
-        <webview
-          ref={webviewRef}
-          data-testid="interactive-html-webview"
-          src={src}
-          partition={HTML_ARTIFACT_PREVIEW_PARTITION}
-          aria-label={title}
-          className="inline-flex h-full w-full bg-white"
+        <iframe
+          ref={iframeRef}
+          data-testid="interactive-html-iframe"
+          srcDoc={srcDoc}
+          title={title}
+          sandbox={HTML_PREVIEW_INTERACTIVE_SANDBOX}
+          className="h-full w-full border-0 bg-white"
         />
       </div>
     </div>
@@ -298,10 +302,12 @@ export const InteractiveHtmlPreview = memo(function InteractiveHtmlPreview({
 /**
  * Two-tier preview surface for model-generated HTML.
  *
- * - inert content (no scripts/embeds) renders in the script-less same-origin frame
+ * - inert content (no scripts/embeds) renders in the script-less frame
  *   (safe by construction: no scripts run, so `parent.api` is unreachable).
- * - active content — fragment or document — renders in the hardened `<webview>`
- *   partition instead: scripts run, but without the preload bridge.
+ * - active content — fragment or document — renders in an opaque-origin sandboxed
+ *   iframe with `allow-scripts`. Scripts run, but without same-origin access to the
+ *   authenticated application window; a small injected bridge reports height and
+ *   wheel deltas back to the parent via `postMessage`.
  *
  * Consent contract: the interactive tier activates only when `authorized` is true —
  * never by mounting. Pass it true solely as the result of a semantically explicit user

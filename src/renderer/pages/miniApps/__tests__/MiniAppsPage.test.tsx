@@ -184,7 +184,7 @@ vi.mock('@renderer/components/MarqueeText', () => ({
   default: ({ children }: React.PropsWithChildren) => <span>{children}</span>
 }))
 
-vi.mock('react-spinners/BeatLoader', () => ({
+vi.mock('react-spinners', () => ({
   default: () => <div data-testid="beat-loader" />
 }))
 

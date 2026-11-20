@@ -23,7 +23,6 @@ const ExportMenuOptions: FC = () => {
     notion: 'data.export.menus.notion',
     yuque: 'data.export.menus.yuque',
     joplin: 'data.export.menus.joplin',
-    obsidian: 'data.export.menus.obsidian',
     siyuan: 'data.export.menus.siyuan',
     docx: 'data.export.menus.docx',
     plain_text: 'data.export.menus.plain_text'
@@ -88,15 +87,6 @@ const ExportMenuOptions: FC = () => {
       <SettingRow>
         <SettingRowTitle>{t('settings.data.export_menu.yuque')}</SettingRowTitle>
         <Switch checked={exportMenuOptions.yuque} onCheckedChange={(checked) => handleToggleOption('yuque', checked)} />
-      </SettingRow>
-      <SettingDivider />
-
-      <SettingRow>
-        <SettingRowTitle>{t('settings.data.export_menu.obsidian')}</SettingRowTitle>
-        <Switch
-          checked={exportMenuOptions.obsidian}
-          onCheckedChange={(checked) => handleToggleOption('obsidian', checked)}
-        />
       </SettingRow>
       <SettingDivider />
 

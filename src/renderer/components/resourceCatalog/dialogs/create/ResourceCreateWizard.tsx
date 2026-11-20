@@ -6,7 +6,6 @@ import { Button, Dialog, DialogContent, DialogTitle, Form, MenuItem, ScrollArea 
 import { cn } from '@cherrystudio/ui/lib/utils'
 import { type ModelSelectorFilter } from '@renderer/components/ModelSelector'
 import { useAgentModelFilter } from '@renderer/hooks/agent/useAgentModelFilter'
-import { useIsCherryCloudModelSelectable } from '@renderer/hooks/cherryCloud/useIsCherryCloudModelSelectable'
 import { useDefaultModel, useModels } from '@renderer/hooks/useModel'
 import { useProviderById } from '@renderer/hooks/useProvider'
 import { AGENT_RUNTIME_CAPABILITIES } from '@shared/ai/agentRuntimeCapabilities'
@@ -50,7 +49,9 @@ function getDefaultValues(
   initialName = '',
   initialValues: ResourceCreateWizardProps['initialValues'] = {}
 ): ResourceCreateWizardFormValues {
-  const agentType = kind === 'agent' ? 'pi-durable' : 'claude-code'
+  // The web build registers the in-process Pi runtime only. `pi-durable` and
+  // `claude-code` need desktop-only packages/binaries, so new agents start on Pi.
+  const agentType = kind === 'agent' ? 'pi' : 'claude-code'
   return {
     avatar: getResourceCreateDefaultAvatar(kind),
     name: initialName,
@@ -151,7 +152,6 @@ export function ResourceCreateWizard({
   const agentType = form.watch('agentType')
   const agentModelFilter = useAgentModelFilter(kind === 'agent' ? agentType : undefined)
   const activeModelFilter = kind === 'agent' ? agentModelFilter : modelFilter
-  const isModelSelectable = useIsCherryCloudModelSelectable({ includeAgentOnlyModels: kind === 'agent', enabled: open })
   const { models: availableModels } = useModels({ enabled: true }, { fetchEnabled: open })
   const { defaultModel } = useDefaultModel({ enabled: open })
   const { provider: defaultModelProvider } = useProviderById(open ? defaultModel?.providerId : undefined)
@@ -160,8 +160,7 @@ export function ResourceCreateWizard({
     defaultModel?.isEnabled &&
     availableModels.some((model) => model.id === defaultModel.id) &&
     defaultModelProvider?.isEnabled &&
-    (!activeModelFilter || activeModelFilter(defaultModel, defaultModelProvider)) &&
-    isModelSelectable(defaultModel)
+    (!activeModelFilter || activeModelFilter(defaultModel, defaultModelProvider))
       ? defaultModel.id
       : null
   const autoSelectedDefaultModelIdRef = useRef<UniqueModelId | null>(null)

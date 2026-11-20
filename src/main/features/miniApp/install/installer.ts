@@ -305,7 +305,7 @@ export async function installExtracted(
   // After the commit, outside the lock. Installing is an IpcApi write DataApi never
   // sees — without this signal the launcher's `/mini-apps` query keeps yesterday's list.
   notifyDataApiDataChange([{ endpoint: '/mini-apps', kind: reinstall ? 'projection' : 'membership' }])
-  return app
+  return app as LocalMiniApp
 }
 
 /**

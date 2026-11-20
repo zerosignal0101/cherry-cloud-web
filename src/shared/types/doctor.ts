@@ -411,7 +411,6 @@ export type DoctorSubjectFor<Id extends DoctorCheckId> =
 export type DoctorNavigateTarget =
   | '/settings/about'
   | '/settings/data'
-  | '/settings/dependencies'
   | '/settings/general'
   | '/settings/mcp'
   | '/settings/provider'

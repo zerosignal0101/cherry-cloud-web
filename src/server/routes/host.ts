@@ -1,9 +1,9 @@
 import type { RouteDef } from '@shared/ipc/define'
 import { appRequestSchemas } from '@shared/ipc/schemas/app'
-import { backupRequestSchemas } from '@shared/ipc/schemas/backup'
 import { navigationRequestSchemas } from '@shared/ipc/schemas/navigation'
 import { windowRequestSchemas } from '@shared/ipc/schemas/window'
 import type { IpcHandlersFor } from '@shared/ipc/types'
+import { NOTES_ROOT_PATH } from '@shared/types/note'
 
 import type { RpcRegistry } from '../transport/registry'
 
@@ -11,17 +11,16 @@ import type { RpcRegistry } from '../transport/registry'
  * Desktop-only IpcApi routes that the still-shared renderer calls on boot.
  *
  * They describe a host the browser does not have — OS paths, a fullscreen flag on
- * a native window, per-window init data, auto-backup notifications. Answering them
- * with web-neutral values keeps `useWindowRuntime` and the window-scoped hosts from
- * throwing on an unimplemented route; each stub is only valid while the caller
- * tolerates the neutral answer, so extend this list one route at a time.
+ * a native window, per-window init data. Answering them with web-neutral values
+ * keeps `useWindowRuntime` and the window-scoped hosts from throwing on an
+ * unimplemented route; each stub is only valid while the caller tolerates the
+ * neutral answer, so extend this list one route at a time.
  */
 const hostSchemas = {
   'app.get_info': appRequestSchemas['app.get_info'],
   'window.is_full_screen': windowRequestSchemas['window.is_full_screen'],
   'window.get_init_data': windowRequestSchemas['window.get_init_data'],
-  'navigation.protocol_dispatch_ready': navigationRequestSchemas['navigation.protocol_dispatch_ready'],
-  'backup.get_auto_sync_state': backupRequestSchemas['backup.get_auto_sync_state']
+  'navigation.protocol_dispatch_ready': navigationRequestSchemas['navigation.protocol_dispatch_ready']
 } satisfies Record<string, RouteDef>
 
 const hostHandlers: IpcHandlersFor<typeof hostSchemas> = {
@@ -35,7 +34,8 @@ const hostHandlers: IpcHandlersFor<typeof hostSchemas> = {
     isPackaged: true,
     appPath: '',
     homePath: '',
-    notesPath: '',
+    // Logical namespace; the server maps it to `DATA_DIR/notes`.
+    notesPath: NOTES_ROOT_PATH,
     configPath: '',
     appDataPath: '',
     resourcesPath: '',
@@ -52,9 +52,7 @@ const hostHandlers: IpcHandlersFor<typeof hostSchemas> = {
   // Windows have no server-side init payload — a tab's state is in its URL.
   'window.get_init_data': async () => null,
 
-  'navigation.protocol_dispatch_ready': async () => {},
-
-  'backup.get_auto_sync_state': async () => ({ pendingNotifications: [] })
+  'navigation.protocol_dispatch_ready': async () => {}
 }
 
 export function registerHostRoutes(registry: RpcRegistry): void {

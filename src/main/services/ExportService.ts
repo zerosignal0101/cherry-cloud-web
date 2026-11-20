@@ -399,32 +399,7 @@ export class ExportService {
         return false
       }
 
-      const [{ default: MarkdownIt }, docx] = await Promise.all([import('markdown-it'), import('docx')])
-      const elements = this.convertMarkdownToDocxElements(markdown, new MarkdownIt(), docx)
-
-      const doc = new docx.Document({
-        styles: {
-          paragraphStyles: [
-            {
-              id: 'Normal',
-              name: 'Normal',
-              run: {
-                size: 24,
-                font: 'Arial'
-              }
-            }
-          ]
-        },
-        sections: [
-          {
-            properties: {},
-            children: elements
-          }
-        ]
-      })
-
-      const buffer = await docx.Packer.toBuffer(doc)
-
+      const buffer = await this.createWordBuffer(markdown)
       await fs.promises.writeFile(filePath, buffer)
       logger.debug('Document exported successfully')
       return true
@@ -432,5 +407,37 @@ export class ExportService {
       logFailure(logger, 'Export to Word failed:', error, 'export.word', classifyFileFailure(error, true))
       throw error
     }
+  }
+
+  /**
+   * Build the same docx bytes without a native save dialog. The web server uses
+   * this and streams the result back to the browser for download.
+   */
+  public createWordBuffer = async (markdown: string): Promise<Buffer> => {
+    const [{ default: MarkdownIt }, docx] = await Promise.all([import('markdown-it'), import('docx')])
+    const elements = this.convertMarkdownToDocxElements(markdown, new MarkdownIt(), docx)
+
+    const doc = new docx.Document({
+      styles: {
+        paragraphStyles: [
+          {
+            id: 'Normal',
+            name: 'Normal',
+            run: {
+              size: 24,
+              font: 'Arial'
+            }
+          }
+        ]
+      },
+      sections: [
+        {
+          properties: {},
+          children: elements
+        }
+      ]
+    })
+
+    return docx.Packer.toBuffer(doc)
   }
 }

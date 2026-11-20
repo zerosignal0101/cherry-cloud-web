@@ -1,11 +1,12 @@
 import dayjs from 'dayjs'
 import { FolderOpen, RefreshCw, Save } from 'lucide-react'
 import type { FC } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button, Input, RowFlex, Switch, WarnTooltip, HelpTooltip } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
+import { loggerService } from '@logger'
 import Selector from '@renderer/components/Selector'
 import {
   SettingDivider,
@@ -18,9 +19,13 @@ import { WebdavBackupManager } from '@renderer/components/WebdavBackupManager'
 import { useWebdavBackupModal, WebdavBackupModal } from '@renderer/components/WebdavModals'
 import { useBackupSyncState } from '@renderer/hooks/useBackupSyncState'
 import { useTheme } from '@renderer/hooks/useTheme'
+import { ipcApi } from '@renderer/ipc'
 import { settingsControlClasses } from '@renderer/pages/settings/settingsStyles'
+import { toast } from '@renderer/services/toast'
 
 const SYNC_STATUS_COLOR = 'var(--muted-foreground)'
+
+const logger = loggerService.withContext('WebDavSettings')
 
 const WebDavSettings: FC = () => {
   const [, setWebdavAutoSync] = usePreference('data.backup.webdav.auto_sync')
@@ -30,11 +35,11 @@ const WebDavSettings: FC = () => {
   const [webdavDisableStream, setWebdavDisableStream] = usePreference('data.backup.webdav.disable_stream')
   const [webdavHost, setWebdavHost] = usePreference('data.backup.webdav.host')
   const [webdavMaxBackups, setWebdavMaxBackups] = usePreference('data.backup.webdav.max_backups')
-  const [webdavPass, setWebdavPass] = usePreference('data.backup.webdav.pass')
   const [webdavPath, setWebdavPath] = usePreference('data.backup.webdav.path')
-  const [webdavSkipBackupFile, setWebdavSkipBackupFile] = usePreference('data.backup.webdav.skip_backup_file')
   const [webdavSyncInterval, setWebdavSyncInterval] = usePreference('data.backup.webdav.sync_interval')
   const [webdavUser, setWebdavUser] = usePreference('data.backup.webdav.user')
+  const [passwordSet, setPasswordSet] = useState(false)
+  const [passwordDraft, setPasswordDraft] = useState('')
 
   const [backupManagerVisible, setBackupManagerVisible] = useState(false)
 
@@ -43,6 +48,37 @@ const WebDavSettings: FC = () => {
   const { t } = useTranslation()
 
   const webdavSync = useBackupSyncState('webdav')
+
+  useEffect(() => {
+    void ipcApi
+      .request('backup.get_secret_status')
+      .then((status) => setPasswordSet(status.webdavPassword))
+      .catch((error) => logger.warn('Failed to read WebDAV credential status', error as Error))
+  }, [])
+
+  const savePassword = async () => {
+    const value = passwordDraft
+    if (!value) return
+    try {
+      await ipcApi.request('backup.set_secret', { key: 'webdav.password', value })
+      setPasswordDraft('')
+      setPasswordSet(true)
+    } catch (error) {
+      logger.error('Failed to save WebDAV password', error as Error)
+      toast.error(t('settings.data.backup.secret.save_failed'))
+    }
+  }
+
+  const clearPassword = async () => {
+    try {
+      await ipcApi.request('backup.clear_secret', { key: 'webdav.password' })
+      setPasswordDraft('')
+      setPasswordSet(false)
+    } catch (error) {
+      logger.error('Failed to clear WebDAV password', error as Error)
+      toast.error(t('settings.data.backup.secret.save_failed'))
+    }
+  }
 
   const onSyncIntervalChange = async (value: number) => {
     await setWebdavSyncInterval(value)
@@ -126,14 +162,24 @@ const WebDavSettings: FC = () => {
       <SettingDivider />
       <SettingRow id="setting-data-webdav-password" className="scroll-mt-6">
         <SettingRowTitle>{t('settings.data.webdav.password')}</SettingRowTitle>
-        <Input
-          type="password"
-          placeholder={t('settings.data.webdav.password')}
-          value={webdavPass}
-          onChange={(e) => setWebdavPass(e.target.value)}
-          className={settingsControlClasses.text}
-          onBlur={() => setWebdavPass(webdavPass || '')}
-        />
+        <RowFlex className="items-center gap-2">
+          <Input
+            type="password"
+            autoComplete="new-password"
+            placeholder={
+              passwordSet ? t('settings.data.backup.secret.saved') : t('settings.data.webdav.password.placeholder')
+            }
+            value={passwordDraft}
+            onChange={(e) => setPasswordDraft(e.target.value)}
+            onBlur={() => void savePassword()}
+            className={settingsControlClasses.text}
+          />
+          {passwordSet && (
+            <Button variant="ghost" onClick={() => void clearPassword()}>
+              {t('settings.data.backup.secret.clear')}
+            </Button>
+          )}
+        </RowFlex>
       </SettingRow>
       <SettingDivider />
       <SettingRow id="setting-data-webdav-path" className="scroll-mt-6">
@@ -150,11 +196,11 @@ const WebDavSettings: FC = () => {
       <SettingRow>
         <SettingRowTitle>{t('settings.general.backup.title')}</SettingRowTitle>
         <RowFlex className="flex-wrap items-center justify-end gap-2">
-          <Button onClick={showBackupModal} disabled={backuping} variant="outline">
+          <Button onClick={showBackupModal} disabled={backuping || !webdavHost || !passwordSet} variant="outline">
             <Save size={14} />
             {t('settings.data.webdav.backup.button')}
           </Button>
-          <Button onClick={showBackupManager} disabled={!webdavHost} variant="outline">
+          <Button onClick={showBackupManager} disabled={!webdavHost || !passwordSet} variant="outline">
             <FolderOpen size={14} />
             {t('settings.data.webdav.restore.button')}
           </Button>
@@ -204,14 +250,6 @@ const WebDavSettings: FC = () => {
       <SettingDivider />
       <SettingRow>
         <SettingRowTitle className="flex items-center gap-1.5">
-          {t('settings.data.backup.skip_file_data_title')}{' '}
-          <HelpTooltip content={t('settings.data.backup.skip_file_data_help')} />
-        </SettingRowTitle>
-        <Switch checked={webdavSkipBackupFile} onCheckedChange={(value) => void setWebdavSkipBackupFile(value)} />
-      </SettingRow>
-      <SettingDivider />
-      <SettingRow>
-        <SettingRowTitle className="flex items-center gap-1.5">
           {t('settings.data.webdav.disableStream.title')}{' '}
           <HelpTooltip content={t('settings.data.webdav.disableStream.help')} />
         </SettingRowTitle>
@@ -254,7 +292,6 @@ const WebDavSettings: FC = () => {
           webdavConfig={{
             webdavHost,
             webdavUser,
-            webdavPass,
             webdavPath,
             webdavDisableStream,
             allowSelfSignedTls: webdavAllowSelfSignedTls

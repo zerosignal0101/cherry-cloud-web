@@ -33,6 +33,8 @@ cherry-cloud-web 是 cherry-studio 的 Web 化分支：服务端持有数据与�
 - `pnpm dev`：并行启动 Vite 与服务端（默认 5173 / 8787）。
 - `pnpm build`：类型检查 + 构建 SPA。
 - `pnpm typecheck` / `pnpm lint` / `pnpm format` / `pnpm test`。
+- `pnpm test:e2e`：构建后用 Playwright 跑桌面 1440×900 与手机 390×844 主路径。
+- 部署、反向代理与备份恢复见 `docs/deployment.md`。
 
 ## 上游同步
 

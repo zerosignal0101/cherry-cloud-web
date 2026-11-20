@@ -353,7 +353,7 @@ export class SkillService {
 
     await validateZipFile(zipFilePath)
     const canonicalZipPath = await fs.promises.realpath(zipFilePath)
-    const sourceUrl = pathToFileURL(canonicalZipPath).href
+    const sourceUrl = options.sourceUrl ?? pathToFileURL(canonicalZipPath).href
     const tempDir = await createTempDir('zip-install')
 
     try {

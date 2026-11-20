@@ -1,8 +1,8 @@
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
 
-import mime from 'mime'
 import type { FastifyInstance } from 'fastify'
+import mime from 'mime'
 
 import { resolvePhysicalPath } from '@main/services/file/utils/pathResolver'
 import { FileEntryIdSchema } from '@shared/data/types/file'
@@ -28,15 +28,17 @@ export async function registerFileRoutes(app: FastifyInstance, options: FileRout
 
     const part = await request.file()
     if (!part) {
-      return reply.code(400).send({ ok: false, error: { code: 'NO_FILE', message: 'Multipart field "file" is required' } })
+      return reply
+        .code(400)
+        .send({ ok: false, error: { code: 'NO_FILE', message: 'Multipart field "file" is required' } })
     }
 
     const data = await part.toBuffer()
     const entry = await storeUploadedFile({ filename: part.filename, data })
 
-    return reply.code(201).send(
-      entryToResponse(entry.id, entry.name, entry.ext, entry.origin === 'internal' ? entry.size : null)
-    )
+    return reply
+      .code(201)
+      .send(entryToResponse(entry.id, entry.name, entry.ext, entry.origin === 'internal' ? entry.size : null))
   })
 
   /**

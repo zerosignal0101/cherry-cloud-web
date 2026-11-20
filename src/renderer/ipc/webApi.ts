@@ -1,3 +1,5 @@
+import type { CacheSyncMessage } from '@shared/data/cache/cacheTypes'
+import { decodeBinary, encodeBinary } from '@shared/ipc/binary'
 import type { SerializedIpcError } from '@shared/ipc/errors/IpcError'
 import { IpcChannel } from '@shared/IpcChannel'
 
@@ -22,7 +24,7 @@ let heartbeatTimer: ReturnType<typeof setInterval> | null = null
  * id (the web equivalent of a WindowId), so it must survive reconnects and be
  * the same value on the RPC request and the WebSocket upgrade.
  */
-function clientId(): string {
+export function getClientId(): string {
   let id = sessionStorage.getItem(CLIENT_ID_KEY)
   if (!id) {
     id = crypto.randomUUID()
@@ -34,7 +36,7 @@ function clientId(): string {
 function websocketUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   // The session cookie authenticates the upgrade; no query-string token exists.
-  return `${protocol}//${window.location.host}/api/ws?client=${encodeURIComponent(clientId())}`
+  return `${protocol}//${window.location.host}/api/ws?client=${encodeURIComponent(getClientId())}`
 }
 
 /** Session expired or missing: send the browser to the login page and stop retrying. */
@@ -91,7 +93,7 @@ function connect(): void {
     }
     if (typeof message !== 'object' || message === null) return
     const frame = message as { type?: string; event?: string; payload?: unknown }
-    if (frame.type === 'event' && typeof frame.event === 'string') dispatch(frame.event, frame.payload)
+    if (frame.type === 'event' && typeof frame.event === 'string') dispatch(frame.event, decodeBinary(frame.payload))
   })
 
   next.addEventListener('close', (event) => {
@@ -113,9 +115,9 @@ async function request(route: string, input?: unknown): Promise<unknown> {
   try {
     response = await fetch('/api/rpc', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-client-id': clientId() },
+      headers: { 'content-type': 'application/json', 'x-client-id': getClientId() },
       credentials: 'same-origin',
-      body: JSON.stringify({ route, input })
+      body: JSON.stringify({ route, input: encodeBinary(input) })
     })
   } catch (error) {
     return transportFailure(error)
@@ -132,7 +134,7 @@ async function request(route: string, input?: unknown): Promise<unknown> {
   }
 
   try {
-    return JSON.parse(text)
+    return decodeBinary(JSON.parse(text))
   } catch {
     return transportFailure(`Malformed response (HTTP ${response.status})`)
   }
@@ -172,7 +174,7 @@ async function dataRequest(request: unknown): Promise<unknown> {
   try {
     response = await fetch('/api/data', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-client-id': clientId() },
+      headers: { 'content-type': 'application/json', 'x-client-id': getClientId() },
       credentials: 'same-origin',
       body: JSON.stringify(request)
     })
@@ -237,6 +239,35 @@ const preference = {
 }
 
 /**
+ * `window.api.cache` — the desktop preload relayed `cache:sync` between
+ * windows. In the browser each tab mirrors the server's shared cache through
+ * one initial snapshot plus deltas; renderer-origin writes go back over RPC.
+ */
+const cache = {
+  getAllShared: async (): Promise<Record<string, { value: unknown; expireAt?: number }>> => {
+    const result = (await request('cache.get_all_shared')) as {
+      ok?: boolean
+      data?: Record<string, { value: unknown; expireAt?: number }>
+      error?: { message?: string }
+    }
+    if (!result?.ok || !result.data) {
+      throw new Error(result?.error?.message ?? 'Failed to load the shared cache')
+    }
+    return result.data
+  },
+  broadcastSync: (message: CacheSyncMessage): void => {
+    void request('cache.sync_shared', {
+      type: message.type,
+      key: message.key,
+      value: message.value,
+      expireAt: message.expireAt
+    }).catch(() => {})
+  },
+  onSync: (callback: (message: CacheSyncMessage) => void): (() => void) =>
+    on(IpcChannel.Cache_Sync, (payload) => callback(payload as CacheSyncMessage))
+}
+
+/**
  * `window.electron` — `@electron-toolkit/preload` on desktop. The renderer still
  * reads `process.env` for log levels and platform branches, and a few desktop
  * call sites invoke channels that have no server counterpart (log forwarding,
@@ -246,7 +277,7 @@ const preference = {
 function installElectronShim(): void {
   if (window.electron) return
   const noop = (): void => {}
-  const noopUnsubscribe = (): void => {}
+  const noopUnsubscribe = (): (() => void) => noop
   window.electron = {
     ipcRenderer: {
       invoke: async (): Promise<undefined> => undefined,
@@ -270,6 +301,61 @@ function installElectronShim(): void {
   }
 }
 
+/**
+ * `window.api.backup` — the desktop preload forwarded these to the main-process
+ * BackupManager. The web build has one server-side backup engine and keeps the
+ * same method names so the existing settings components stay unchanged.
+ *
+ * Secret values never appear here: the server reads them from SecretService.
+ * Local-directory and Nutstore methods are intentionally absent from the web
+ * product; callers that still reach one get an explicit error rather than a
+ * silent success.
+ */
+const backup = {
+  backupToWebdav: (config?: { fileName?: string }) =>
+    ipcApi.request('backup.backup_to_webdav', { fileName: config?.fileName || undefined }),
+  listWebdavFiles: () => ipcApi.request('backup.list_webdav_files'),
+  deleteWebdavFile: (fileName: string) => ipcApi.request('backup.delete_webdav_file', { fileName }),
+  restoreFromWebdav: (config?: { fileName?: string }) =>
+    ipcApi.request('backup.restore_from_webdav', { fileName: requireFileName(config?.fileName) }),
+  checkWebdavConnection: () => ipcApi.request('backup.check_webdav'),
+
+  backupToS3: (config?: { fileName?: string }) =>
+    ipcApi.request('backup.backup_to_s3', { fileName: config?.fileName || undefined }),
+  listS3Files: () => ipcApi.request('backup.list_s3_files'),
+  deleteS3File: (fileName: string) => ipcApi.request('backup.delete_s3_file', { fileName }),
+  restoreFromS3: (config?: { fileName?: string }) =>
+    ipcApi.request('backup.restore_from_s3', { fileName: requireFileName(config?.fileName) }),
+  checkS3Connection: () => ipcApi.request('backup.check_s3'),
+
+  backup: async (): Promise<never> => {
+    throw new Error('Local file backup is not available in the web build; use WebDAV or S3.')
+  },
+  restore: async (): Promise<never> => {
+    throw new Error('Local file restore is not available in the web build; restore from WebDAV or S3.')
+  },
+  backupToLocalDir: async (): Promise<never> => {
+    throw new Error('Local directory backup is not available in the web build.')
+  },
+  restoreFromLocalBackup: async (): Promise<never> => {
+    throw new Error('Local directory restore is not available in the web build.')
+  },
+  listLocalBackupFiles: async (): Promise<never> => {
+    throw new Error('Local directory backup is not available in the web build.')
+  },
+  deleteLocalBackupFile: async (): Promise<never> => {
+    throw new Error('Local directory backup is not available in the web build.')
+  },
+  createDirectory: async (): Promise<never> => {
+    throw new Error('WebDAV directory browser operations are not available in the web build.')
+  }
+}
+
+function requireFileName(fileName: string | undefined): string {
+  if (!fileName) throw new Error('A backup file name is required')
+  return fileName
+}
+
 /** Installs the browser implementation of the preload bridge. Idempotent. */
 export function installWebApi(): void {
   installElectronShim()
@@ -281,6 +367,8 @@ export function installWebApi(): void {
       onDataChanged: (callback: Listener) => on('data-api:data-changed', callback)
     },
     preference,
-    file: fileApi
+    file: fileApi,
+    cache,
+    backup
   }
 }

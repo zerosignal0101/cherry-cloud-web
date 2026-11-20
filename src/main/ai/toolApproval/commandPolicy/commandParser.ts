@@ -1,6 +1,6 @@
 import path from 'node:path'
 
-import { Language, Parser, type Node } from '@vscode/tree-sitter-wasm'
+import type { Language, Node, Parser } from '@vscode/tree-sitter-wasm'
 
 import { application } from '@application'
 
@@ -58,13 +58,21 @@ const MAX_NODES = 10_000
 const MAX_TREE_DEPTH = 128
 export const MAX_COMMAND_NESTING = 8
 let languages: Record<CommandDialect, Language> | undefined
+let ParserClass: typeof Parser | undefined
 let initialization: Promise<void> | undefined
 
 /** Grammar tables are immutable; each invocation disposes its own parser and syntax tree. A failed load retries. */
 export function initializeCommandParser(): Promise<void> {
   initialization ??= (async () => {
     const assets = application.getPath('feature.agents.command_parser_assets')
-    await Parser.init({ locateFile: (filename: string) => path.join(assets, filename) })
+    // `@vscode/tree-sitter-wasm` is CommonJS. A static named import makes Node's
+    // ESM loader reject the module before the server starts; the parser is only
+    // needed when a shell command is actually evaluated, so load it lazily.
+    const loaded = await import('@vscode/tree-sitter-wasm')
+    const sdk = ('default' in loaded ? loaded.default : loaded) as typeof import('@vscode/tree-sitter-wasm')
+    const { Language, Parser: ParserImpl } = sdk
+    ParserClass = ParserImpl
+    await ParserImpl.init({ locateFile: (filename: string) => path.join(assets, filename) })
     const [bash, powershell] = await Promise.all([
       Language.load(path.join(assets, 'tree-sitter-bash.wasm')),
       Language.load(path.join(assets, 'tree-sitter-powershell.wasm'))
@@ -164,7 +172,8 @@ export function parseCommandSyntax(text: string, dialect: CommandDialect, source
   if (text.length > MAX_INPUT) {
     diagnostic('input-limit', { start: 0, end: text.length, source })
   }
-  const parser = new Parser()
+  if (!ParserClass) throw new Error('Command parser has not been initialized')
+  const parser = new ParserClass()
   parser.setLanguage(languages[dialect])
   const deadline = performance.now() + 200
   const tree = parser.parse(text.slice(0, MAX_INPUT), undefined, {

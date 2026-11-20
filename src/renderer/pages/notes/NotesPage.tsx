@@ -256,46 +256,22 @@ const NotesPage: FC<NotesPageProps> = ({ notePath, onNoteOpened }) => {
   useEffect(() => {
     async function initialize() {
       if (!notesPath) {
-        // 首次启动，获取默认路径
+        // 首次启动，获取服务端笔记根
         const info = await ipcApi.request('app.get_info')
-        const defaultPath = info.notesPath
-        updateNotesPath(defaultPath)
+        updateNotesPath(info.notesPath)
         return
       }
 
-      // 验证路径是否有效（处理跨平台恢复场景）
+      // A stale desktop path (or a directory that no longer exists) falls back
+      // to the server-owned notes root. There is no host directory picker.
       try {
         const resolved = await resolveNotesPath(notesPath)
-        if (!resolved.isFallback) {
-          return
-        }
-        const defaultPath = resolved.path
-
-        logger.warn('Invalid notes path detected, resetting to default', {
-          previousPath: notesPath,
-          defaultPath
-        })
-
-        // 重置为默认路径
-        updateNotesPath(defaultPath)
-
-        // 检查默认路径下是否有笔记文件
-        try {
-          const entries = await window.api.file.listDirectory(defaultPath, {
-            recursive: false,
-            includeFiles: true,
-            includeDirectories: true
+        if (resolved.isFallback) {
+          logger.warn('Invalid notes path detected, resetting to server root', {
+            previousPath: notesPath,
+            defaultPath: resolved.path
           })
-          if (!entries || entries.length === 0) {
-            // 默认目录为空，提示用户需要迁移文件
-            toast.warning({
-              title: t('notes.crossPlatformRestoreWarning', { path: defaultPath }),
-              timeout: 10000
-            })
-          }
-        } catch (error) {
-          // 目录不存在或读取失败，会由 FileStorage 自动创建
-          logger.debug('Default notes directory will be created', { error })
+          updateNotesPath(resolved.path)
         }
       } catch (error) {
         logger.error('Failed to validate notes path:', error as Error)

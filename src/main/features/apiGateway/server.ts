@@ -58,7 +58,10 @@ export class ApiGateway {
         await this.listen(host === '0.0.0.0' ? '::' : '::1', this.boundPort)
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code
-        if (code !== 'EAFNOSUPPORT' && code !== 'EADDRNOTAVAIL') throw error
+        // `ERR_INVALID_URL` comes from the Node adapter building a URL around the
+        // unbracketed IPv6 loopback literal; the IPv4 listener already serves
+        // loopback consumers, so treat IPv6 loopback as unavailable.
+        if (code !== 'EAFNOSUPPORT' && code !== 'EADDRNOTAVAIL' && code !== 'ERR_INVALID_URL') throw error
         logger.info('IPv6 unavailable; listening on IPv4 only', { code })
       }
       logger.info('API server started', { hosts: this.getHosts(), port: this.boundPort })

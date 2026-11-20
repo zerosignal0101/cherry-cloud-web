@@ -20,7 +20,10 @@ export default defineConfig({
       // Vendored upstream packages consumed from source. Subpaths are listed
       // before the bare specifier so a prefix match cannot append onto the
       // replacement file.
-      { find: /^@cherrystudio\/ai-core\/contextOverflow$/, replacement: resolvePath('./vendor/ai-core/src/contextOverflow.ts') },
+      {
+        find: /^@cherrystudio\/ai-core\/contextOverflow$/,
+        replacement: resolvePath('./vendor/ai-core/src/contextOverflow.ts')
+      },
       { find: /^@cherrystudio\/ai-core\/provider$/, replacement: resolvePath('./vendor/ai-core/src/core/providers') },
       {
         find: /^@cherrystudio\/ai-core\/built-in\/plugins$/,

@@ -10,12 +10,12 @@ import {
   type TopicMoveAssistantTarget
 } from '@renderer/components/chat/actions/topicContextMenuActions'
 import { getTopicMessages } from '@renderer/hooks/useTopic'
-import { ipcApi } from '@renderer/ipc'
 import { copyTopicAsMarkdown, copyTopicAsPlainText } from '@renderer/services/copy'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import { chooseImageExportMode } from '@renderer/services/imageExportModeChooser'
 import { toast } from '@renderer/services/toast'
 import type { Topic } from '@renderer/types/topic'
+import { exportWordFromMarkdown } from '@renderer/utils/exportWord'
 import { removeSpecialCharactersForFileName } from '@renderer/utils/file'
 import type { TopicTabPosition } from '@shared/data/preference/preferenceTypes'
 
@@ -121,10 +121,7 @@ export function createTopicActionContext({
     onExportWord: async (topic) => {
       const { topicToMarkdown } = await import('@renderer/services/ExportService')
       const markdown = await topicToMarkdown(topic)
-      void ipcApi.request('export.word.from_markdown', {
-        markdown,
-        fileName: removeSpecialCharactersForFileName(topic.name)
-      })
+      void exportWordFromMarkdown(markdown, removeSpecialCharactersForFileName(topic.name))
     },
     onExportYuque: async (topic) => {
       const { exportMarkdownToYuque, topicToMarkdown } = await import('@renderer/services/ExportService')

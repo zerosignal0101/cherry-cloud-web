@@ -1,11 +1,12 @@
 import dayjs from 'dayjs'
 import { FolderOpen, RefreshCw, Save } from 'lucide-react'
 import type { FC } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { Button, Input, RowFlex, Switch, WarnTooltip, HelpTooltip } from '@cherrystudio/ui'
+import { Button, Input, RowFlex, WarnTooltip, HelpTooltip } from '@cherrystudio/ui'
 import { usePreference } from '@data/hooks/usePreference'
+import { loggerService } from '@logger'
 import AppLogo from '@renderer/assets/images/logo.png'
 import { S3BackupManager } from '@renderer/components/S3BackupManager'
 import { S3BackupModal, useS3BackupModal } from '@renderer/components/S3Modals'
@@ -20,9 +21,13 @@ import {
 import { useBackupSyncState } from '@renderer/hooks/useBackupSyncState'
 import { useMiniAppPopup } from '@renderer/hooks/useMiniAppPopup'
 import { useTheme } from '@renderer/hooks/useTheme'
+import { ipcApi } from '@renderer/ipc'
 import { settingsControlClasses } from '@renderer/pages/settings/settingsStyles'
+import { toast } from '@renderer/services/toast'
 
 const SYNC_STATUS_COLOR = 'var(--muted-foreground)'
+
+const logger = loggerService.withContext('S3Settings')
 
 const S3Settings: FC = () => {
   const [, setS3AutoSync] = usePreference('data.backup.s3.auto_sync')
@@ -30,11 +35,11 @@ const S3Settings: FC = () => {
   const [s3Region, setS3Region] = usePreference('data.backup.s3.region')
   const [s3Bucket, setS3Bucket] = usePreference('data.backup.s3.bucket')
   const [s3AccessKeyId, setS3AccessKeyId] = usePreference('data.backup.s3.access_key_id')
-  const [s3SecretAccessKey, setS3SecretAccessKey] = usePreference('data.backup.s3.secret_access_key')
   const [s3Root, setS3Root] = usePreference('data.backup.s3.root')
-  const [s3SkipBackupFile, setS3SkipBackupFile] = usePreference('data.backup.s3.skip_backup_file')
   const [s3SyncInterval, setS3SyncInterval] = usePreference('data.backup.s3.sync_interval')
   const [s3MaxBackups, setS3MaxBackups] = usePreference('data.backup.s3.max_backups')
+  const [secretSet, setSecretSet] = useState(false)
+  const [secretDraft, setSecretDraft] = useState('')
 
   const [backupManagerVisible, setBackupManagerVisible] = useState(false)
 
@@ -44,6 +49,37 @@ const S3Settings: FC = () => {
   const { openSmartMiniApp } = useMiniAppPopup()
 
   const s3Sync = useBackupSyncState('s3')
+
+  useEffect(() => {
+    void ipcApi
+      .request('backup.get_secret_status')
+      .then((status) => setSecretSet(status.s3SecretAccessKey))
+      .catch((error) => logger.warn('Failed to read S3 credential status', error as Error))
+  }, [])
+
+  const saveSecret = async () => {
+    const value = secretDraft
+    if (!value) return
+    try {
+      await ipcApi.request('backup.set_secret', { key: 's3.secret_access_key', value })
+      setSecretDraft('')
+      setSecretSet(true)
+    } catch (error) {
+      logger.error('Failed to save S3 secret access key', error as Error)
+      toast.error(t('settings.data.backup.secret.save_failed'))
+    }
+  }
+
+  const clearSecret = async () => {
+    try {
+      await ipcApi.request('backup.clear_secret', { key: 's3.secret_access_key' })
+      setSecretDraft('')
+      setSecretSet(false)
+    } catch (error) {
+      logger.error('Failed to clear S3 secret access key', error as Error)
+      toast.error(t('settings.data.backup.secret.save_failed'))
+    }
+  }
 
   const onSyncIntervalChange = async (value: number) => {
     await setS3SyncInterval(value)
@@ -166,14 +202,24 @@ const S3Settings: FC = () => {
       <SettingDivider />
       <SettingRow>
         <SettingRowTitle>{t('settings.data.s3.secretAccessKey.label')}</SettingRowTitle>
-        <Input
-          type="password"
-          placeholder={t('settings.data.s3.secretAccessKey.placeholder')}
-          value={s3SecretAccessKey}
-          onChange={(e) => setS3SecretAccessKey(e.target.value)}
-          className={settingsControlClasses.text}
-          onBlur={(e) => setS3SecretAccessKey(e.target.value)}
-        />
+        <RowFlex className="items-center gap-2">
+          <Input
+            type="password"
+            autoComplete="new-password"
+            placeholder={
+              secretSet ? t('settings.data.backup.secret.saved') : t('settings.data.s3.secretAccessKey.placeholder')
+            }
+            value={secretDraft}
+            onChange={(e) => setSecretDraft(e.target.value)}
+            onBlur={() => void saveSecret()}
+            className={settingsControlClasses.text}
+          />
+          {secretSet && (
+            <Button variant="ghost" onClick={() => void clearSecret()}>
+              {t('settings.data.backup.secret.clear')}
+            </Button>
+          )}
+        </RowFlex>
       </SettingRow>
       <SettingDivider />
       <SettingRow>
@@ -193,14 +239,14 @@ const S3Settings: FC = () => {
           <Button
             onClick={showBackupModal}
             variant="outline"
-            disabled={backuping || !s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId || !s3SecretAccessKey}>
+            disabled={backuping || !s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId || !secretSet}>
             <Save size={14} />
             {t('settings.data.s3.backup.button')}
           </Button>
           <Button
             onClick={showBackupManager}
             variant="outline"
-            disabled={!s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId || !s3SecretAccessKey}>
+            disabled={!s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId || !secretSet}>
             <FolderOpen size={14} />
             {t('settings.data.s3.backup.manager.button')}
           </Button>
@@ -213,7 +259,7 @@ const S3Settings: FC = () => {
           size={14}
           value={s3SyncInterval}
           onChange={onSyncIntervalChange}
-          disabled={!s3Endpoint || !s3AccessKeyId || !s3SecretAccessKey}
+          disabled={!s3Endpoint || !s3AccessKeyId || !secretSet}
           options={[
             { label: t('settings.data.s3.autoSync.off'), value: 0 },
             { label: t('settings.data.s3.autoSync.minute', { count: 1 }), value: 1 },
@@ -235,7 +281,7 @@ const S3Settings: FC = () => {
           size={14}
           value={s3MaxBackups}
           onChange={onMaxBackupsChange}
-          disabled={!s3Endpoint || !s3AccessKeyId || !s3SecretAccessKey}
+          disabled={!s3Endpoint || !s3AccessKeyId || !secretSet}
           options={[
             { label: t('settings.data.s3.maxBackups.unlimited'), value: 0 },
             { label: '1', value: 1 },
@@ -246,14 +292,6 @@ const S3Settings: FC = () => {
             { label: '50', value: 50 }
           ]}
         />
-      </SettingRow>
-      <SettingDivider />
-      <SettingRow>
-        <SettingRowTitle className="flex items-center gap-1.5">
-          {t('settings.data.s3.skipBackupFile.label')}{' '}
-          <HelpTooltip content={t('settings.data.s3.skipBackupFile.help')} />
-        </SettingRowTitle>
-        <Switch checked={s3SkipBackupFile} onCheckedChange={(value) => void setS3SkipBackupFile(value)} />
       </SettingRow>
       {s3SyncInterval > 0 && (
         <>
@@ -281,7 +319,6 @@ const S3Settings: FC = () => {
             region: s3Region,
             bucket: s3Bucket,
             accessKeyId: s3AccessKeyId,
-            secretAccessKey: s3SecretAccessKey,
             root: s3Root
           }}
         />

@@ -1,41 +1,42 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useId, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { WebviewBrowser } from '@renderer/components/WebviewBrowser'
-import { useCurrentTab, useIsActiveTab, useTabSelfVisuals } from '@renderer/hooks/tab'
-import { getWebviewPartition, WebviewSecurityProfile } from '@shared/utils/webviewSecurity'
+import { IframeBrowser } from '@renderer/components/IframeBrowser'
+import { useTabSelfVisuals } from '@renderer/hooks/tab'
+import { getBrowserStartPageUrl, rememberBrowserPageUrl } from '@renderer/services/browserStartPage'
 
+const START_PAGE_CONTEXT = 'standalone:persist:agent-browser'
+
+/**
+ * The standalone browser tab.
+ *
+ * Remote pages run in a sandboxed iframe. The desktop app could read guest
+ * titles and history through Chromium; here the address is the only reliable
+ * navigation fact, so it also becomes the tab title and the history entry.
+ */
 export function BrowserPage({ initialUrl }: { initialUrl?: string }) {
   const { t } = useTranslation()
   const navigate = useNavigate({ from: '/app/browser' })
-  const tab = useCurrentTab()
-  const isActive = useIsActiveTab()
-  const id = useId()
-  const [title, setTitle] = useState(initialUrl ?? '')
-  const [favicon, setFavicon] = useState<string>()
-  useTabSelfVisuals({ title: title || t('settings.browser.title'), icon: favicon, routePrefix: '/app/browser' })
+  const [title, setTitle] = useState(initialUrl || t('settings.browser.title'))
+  const startUrl = initialUrl && initialUrl !== 'about:blank' ? initialUrl : getBrowserStartPageUrl(START_PAGE_CONTEXT)
+  useTabSelfVisuals({ title: title || t('settings.browser.title'), icon: undefined, routePrefix: '/app/browser' })
 
   const handleUrlChange = useCallback(
     (url: string) => {
       if (url !== initialUrl) void navigate({ search: { url }, replace: true })
+      rememberBrowserPageUrl(START_PAGE_CONTEXT, url)
     },
     [initialUrl, navigate]
   )
 
-  return (
-    <WebviewBrowser
-      initialUrl={initialUrl}
-      securityProfile={
-        initialUrl?.startsWith('file:') ? WebviewSecurityProfile.AgentHtmlArtifact : WebviewSecurityProfile.AgentBrowser
-      }
-      startPageContext={`standalone:${getWebviewPartition(WebviewSecurityProfile.AgentBrowser)}`}
-      target={{ id: `browser:${tab?.id ?? id}`, label: t('settings.browser.title') }}
-      isHostActive={isActive}
-      onNavigate={handleUrlChange}
-      onUrlChange={handleUrlChange}
-      onTitleChange={setTitle}
-      onFaviconChange={setFavicon}
-    />
-  )
+  if (startUrl.startsWith('file:')) {
+    return (
+      <div className="flex h-full items-center justify-center px-6 text-center text-muted-foreground text-sm">
+        {t('webview.navigation.load_failed')}
+      </div>
+    )
+  }
+
+  return <IframeBrowser initialUrl={startUrl} onUrlChange={handleUrlChange} onTitleChange={setTitle} />
 }

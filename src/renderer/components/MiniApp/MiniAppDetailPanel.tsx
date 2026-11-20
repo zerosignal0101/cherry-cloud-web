@@ -33,6 +33,7 @@ import { useMiniAppUpdate } from '@renderer/hooks/useMiniAppUpdate'
 import { useModelById } from '@renderer/hooks/useModel'
 import { useProviders } from '@renderer/hooks/useProvider'
 import { ipcApi } from '@renderer/ipc'
+import { pickBrowserFiles } from '@renderer/ipc/webFile'
 import { toast } from '@renderer/services/toast'
 import { formatFileSize } from '@renderer/utils/file'
 import { permissionLabel } from '@renderer/utils/miniAppPermission'
@@ -248,8 +249,10 @@ const MiniAppDetailPanel: FC<Props> = ({ appId, open = true, onClose }) => {
   useEffect(() => {
     if (replaceError) toast.error(t(replaceError.key, replaceError.params))
   }, [replaceError, t])
-  const handlePickReplacement = () =>
-    replace.settle(() => ipcApi.request('mini_app.install.pick_and_preview'), 'miniApp.install.preview_error')
+  const handlePickReplacement = async () => {
+    const [file] = await pickBrowserFiles({ accept: '.miniapp,application/zip', multiple: false })
+    if (file) await replace.previewUpload(file)
+  }
 
   const handleConfirmDestructive = async () => {
     if (!pendingAction) return

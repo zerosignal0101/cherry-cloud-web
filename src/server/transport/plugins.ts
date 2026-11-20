@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import * as z from 'zod'
 
+import { decodeBinary, encodeBinary } from '@shared/ipc/binary'
+
 import { ForbiddenError, UnauthorizedError, type AuthGuard } from '../auth/guard'
 import { forbidden, unauthorized } from '../routes/auth'
 import { normalizeClientId, type ConnectionRegistry } from './connections'
@@ -40,8 +42,10 @@ export async function registerRpcRoutes(app: FastifyInstance, options: RpcPlugin
     // stream back to the caller (`ai.stream.*`) resolve it through
     // `IpcContext.senderId`, exactly like a WindowId in the desktop app.
     const senderId = normalizeClientId(request.headers['x-client-id'])
+    if (senderId) options.connections.ensure(senderId)
 
-    return options.registry.dispatch(parsed.data.route, parsed.data.input, { senderId })
+    const result = await options.registry.dispatch(parsed.data.route, decodeBinary(parsed.data.input), { senderId })
+    return encodeBinary(result)
   })
 }
 

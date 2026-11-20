@@ -1,5 +1,6 @@
-import { application } from '@application'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { application } from '@application'
 
 import { ConnectionRegistry } from '../../transport/connections'
 import { RpcRegistry } from '../../transport/registry'

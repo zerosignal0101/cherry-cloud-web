@@ -1,3 +1,4 @@
+import { RouterProvider } from '@tanstack/react-router'
 import { lazy, Suspense, useEffect, useMemo } from 'react'
 
 import { usePreference } from '@data/hooks/usePreference'
@@ -30,11 +31,8 @@ import { useWindowRuntime } from '@renderer/hooks/useWindowRuntime'
 import { router } from '@renderer/router'
 import { registerImageModeChooser } from '@renderer/services/imageExportModeChooser'
 import { WindowFileEditRecovery } from '@renderer/windows/WindowFileEditRecovery'
-import { RouterProvider } from '@tanstack/react-router'
 
-import { useAppUpdateHandler } from './hooks/useAppUpdateHandler'
 import { useAutoBackupEvents } from './hooks/useAutoBackupEvents'
-import { useCherryCloudSubscriptionReminder } from './hooks/useCherryCloudSubscriptionReminder'
 import { useTopicNamingErrorNotification } from './hooks/useTopicNamingErrorNotification'
 import { PrivacyPolicyUpdateGate } from './privacy/PrivacyPolicyUpdateGate'
 
@@ -55,7 +53,7 @@ function BootFallback(): React.ReactElement {
 // TabRouter/<Activity>, so these window-scoped subscriptions and DOM sync are never
 // torn down when a background tab hides.
 //
-// useAppUpdateHandler / useAutoBackupEvents / useStorageMonitorNotification / useTopicNamingErrorNotification are
+// useAutoBackupEvents / useStorageMonitorNotification / useTopicNamingErrorNotification are
 // intentionally main-only (update events only reach the main window; the storage warning and
 // topic-naming-failed toast must not duplicate across windows) and intentionally React hooks:
 // they depend on React-visible
@@ -89,11 +87,9 @@ function MainWindowRuntime(): null {
     console.timeEnd('init')
   }, [])
 
-  useAppUpdateHandler()
   useAutoBackupEvents()
   useStorageMonitorNotification()
   useTopicNamingErrorNotification()
-  useCherryCloudSubscriptionReminder()
 
   return null
 }

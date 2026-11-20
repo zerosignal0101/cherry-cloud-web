@@ -146,6 +146,11 @@ export function resolveMountedMcpServers(
   if (!memoryDisabled) mounted.add(CHERRY_MCP_SERVER.AGENT_MEMORY)
   if (resolveAgentCapabilities(agent).environment === 'open') {
     const automation = resolveAutomationAccess(agent, { channelLinked, browserEnabled, computerUseEnabled })
+    // Granular browser tools are a first-class server: the server build exposes
+    // them through Playwright, and the desktop build through its debugger-backed
+    // BrowserSessionService. The automation REPL remains for computer control and
+    // for scripts that compose several browser calls.
+    if (automation.browser) mounted.add(CHERRY_MCP_SERVER.BROWSER)
     if (automation.browser || automation.computer) mounted.add(CHERRY_MCP_SERVER.AUTOMATION)
     mounted.add(CHERRY_MCP_SERVER.SKILLS)
     // Registering an MCP server writes to the user's environment, so it rides the same axis as skills.

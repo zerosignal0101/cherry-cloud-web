@@ -18,18 +18,15 @@ import {
 import type { AppRouter } from '@renderer/types/router'
 
 import BasicDataSettings from './BasicDataSettings'
-import { JoplinIcon, NotionIcon, NutstoreIcon, ObsidianIcon, SiyuanIcon } from './DataIntegrationIcons'
+import { JoplinIcon, NotionIcon, SiyuanIcon } from './DataIntegrationIcons'
 import { DATA_PANEL_KEYS, type DataPanelKey, DEFAULT_DATA_PANEL } from './dataPanels'
 
 const dataRouteApi = getRouteApi('/settings/data')
 
 const ExportMenuOptions = lazy(() => import('./ExportMenuSettings'))
 const JoplinSettings = lazy(() => import('./JoplinSettings'))
-const LocalBackupSettings = lazy(() => import('./LocalBackupSettings'))
 const MarkdownExportSettings = lazy(() => import('./MarkdownExportSettings'))
 const NotionSettings = lazy(() => import('./NotionSettings'))
-const NutstoreSettings = lazy(() => import('./NutstoreSettings'))
-const ObsidianSettings = lazy(() => import('./ObsidianSettings'))
 const S3Settings = lazy(() => import('./S3Settings'))
 const SiyuanSettings = lazy(() => import('./SiyuanSettings'))
 const WebDavSettings = lazy(() => import('./WebDavSettings'))
@@ -55,9 +52,7 @@ const DataSettings: FC = () => {
   const menuItems: DataMenuItem[] = [
     { key: 'data', title: t('settings.data.data.title'), icon: <FolderCog size={16} /> },
     { key: 'divider_1', isDivider: true, text: t('settings.data.divider.cloud_storage') },
-    { key: 'local_backup', title: t('settings.data.local.title'), icon: <FolderCog size={16} /> },
     { key: 'webdav', title: t('settings.data.webdav.title'), icon: <CloudUpload size={16} /> },
-    { key: 'nutstore', title: t('settings.data.nutstore.title'), icon: <NutstoreIcon size={16} /> },
     { key: 's3', title: t('settings.data.s3.title.label'), icon: <Server size={16} /> },
     { key: 'divider_2', isDivider: true, text: t('settings.data.divider.import_settings') },
     {
@@ -80,7 +75,6 @@ const DataSettings: FC = () => {
     { key: 'notion', title: t('settings.data.notion.title'), icon: <NotionIcon size={16} /> },
     { key: 'yuque', title: t('settings.data.yuque.title'), icon: <BookOpen size={16} /> },
     { key: 'joplin', title: t('settings.data.joplin.title'), icon: <JoplinIcon size={16} /> },
-    { key: 'obsidian', title: t('settings.data.obsidian.title'), icon: <ObsidianIcon size={16} /> },
     { key: 'siyuan', title: t('settings.data.siyuan.title'), icon: <SiyuanIcon size={16} /> }
   ]
 
@@ -117,16 +111,13 @@ const DataSettings: FC = () => {
         ) : (
           <Suspense fallback={null}>
             {menu === 'webdav' && <WebDavSettings />}
-            {menu === 'nutstore' && <NutstoreSettings />}
             {menu === 's3' && <S3Settings />}
             {menu === 'import_settings' && <ImportMenuOptions />}
             {menu === 'export_menu' && <ExportMenuOptions />}
             {menu === 'markdown_export' && <MarkdownExportSettings />}
-            {menu === 'local_backup' && <LocalBackupSettings />}
             {menu === 'notion' && <NotionSettings />}
             {menu === 'yuque' && <YuqueSettings />}
             {menu === 'joplin' && <JoplinSettings />}
-            {menu === 'obsidian' && <ObsidianSettings />}
             {menu === 'siyuan' && <SiyuanSettings />}
           </Suspense>
         )}

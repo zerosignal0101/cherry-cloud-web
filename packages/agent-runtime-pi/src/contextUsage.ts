@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto'
 
-import { measureSystemContext } from '@earendil-works/pi-ai/utils/context-usage'
 import { getCurrentSystemMessage } from '@earendil-works/pi-ai/utils/transcript'
-import { estimateSystemCharacters, estimateTokens, type AgentSession } from '@earendil-works/pi-coding-agent'
+import { estimateTokens, type AgentSession } from '@earendil-works/pi-coding-agent'
 
 import type {
   ContextCategory,
@@ -29,35 +28,33 @@ export function readContextUsage(session: AgentSession): OperationResult<ThreadC
   )
   const categories: ContextCategory[] = []
   const resources: ContextResource[] = []
-  for (const part of measureSystemContext(system, deferred, estimateSystemCharacters, '')) {
+  const systemParts = [
+    ...(system?.toolsAdded ?? []).map((tool) => ({
+      id: tool.name,
+      kind: 'system-tools',
+      state: 'loaded' as const,
+      tokens: estimateTokens({ role: 'system', content: JSON.stringify(tool) })
+    })),
+    ...deferred.map((tool) => ({
+      id: tool.name,
+      kind: 'system-tools',
+      state: 'deferred' as const,
+      tokens: estimateTokens({ role: 'system', content: JSON.stringify(tool) })
+    }))
+  ]
+  for (const part of systemParts) {
     const key = categoryKeys[part.kind] ?? 'other'
-    const occupancy = part.state === 'deferred' ? 'deferred' : 'included'
-    const id = `${key}:${occupancy}`
-    const category = categories.find((category) => category.id === id)
+    const id = `${key}:${part.state}`
+    const category = categories.find((entry) => entry.id === id)
     if (category) categories[categories.indexOf(category)] = { ...category, tokens: category.tokens + part.tokens }
-    else categories.push({ id, key, occupancy, tokens: part.tokens, precision: 'estimated' })
-    if (part.state)
-      resources.push({
-        id: `tool:${part.id}`,
-        category: key,
-        name: part.id,
-        source: part.source,
-        state: part.state,
-        count: { tokens: part.tokens, precision: 'estimated' }
-      })
-    else
-      for (const resource of part.resources ?? [])
-        resources.push({
-          id: `section:${part.id}:${resource.id}`,
-          category: key,
-          name: resource.name,
-          source: resource.source,
-          state: 'loaded',
-          count: {
-            tokens: estimateSystemCharacters(resource.characters, 0),
-            precision: 'estimated'
-          }
-        })
+    else categories.push({ id, key, occupancy: part.state, tokens: part.tokens, precision: 'estimated' })
+    resources.push({
+      id: `tool:${part.id}`,
+      category: key,
+      name: part.id,
+      state: part.state,
+      count: { tokens: part.tokens, precision: 'estimated' }
+    })
   }
   categories.push({
     id: 'messages',

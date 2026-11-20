@@ -14,7 +14,6 @@ import {
 } from './claudeCode'
 import { listEntries, reclaimStale } from './orphanSessionReclaim'
 import { PiRuntimeDriver } from './pi/PiRuntimeDriver'
-import { PiDurableRuntimeDriver } from './piDurable/PiDurableRuntimeDriver'
 import { runtimeDriverRegistry } from './registry'
 import type {
   AgentRuntimeConnectInput,
@@ -151,6 +150,8 @@ class LazyClaudeCodeRuntimeDriver implements AgentSessionRuntimeDriver {
 /** Register every built-in runtime at the AgentSessionRuntimeService lifecycle boundary. */
 export function registerRuntimeDrivers(): void {
   runtimeDriverRegistry.register(new LazyClaudeCodeRuntimeDriver())
+  // The web build ships the in-process Pi runtime only. `pi-durable` depends on
+  // unreleased Pi packages (query-fork/context-usage) and stays desktop-only
+  // until those ship; registering it here would make the server bundle fail.
   runtimeDriverRegistry.register(new PiRuntimeDriver())
-  runtimeDriverRegistry.register(new PiDurableRuntimeDriver())
 }

@@ -1,11 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import * as z from 'zod'
 
+import { agentWorkspaceService } from '@data/services/AgentWorkspaceService'
 import { ApiServer } from '@main/data/api/core/ApiServer'
 import { apiHandlers } from '@main/data/api/handlers/apiHandlers'
-import type { DataRequest } from '@shared/data/api/types'
+import type { DataRequest, DataResponse } from '@shared/data/api/types'
 
 import { ForbiddenError, UnauthorizedError, type AuthGuard } from '../auth/guard'
+import type { MiniAppAssets } from '../features/miniapps/MiniAppAssets'
 import { forbidden, unauthorized } from './auth'
 
 const dataRequestSchema = z.object({
@@ -25,6 +27,8 @@ const dataRequestSchema = z.object({
 export interface DataRouteOptions {
   guard: AuthGuard
   apiServer: ApiServer
+  /** Rewrites `cherry-miniapp://` DTO URLs into signed browser asset routes. */
+  miniAppAssets?: MiniAppAssets
 }
 
 /**
@@ -35,6 +39,49 @@ export interface DataRouteOptions {
  * adapter; the response envelope keeps `status`/`error` so the renderer client
  * (`window.api.dataApi.request`) sees the same shape it always has.
  */
+/**
+ * Responses in the agent domain embed host layout (`Workspace.path`, a Skill's
+ * `sourceUrl` from a local ZIP). The browser only ever sees server-owned
+ * logical namespaces; the physical path stays inside the runtime.
+ */
+function sanitizeAgentDomainPaths(response: DataResponse): DataResponse {
+  if (!('data' in response) || response.data === undefined) return response
+  let workspaces: Array<{ id: string; path: string }> = []
+  try {
+    workspaces = agentWorkspaceService
+      .list({ includeSystem: true })
+      .map(({ id, path }) => ({ id, path }))
+      .sort((left, right) => right.path.length - left.path.length)
+  } catch {
+    // A database that is still opening must not corrupt the response.
+  }
+
+  const rewrite = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      const workspace = workspaces.find(
+        (candidate) => value === candidate.path || value.startsWith(`${candidate.path}/`)
+      )
+      if (workspace) {
+        const suffix = value.slice(workspace.path.length)
+        return `/workspaces/${workspace.id}${suffix}`
+      }
+      return value
+    }
+    if (Array.isArray(value)) return value.map(rewrite)
+    if (value && typeof value === 'object') {
+      const result: Record<string, unknown> = {}
+      for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+        if (key === 'sourceUrl' && typeof entry === 'string' && !/^https?:\/\//i.test(entry)) continue
+        result[key] = rewrite(entry)
+      }
+      return result
+    }
+    return value
+  }
+
+  return { ...response, data: rewrite(response.data) }
+}
+
 export async function registerDataRoutes(app: FastifyInstance, options: DataRouteOptions): Promise<void> {
   app.post('/api/data', async (request, reply) => {
     try {
@@ -54,7 +101,8 @@ export async function registerDataRoutes(app: FastifyInstance, options: DataRout
       })
     }
 
-    return options.apiServer.handleRequest(parsed.data as DataRequest)
+    const response = sanitizeAgentDomainPaths(await options.apiServer.handleRequest(parsed.data as DataRequest))
+    return options.miniAppAssets ? options.miniAppAssets.rewriteValue(response) : response
   })
 }
 

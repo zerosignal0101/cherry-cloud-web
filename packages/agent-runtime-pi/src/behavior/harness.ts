@@ -362,7 +362,7 @@ export function createPiBehavior(options: PiBehaviorOptions): PiBehavior {
         (file) => file.id === id && file.parentSessionPath === parent.manager.getSessionFile()
       )
       if (candidates.length !== 1) continue
-      const manager = SessionManager.openExisting(candidates[0].path, id)
+      const manager = SessionManager.open(candidates[0].path)
       const origin = historyOf(manager.getBranch(), id).findLast(
         (item) => item.kind === 'record' && item.record.type === 'subagent-origin'
       )

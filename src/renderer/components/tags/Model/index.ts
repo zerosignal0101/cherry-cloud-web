@@ -15,7 +15,6 @@ export {
 } from './ModelTag'
 export { ReasoningTag } from './ReasoningTag'
 export { RerankerTag } from './RerankerTag'
-export { SubscriptionTag } from './SubscriptionTag'
 export { ToolsCallingTag } from './ToolsCallingTag'
 export { VideoTag } from './VideoTag'
 export { VisionTag } from './VisionTag'

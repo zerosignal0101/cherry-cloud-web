@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { loggerService } from '@logger'
 import { ipcApi } from '@renderer/ipc'
+import { getClientId } from '@renderer/ipc/webApi'
 import { toast } from '@renderer/services/toast'
 import type { OutputFor } from '@shared/ipc/types'
 import { resolveLocalizedText } from '@shared/types/miniAppManifest'
@@ -111,6 +112,35 @@ export function useMiniAppInstallPreview(onDone: () => void, options: { expectAp
     [expectAppId]
   )
 
+  /**
+   * Browser upload preview. The desktop file picker cannot produce a host path,
+   * so the archive is posted as multipart and the server stages it under
+   * `DATA_DIR/tmp` until the consent token is consumed or cancelled.
+   */
+  const previewUpload = useCallback(
+    async (file: File) => {
+      await settle(async () => {
+        const body = new FormData()
+        body.append('file', file, file.name)
+        const response = await fetch('/api/miniapps/preview', {
+          method: 'POST',
+          body,
+          credentials: 'same-origin',
+          headers: { 'x-client-id': getClientId() }
+        })
+        const payload = (await response.json().catch(() => undefined)) as
+          | { error?: string }
+          | InstallPreview
+          | undefined
+        if (!response.ok) {
+          throw new Error(payload && 'error' in payload && payload.error ? payload.error : 'Preview failed')
+        }
+        return payload as InstallPreview
+      }, 'miniApp.install.preview_error')
+    },
+    [settle]
+  )
+
   /** Back to the host: the consent is withdrawn, the host stays open. */
   const cancelPreview = useCallback(() => {
     generationRef.current += 1
@@ -164,5 +194,5 @@ export function useMiniAppInstallPreview(onDone: () => void, options: { expectAp
     }
   }
 
-  return { preview, busy, error, settle, cancelPreview, confirm }
+  return { preview, busy, error, settle, previewUpload, cancelPreview, confirm }
 }

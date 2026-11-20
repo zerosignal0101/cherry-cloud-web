@@ -6,12 +6,12 @@ import type { useUpdateSession } from '@renderer/hooks/agent/useSession'
 import { useConversationExportMenuOptions } from '@renderer/hooks/chat/useConversationExportMenuOptions'
 import { useNotesSettings } from '@renderer/hooks/useNotesSettings'
 import { finishTopicRenaming, startTopicRenaming } from '@renderer/hooks/useTopic'
-import { ipcApi } from '@renderer/ipc'
 import type { AgentSessionExportOptions } from '@renderer/services/agentSessionExport'
 import { showImageActionFeedback } from '@renderer/services/imageActionFeedback'
 import { toast } from '@renderer/services/toast'
 import { buildAgentSessionTopicId } from '@renderer/utils/agentSession'
 import { fetchMessagesSummary } from '@renderer/utils/aiGeneration'
+import { exportWordFromMarkdown } from '@renderer/utils/exportWord'
 import { removeSpecialCharactersForFileName } from '@renderer/utils/file'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 
@@ -146,10 +146,7 @@ export function useSessionItemMenuActions({
         await import('@renderer/services/agentSessionExport')
       const title = getAgentSessionExportTitle(session)
       const markdown = await agentSessionToMarkdown(session, undefined, undefined, getSessionExportOptions(session))
-      await ipcApi.request('export.word.from_markdown', {
-        markdown,
-        fileName: removeSpecialCharactersForFileName(title)
-      })
+      await exportWordFromMarkdown(markdown, removeSpecialCharactersForFileName(title))
     },
     [getSessionExportOptions]
   )

@@ -1,26 +1,42 @@
 import { application } from '@application'
 import { CacheService } from '@data/CacheService'
 import { PreferenceService } from '@data/PreferenceService'
+import { loggerService } from '@logger'
+import { AgentJobsService } from '@main/ai/agents/AgentJobsService'
+import { AgentLifecycleService } from '@main/ai/agents/AgentLifecycleService'
+import { AgentSessionDeliveryService } from '@main/ai/agentSession/AgentSessionDeliveryService'
+import { AgentSessionRuntimeService } from '@main/ai/agentSession/AgentSessionRuntimeService'
+import { AgentImportService } from '@main/ai/agentSession/import/AgentImportService'
 import { AiService } from '@main/ai/AiService'
 import { McpCatalogService } from '@main/ai/mcp/McpCatalogService'
 import { McpPackageService } from '@main/ai/mcp/McpPackageService'
 import { McpRuntimeService } from '@main/ai/mcp/McpRuntimeService'
+import { TraceStorageService } from '@main/ai/observability/storage/TraceStorageService'
 import { AiStreamManager } from '@main/ai/streamManager'
 import { RuntimeActivityService } from '@main/core/application/RuntimeActivityService'
 import { JobManager } from '@main/core/job/JobManager'
 import { LifecycleManager, Phase, ServiceContainer, type ServiceConstructor } from '@main/core/lifecycle'
 import { PowerService } from '@main/core/power/PowerService'
 import { SchedulerService } from '@main/core/scheduler/SchedulerService'
+import { ApiGatewayService } from '@main/features/apiGateway/ApiGatewayService'
+import { FileEditService } from '@main/services/file/FileEditService'
 import { FileManager } from '@main/services/file/FileManager'
+import { FileObservationService } from '@main/services/file/observation/FileObservationService'
+import { DirectoryTreeManager } from '@main/services/file/tree/DirectoryTreeManager'
 import { ProviderRegistryUpdaterService } from '@main/services/ProviderRegistryUpdaterService'
 import { WebSearchService } from '@main/services/webSearch/WebSearchService'
-import { loggerService } from '@logger'
 
 import { WebDbService } from '../data/dbService'
+import { ServerBrowserSessionService } from '../features/browser/ServerBrowserSessionService'
+import { WebNotificationService } from './webNotificationService'
 import {
   WebAnalyticsService,
   WebAutomationReplService,
-  WebBrowserSessionService,
+  WebMiniAppRuntimeService,
+  WebChannelManager,
+  WebClaudeCodeProcessManager,
+  WebClaudeCodeWarmQueryManager,
+  WebRemoteAccessService,
   WebIpcApiService,
   WebProtocolService,
   WebWindowManager
@@ -38,17 +54,33 @@ const logger = loggerService.withContext('AiRuntime')
  */
 const webServices = [
   WebDbService,
+  WebMiniAppRuntimeService,
   CacheService,
   PreferenceService,
   WebWindowManager,
   WebIpcApiService,
-  WebBrowserSessionService,
+  ServerBrowserSessionService,
   WebAutomationReplService,
   WebProtocolService,
   PowerService,
   RuntimeActivityService,
+  TraceStorageService,
   SchedulerService,
   JobManager,
+  WebChannelManager,
+  WebNotificationService,
+  WebClaudeCodeProcessManager,
+  WebClaudeCodeWarmQueryManager,
+  WebRemoteAccessService,
+  ApiGatewayService,
+  AgentSessionRuntimeService,
+  AgentSessionDeliveryService,
+  AgentImportService,
+  AgentLifecycleService,
+  AgentJobsService,
+  FileObservationService,
+  DirectoryTreeManager,
+  FileEditService,
   FileManager,
   ProviderRegistryUpdaterService,
   WebSearchService,

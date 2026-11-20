@@ -38,7 +38,7 @@ export const useNotesMenu = ({
   activeNode
 }: UseNotesMenuProps) => {
   const { t } = useTranslation()
-  const [exportMenuOptions] = useMultiplePreferences({
+  const [storedExportMenuOptions] = useMultiplePreferences({
     docx: 'data.export.menus.docx',
     image: 'data.export.menus.image',
     joplin: 'data.export.menus.joplin',
@@ -48,6 +48,9 @@ export const useNotesMenu = ({
     siyuan: 'data.export.menus.siyuan',
     yuque: 'data.export.menus.yuque'
   })
+  // No local Obsidian vault is reachable from the server; keep the preference
+  // for desktop sync but never expose the action in the web menu.
+  const exportMenuOptions = { ...storedExportMenuOptions, obsidian: false }
 
   const handleExportKnowledge = useCallback(
     async (note: NotesTreeNode) => {

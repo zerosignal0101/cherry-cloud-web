@@ -40,9 +40,7 @@ export const useFiles = (props?: Props) => {
         return []
       }
 
-      const selectProps: Electron.OpenDialogOptions['properties'] = multipleSelections
-        ? ['openFile', 'multiSelections']
-        : ['openFile']
+      const selectProps = multipleSelections ? ['openFile', 'multiSelections'] : ['openFile']
 
       // when the number of extensions is greater than 20, use *.* to avoid selecting window lag
       const useAllFiles = extensions.length > 20

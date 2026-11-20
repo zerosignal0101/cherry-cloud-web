@@ -2,7 +2,7 @@ import { useParams } from '@tanstack/react-router'
 import type { FC } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import BeatLoader from 'react-spinners/BeatLoader'
+import { BeatLoader } from 'react-spinners'
 
 import { cacheService } from '@data/CacheService'
 import { useSharedCacheValue } from '@data/hooks/useCache'
@@ -13,7 +13,7 @@ import { useMiniApps } from '@renderer/hooks/useMiniApps'
 import { DataApiError, ErrorCode } from '@shared/data/api/errors'
 import type { MiniApp } from '@shared/data/types/miniApp'
 
-// Tab mode page shell — relies on the global MiniAppTabsPool instead of creating WebViews directly
+// Tab mode page shell — each visible pane owns its own sandboxed iframe.
 import MiniAppPane from './components/MiniAppPane'
 import SplitPanePicker from './components/SplitPanePicker'
 

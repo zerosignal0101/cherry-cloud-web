@@ -12,9 +12,9 @@ const {
   deleteWorkspaceMock,
   invalidateCacheMock,
   ipcRequestMock,
+  promptMock,
   refetchReferencesMock,
   refetchWorkspacesMock,
-  selectFolderMock,
   toastErrorMock,
   toastSuccessMock,
   useMutationMock,
@@ -25,9 +25,9 @@ const {
   deleteWorkspaceMock: vi.fn(),
   invalidateCacheMock: vi.fn(),
   ipcRequestMock: vi.fn(),
+  promptMock: vi.fn(),
   refetchReferencesMock: vi.fn(),
   refetchWorkspacesMock: vi.fn(),
-  selectFolderMock: vi.fn(),
   toastErrorMock: vi.fn(),
   toastSuccessMock: vi.fn(),
   useMutationMock: vi.fn(),
@@ -251,30 +251,25 @@ beforeEach(() => {
   })
   createWorkspaceMock.mockResolvedValue(CREATED_WORKSPACE)
   deleteWorkspaceMock.mockResolvedValue({ deletedIds: ['session-alpha-recent', 'session-alpha-older'] })
-  ipcRequestMock.mockImplementation((route, input) =>
-    route === 'ai.agent.workspace.register'
-      ? createWorkspaceMock(input)
-      : deleteWorkspaceMock({ params: { workspaceId: input.workspaceId } })
-  )
+  ipcRequestMock.mockImplementation((route, input) => {
+    if (route === 'workspace.create') {
+      return Promise.resolve({ id: CREATED_WORKSPACE.id, name: input.name, createdAt: 0, updatedAt: 0 })
+    }
+    if (route === 'ai.agent.workspace.register') return createWorkspaceMock(input)
+    return deleteWorkspaceMock({ params: { workspaceId: input.workspaceId } })
+  })
   invalidateCacheMock.mockResolvedValue(undefined)
   refetchReferencesMock.mockResolvedValue(undefined)
   refetchWorkspacesMock.mockResolvedValue(undefined)
-  selectFolderMock.mockResolvedValue(null)
-
-  Object.defineProperty(window, 'api', {
-    configurable: true,
-    value: {
-      file: {
-        selectFolder: selectFolderMock
-      }
-    }
-  })
+  promptMock.mockReturnValue('new-project')
+  vi.stubGlobal('prompt', promptMock)
 })
 
 afterEach(() => {
   cleanup()
   MockUseDataApiUtils.resetMocks()
   vi.clearAllMocks()
+  vi.unstubAllGlobals()
 })
 
 function renderSelector(onChange = vi.fn()) {
@@ -362,21 +357,19 @@ describe('WorkspaceSelector', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith('workspace-beta'))
   })
 
-  it('does nothing when the footer folder picker is canceled', async () => {
+  it('does nothing when the workspace name prompt is canceled', async () => {
+    promptMock.mockReturnValue(null)
     const { onChange } = renderSelector()
     openPopover()
 
     fireEvent.click(screen.getByRole('button', { name: 'Add new work directory' }))
 
-    await waitFor(() =>
-      expect(selectFolderMock).toHaveBeenCalledWith({ properties: ['openDirectory', 'createDirectory'] })
-    )
-    expect(createWorkspaceMock).not.toHaveBeenCalled()
+    await waitFor(() => expect(promptMock).toHaveBeenCalledWith('Add new work directory'))
+    expect(ipcRequestMock).not.toHaveBeenCalledWith('workspace.create', expect.anything())
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('creates and selects a workspace without an extra list refetch', async () => {
-    selectFolderMock.mockResolvedValue('/Users/jd/new-project')
+  it('creates a server workspace and selects it without an extra list refetch', async () => {
     const { onChange } = renderSelector()
     openPopover()
 
@@ -385,17 +378,18 @@ describe('WorkspaceSelector', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add new work directory' }))
 
-    await waitFor(() =>
-      expect(ipcRequestMock).toHaveBeenCalledWith('ai.agent.workspace.register', { path: '/Users/jd/new-project' })
-    )
+    await waitFor(() => expect(ipcRequestMock).toHaveBeenCalledWith('workspace.create', { name: 'new-project' }))
+    expect(ipcRequestMock).toHaveBeenCalledWith('ai.agent.workspace.register', {
+      path: '/workspaces/workspace-created',
+      name: 'new-project'
+    })
     expect(refetchWorkspacesMock).not.toHaveBeenCalled()
     expect(invalidateCacheMock).toHaveBeenCalledWith('/agent-workspaces')
     expect(onChange).toHaveBeenCalledWith('workspace-created')
   })
 
   it('preserves the selection and allows retry after registration is rejected', async () => {
-    selectFolderMock.mockResolvedValue('/Users/jd/new-project')
-    ipcRequestMock.mockRejectedValueOnce(new Error('Workspace storage is in use'))
+    createWorkspaceMock.mockRejectedValueOnce(new Error('Workspace storage is in use'))
     const { onChange } = renderSelector()
     openPopover()
     fireEvent.click(screen.getByRole('button', { name: 'Add new work directory' }))

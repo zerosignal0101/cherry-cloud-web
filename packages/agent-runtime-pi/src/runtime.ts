@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 
-import { canSuggestPrompt } from '@earendil-works/pi-ai/utils/query-fork'
 import {
   type AgentSession,
   type SessionEntry,
@@ -351,9 +350,19 @@ export async function createPiRuntime(options: PiRuntimeOptions): Promise<Operat
         },
         async predictPrompt(prompt, signal) {
           if (unavailable() || signal.aborted || !entry.session.isIdle) return ''
-          const fork = entry.session.createQueryFork()
-          if (!canSuggestPrompt(fork.messages) || unavailable() || signal.aborted) return ''
-          const { message, calledTool } = await fork.query(prompt, AbortSignal.any([signal, closingAccess.signal]))
+          const createQueryFork = (
+            entry.session as { createQueryFork?: () => { messages: unknown[]; query: Function } }
+          ).createQueryFork
+          if (!createQueryFork) return ''
+          const fork = createQueryFork()
+          if (fork.messages.length === 0 || unavailable() || signal.aborted) return ''
+          const { message, calledTool } = (await fork.query(
+            prompt,
+            AbortSignal.any([signal, closingAccess.signal])
+          )) as {
+            message?: { stopReason?: string; content: { type: string; text?: string }[] }
+            calledTool?: boolean
+          }
           if (calledTool || signal.aborted || unavailable() || message?.stopReason !== 'stop') return ''
           return message.content.find((part) => part.type === 'text')?.text ?? ''
         },
@@ -525,7 +534,7 @@ export async function createPiRuntime(options: PiRuntimeOptions): Promise<Operat
                 streamingBehavior: input.whenBusy === 'follow-up' ? 'followUp' : 'steer'
               }),
               preflightResult: (disposition) => {
-                if (disposition === 'handled') entry.session.sessionManager.flush()
+                if (disposition === 'handled') (entry.session.sessionManager as { flush?: () => void }).flush?.()
                 acknowledged = true
                 const facts: InputFact[] = [
                   disposition === 'started'

@@ -34,8 +34,6 @@ vi.mock('@renderer/components/SettingsPrimitives', () => ({
   SettingTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>
 }))
 
-vi.mock('../BackupPopup', () => ({ default: { show: vi.fn() } }))
-vi.mock('../RestorePopup', () => ({ default: { show: vi.fn() } }))
 vi.mock('../ClearCachePopup', async (importOriginal) => {
   const actual = await importOriginal<typeof ClearCachePopupModule>()
   return { ...actual, default: { show: clearCacheShowMock } }

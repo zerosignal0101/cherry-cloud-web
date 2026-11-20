@@ -1,6 +1,6 @@
 import { type CSSProperties, memo, useEffect, useId, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import BeatLoader from 'react-spinners/BeatLoader'
+import { BeatLoader } from 'react-spinners'
 
 import { type MarkdownSource, ScrollArea } from '@cherrystudio/ui'
 

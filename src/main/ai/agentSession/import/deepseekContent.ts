@@ -85,8 +85,10 @@ export async function deepseekContent(
               cleanupPolicy: 'manual'
             })
             entryId = entry.id
+            if (!entryId) throw new Error('Failed to store imported Agent attachment')
             saveFile(file.id, entryId)
           }
+          if (!entryId) throw new Error('Failed to resolve imported Agent attachment')
           const url = manager.getUrl(entryId)
           parts.push(
             withCherryMeta({ type: 'file', url, filename: file.file_name, mediaType }, { fileEntryId: entryId })

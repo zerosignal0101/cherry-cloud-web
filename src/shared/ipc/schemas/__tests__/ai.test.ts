@@ -6,14 +6,14 @@ import { aiRequestSchemas } from '../ai'
 
 describe('ai.agent.workspace.register schema', () => {
   const schema = aiRequestSchemas['ai.agent.workspace.register'].input
-  it('normalizes registration input without accepting relative or invalid paths', () => {
-    expect(schema.parse({ path: ' /tmp/workspace ', name: ' Workspace ' })).toEqual({
-      path: '/tmp/workspace',
+  it('normalizes registration input without accepting relative or host paths', () => {
+    expect(schema.parse({ path: ' /workspaces/workspace-1234 ', name: ' Workspace ' })).toEqual({
+      path: '/workspaces/workspace-1234',
       name: 'Workspace'
     })
-    for (const path of ['relative/path', '', '   ', '/tmp/bad\0path'])
+    for (const path of ['relative/path', '', '   ', '/tmp/workspace', '/workspaces/bad\0path', '/workspaces/short'])
       expect(schema.safeParse({ path }).success).toBe(false)
-    expect(schema.safeParse({ path: '/tmp/workspace', name: '  ' }).success).toBe(false)
+    expect(schema.safeParse({ path: '/workspaces/workspace-1234', name: '  ' }).success).toBe(false)
   })
 })
 

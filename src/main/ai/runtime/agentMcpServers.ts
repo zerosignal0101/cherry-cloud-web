@@ -105,6 +105,15 @@ export function buildAgentMcpServers(
     }
   }
 
+  if (mountedServers.has(CHERRY_MCP_SERVER.BROWSER)) {
+    servers.browser = {
+      name: CHERRY_MCP_SERVER.BROWSER,
+      connect: serveAgentMcpServer(() =>
+        (application.get('BrowserSessionService') as unknown as { createMcpServer(): McpServer }).createMcpServer()
+      )
+    }
+  }
+
   if (mountedServers.has(CHERRY_MCP_SERVER.AUTOMATION)) {
     servers.automation = {
       name: CHERRY_MCP_SERVER.AUTOMATION,

@@ -42,7 +42,6 @@ import type { Citation } from '@renderer/types/message'
 import { getAgentAvatarFromConfiguration } from '@renderer/utils/agent'
 import { buildAgentSessionTopicId } from '@renderer/utils/agentSession'
 import { cn } from '@renderer/utils/style'
-import { BROWSER_TOOL_GROUP } from '@shared/ai/browserTools'
 import { BUILTIN_AGENT_ROLE } from '@shared/ai/builtinAgent'
 import type { AgentSessionEntity } from '@shared/data/api/schemas/agentSessions'
 import type { CherryMessagePart, CherryUIMessage } from '@shared/data/types/message'
@@ -420,9 +419,7 @@ const AgentChat = ({
     !centerSurface && (sessionSnapshot || resourcePane) ? (
       <>
         {resourcePaneCount && <ResourcePaneCountButton {...resourcePaneCount} />}
-        <AgentRightPane.Shortcuts
-          browserEnabled={!!activeAgent && !activeAgent.disabledTools?.includes(BROWSER_TOOL_GROUP)}
-        />
+        <AgentRightPane.Shortcuts />
       </>
     ) : undefined
   let topBar: ReactNode

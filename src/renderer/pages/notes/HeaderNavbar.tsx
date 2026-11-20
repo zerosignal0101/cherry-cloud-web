@@ -31,6 +31,7 @@ import { ipcApi } from '@renderer/ipc'
 import { findNode } from '@renderer/services/NotesTreeService'
 import { toast } from '@renderer/services/toast'
 import type { NotesTreeNode, RenameNote } from '@renderer/types/note'
+import { exportWordFromMarkdown } from '@renderer/utils/exportWord'
 
 import type { MenuItem as NotesMenuItem } from './MenuConfig'
 import { menuItems } from './MenuConfig'
@@ -104,7 +105,7 @@ const HeaderNavbar = ({
         return
       }
       const fileName = activeNode.name.replace('.md', '')
-      await ipcApi.request('export.word.from_markdown', { markdown: content, fileName })
+      await exportWordFromMarkdown(content, fileName)
     } catch (error) {
       logger.error('Failed to export to Word:', error as Error)
       toast.error(t('notes.export_to_word_failed'))

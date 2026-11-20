@@ -34,7 +34,6 @@ interface WebdavBackupManagerProps {
   webdavConfig: {
     webdavHost?: string
     webdavUser?: string
-    webdavPass?: string
     webdavPath?: string
     webdavDisableStream?: boolean
     allowSelfSignedTls?: boolean
@@ -67,7 +66,7 @@ export function WebdavBackupManager({
   const [restoring, setRestoring] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
 
-  const { webdavHost, webdavUser, webdavPass, webdavPath, allowSelfSignedTls } = webdavConfig
+  const { webdavHost, webdavUser, webdavPath, allowSelfSignedTls } = webdavConfig
 
   const fetchBackupFiles = useCallback(async () => {
     if (!webdavHost) {
@@ -80,7 +79,6 @@ export function WebdavBackupManager({
       const files = await window.api.backup.listWebdavFiles({
         webdavHost,
         webdavUser,
-        webdavPass,
         webdavPath,
         allowSelfSignedTls
       })
@@ -94,7 +92,7 @@ export function WebdavBackupManager({
     } finally {
       setLoading(false)
     }
-  }, [webdavHost, webdavUser, webdavPass, webdavPath, allowSelfSignedTls, tlsCertificateHint, t])
+  }, [webdavHost, webdavUser, webdavPath, allowSelfSignedTls, tlsCertificateHint, t])
 
   useEffect(() => {
     if (visible) {
@@ -159,7 +157,6 @@ export function WebdavBackupManager({
         await window.api.backup.deleteWebdavFile(key.toString(), {
           webdavHost,
           webdavUser,
-          webdavPass,
           webdavPath,
           allowSelfSignedTls
         })
@@ -199,7 +196,6 @@ export function WebdavBackupManager({
       await window.api.backup.deleteWebdavFile(fileName, {
         webdavHost,
         webdavUser,
-        webdavPass,
         webdavPath,
         allowSelfSignedTls
       })

@@ -4,11 +4,7 @@ import { useTranslation } from 'react-i18next'
 
 import { usePreference } from '@data/hooks/usePreference'
 import { ChatLayoutModeProvider } from '@renderer/components/chat/layout/ChatLayoutModeContext'
-import {
-  ResourcePaneCountButton,
-  type ResourcePaneCountButtonProps,
-  useRightPanelActions
-} from '@renderer/components/chat/panes/Shell'
+import { ResourcePaneCountButton, type ResourcePaneCountButtonProps } from '@renderer/components/chat/panes/Shell'
 import ConversationCenterState from '@renderer/components/chat/shell/ConversationCenterState'
 import ConversationShell from '@renderer/components/chat/shell/ConversationShell'
 import { useConversationTopBarPortalLayout } from '@renderer/components/chat/shell/ConversationTopBarPortal'
@@ -25,7 +21,6 @@ import { useIsActiveTab } from '@renderer/hooks/tab'
 import { useAssistant } from '@renderer/hooks/useAssistant'
 import { useProviders } from '@renderer/hooks/useProvider'
 import { useTopicMutations } from '@renderer/hooks/useTopic'
-import { topicBrowserRuntimeService } from '@renderer/services/AgentBrowserRuntimeService'
 import { EVENT_NAMES, EventEmitter } from '@renderer/services/EventService'
 import { popup } from '@renderer/services/popup'
 import { toast } from '@renderer/services/toast'
@@ -93,7 +88,6 @@ const Chat: FC<Props> = (props) => {
   const [shouldMountCitationsPanel, setShouldMountCitationsPanel] = useState(false)
   const [branchLocateMessageId, setBranchLocateMessageId] = useState<string | undefined>()
   const setTopicBranchLiveState = useTopicBranchLiveStateSetter()
-  const rightPanelActions = useRightPanelActions()
 
   const mainRef = React.useRef<HTMLDivElement>(null)
   const activeTopic = props.activeTopic
@@ -190,11 +184,10 @@ const Chat: FC<Props> = (props) => {
   const openCitationInBrowser = useCallback(
     (url: string) => {
       if (!activeTopicId) return
-      topicBrowserRuntimeService.openPage(activeTopicId, url)
-      rightPanelActions.tryOpen('browser', { userInitiated: true })
+      window.open(url, '_blank', 'noopener,noreferrer')
       setCitationPanelState(null)
     },
-    [activeTopicId, rightPanelActions]
+    [activeTopicId]
   )
 
   const handleOpenCitationsPanel = useCallback(
@@ -323,11 +316,7 @@ const Chat: FC<Props> = (props) => {
         showConversation ? (
           <>
             {props.resourcePaneCount && <ResourcePaneCountButton {...props.resourcePaneCount} />}
-            <TopicRightPane.Shortcuts
-              browserEnabled={
-                !!assistantContext.assistant && assistantContext.assistant.settings.enableBrowser !== false
-              }
-            />
+            <TopicRightPane.Shortcuts />
           </>
         ) : undefined
       }
