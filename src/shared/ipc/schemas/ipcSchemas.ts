@@ -13,6 +13,7 @@ import { type CherryCloudEventSchemas, cherryCloudRequestSchemas } from './cherr
 import { cherryinRequestSchemas } from './cherryin'
 import { citationRequestSchemas } from './citation'
 import { type ComputerUseEventSchemas, computerUseRequestSchemas } from './computerUse'
+import { copilotRequestSchemas } from './copilot'
 import { diagnosticsRequestSchemas } from './diagnostics'
 import { doctorRequestSchemas } from './doctor'
 import { doctorAgentRequestSchemas } from './doctorAgent'
@@ -45,6 +46,7 @@ import { skillRequestSchemas } from './skill'
 import { type SystemEventSchemas, systemRequestSchemas } from './system'
 import { type TabEventSchemas, tabRequestSchemas } from './tab'
 import { toolResultRequestSchemas } from './toolResult'
+import { traceRequestSchemas } from './trace'
 import { type TranslateEventSchemas, translateRequestSchemas } from './translate'
 import { trashRequestSchemas } from './trash'
 import { type VoiceEventSchemas, voiceRequestSchemas } from './voice'
@@ -75,6 +77,7 @@ export const ipcRequestSchemas = {
   ...cherryCloudRequestSchemas,
   ...citationRequestSchemas,
   ...computerUseRequestSchemas,
+  ...copilotRequestSchemas,
   ...diagnosticsRequestSchemas,
   ...doctorRequestSchemas,
   ...doctorAgentRequestSchemas,
@@ -109,6 +112,7 @@ export const ipcRequestSchemas = {
   ...tabRequestSchemas,
   ...translateRequestSchemas,
   ...toolResultRequestSchemas,
+  ...traceRequestSchemas,
   ...trashRequestSchemas,
   ...webSearchRequestSchemas,
   ...webviewRequestSchemas,

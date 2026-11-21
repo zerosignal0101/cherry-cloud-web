@@ -3,7 +3,7 @@ import { fileEntryService } from '@data/services/FileEntryService'
 import { noteService } from '@data/services/NoteService'
 import { fileHandlers } from '@main/ipc/handlers/file'
 import { fileObservationHandlers } from '@main/ipc/handlers/fileObservation'
-import type { FileEntryId } from '@shared/data/types/file'
+import type { FileEntryId, FileHandle } from '@shared/data/types/file'
 import { fileRequestSchemas } from '@shared/ipc/schemas/file'
 import { fileObservationRequestSchemas } from '@shared/ipc/schemas/fileObservation'
 import { notesRequestSchemas } from '@shared/ipc/schemas/notes'
@@ -154,8 +154,43 @@ function mapPayload(payload: TreeMutationPushPayload, namespaces: readonly FileN
  * are delegated to the upstream handler unchanged.
  */
 function fileHandlersForNamespaces(namespaces: readonly FileNamespace[]): IpcHandlersFor<typeof fileRequestSchemas> {
+  const translateHandle = (handle: FileHandle): FileHandle => {
+    if (handle.kind !== 'path') return handle
+    const namespace = namespaceForPath(namespaces, handle.path)
+    if (!namespace) return handle
+    return { kind: 'path', path: AbsoluteFilePathSchema.parse(namespace.physicalPath(handle.path)) }
+  }
+
   return {
     ...fileHandlers,
+    // Previews and the browser fs adapter address managed trees by their
+    // logical roots (`/notes`, `/skills`, `/workspaces`). Translate the read
+    // path before delegating to the host-file handlers.
+    'file.read': async (input, context) => {
+      if (input.handle.kind !== 'path') return fileHandlers['file.read'](input, context)
+      const namespace = namespaceForPath(namespaces, input.handle.path)
+      if (!namespace) return fileHandlers['file.read'](input, context)
+      return fileHandlers['file.read'](
+        {
+          ...input,
+          handle: {
+            kind: 'path',
+            path: AbsoluteFilePathSchema.parse(namespace.physicalPath(input.handle.path))
+          }
+        },
+        context
+      )
+    },
+    'file.get_metadata': async (handle, context) => fileHandlers['file.get_metadata'](translateHandle(handle), context),
+    'file.batch_get_metadata': async (input, context) =>
+      fileHandlers['file.batch_get_metadata'](
+        {
+          items: input.items.map((item) => ({ ...item, handle: translateHandle(item.handle) }))
+        },
+        context
+      ),
+    'file.write_if_unchanged': async (input, context) =>
+      fileHandlers['file.write_if_unchanged']({ ...input, handle: translateHandle(input.handle) }, context),
     'file.validate_notes_directory': async (path) => {
       const notes = namespaces.find((namespace) => namespace.logicalRoot === '/notes')
       return notes?.isNamespace(path) ? true : false

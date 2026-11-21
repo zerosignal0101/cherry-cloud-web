@@ -36,8 +36,22 @@ export function useComposerQuoteInsertion<T extends QuoteInsertionActions>(actio
 
   useEffect(() => {
     if (!layerActive) return
-    return window.electron?.ipcRenderer.on(IpcChannel.App_QuoteToMain, (_, selectedText: string) => {
-      insertQuote(selectedText)
-    })
+    // Desktop delivers the quote over Electron IPC; the web bridge dispatches
+    // the same channel as a DOM event on the tab's own window.
+    const handleDomQuote = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail
+      if (typeof detail === 'string') insertQuote(detail)
+    }
+    const unsubscribeElectron = window.electron?.ipcRenderer.on(
+      IpcChannel.App_QuoteToMain,
+      (_, selectedText: string) => {
+        insertQuote(selectedText)
+      }
+    )
+    window.addEventListener(IpcChannel.App_QuoteToMain, handleDomQuote)
+    return () => {
+      unsubscribeElectron?.()
+      window.removeEventListener(IpcChannel.App_QuoteToMain, handleDomQuote)
+    }
   }, [layerActive])
 }

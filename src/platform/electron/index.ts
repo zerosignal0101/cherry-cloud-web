@@ -14,6 +14,10 @@
  *   and drops them, because the browser talks to the server over `window.api.ipcApi`
  *   (HTTP + WebSocket), never over Electron IPC.
  */
+import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname } from 'node:path'
+
 import { resolveDataDir, resolveDataPaths } from '../dataPaths'
 
 export interface IpcMainEvent {
@@ -225,14 +229,62 @@ export const session = {
   }
 }
 
-/** The server has no OS keychain; encrypted-at-rest secrets are not supported. */
+/**
+ * Server-side replacement for Electron `safeStorage`.
+ *
+ * Upstream services (Copilot, MCP OAuth, device identity) encrypt a small token
+ * with this API. The browser cannot offer an OS keychain, so the server uses
+ * AES-256-GCM with `APP_SECRET` (or a generated key file next to the other
+ * secret material). The payload format mirrors `SecretBox` so a restored
+ * `secret.key` keeps existing tokens readable.
+ */
+const SAFE_STORAGE_VERSION = 'v1'
+const SAFE_STORAGE_KEY_BYTES = 32
+let safeStorageKey: Buffer | undefined
+
+function getSafeStorageKey(): Buffer {
+  if (safeStorageKey) return safeStorageKey
+  const secret = process.env.APP_SECRET?.trim()
+  if (secret) {
+    safeStorageKey = scryptSync(secret, 'cherry-cloud-web', SAFE_STORAGE_KEY_BYTES)
+    return safeStorageKey
+  }
+  const keyFile = paths.secrets
+  if (existsSync(keyFile)) {
+    safeStorageKey = Buffer.from(readFileSync(keyFile, 'utf8').trim(), 'base64')
+    return safeStorageKey
+  }
+  const key = randomBytes(SAFE_STORAGE_KEY_BYTES)
+  mkdirSync(dirname(keyFile), { recursive: true, mode: 0o700 })
+  writeFileSync(keyFile, key.toString('base64') + '\n', { mode: 0o600 })
+  safeStorageKey = key
+  return key
+}
+
 export const safeStorage = {
-  isEncryptionAvailable: (): boolean => false,
-  encryptString: (_text: string): Buffer => {
-    throw new Error('safeStorage is not available in the web build')
+  isEncryptionAvailable: (): boolean => true,
+  encryptString: (text: string): Buffer => {
+    const iv = randomBytes(12)
+    const cipher = createCipheriv('aes-256-gcm', getSafeStorageKey(), iv)
+    const ciphertext = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()])
+    return Buffer.from(
+      [
+        SAFE_STORAGE_VERSION,
+        iv.toString('base64'),
+        cipher.getAuthTag().toString('base64'),
+        ciphertext.toString('base64')
+      ].join(':'),
+      'utf8'
+    )
   },
-  decryptString: (_buffer: Buffer): string => {
-    throw new Error('safeStorage is not available in the web build')
+  decryptString: (buffer: Buffer): string => {
+    const [version, iv, tag, ciphertext] = buffer.toString('utf8').split(':')
+    if (version !== SAFE_STORAGE_VERSION || !iv || !tag || ciphertext === undefined) {
+      throw new Error('Unsupported safeStorage payload')
+    }
+    const decipher = createDecipheriv('aes-256-gcm', getSafeStorageKey(), Buffer.from(iv, 'base64'))
+    decipher.setAuthTag(Buffer.from(tag, 'base64'))
+    return Buffer.concat([decipher.update(Buffer.from(ciphertext, 'base64')), decipher.final()]).toString('utf8')
   }
 }
 

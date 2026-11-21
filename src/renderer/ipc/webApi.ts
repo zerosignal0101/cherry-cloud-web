@@ -1,10 +1,12 @@
 import type { CacheSyncMessage } from '@shared/data/cache/cacheTypes'
+import type { TraceDataCursor } from '@shared/data/types/trace'
 import { decodeBinary, encodeBinary } from '@shared/ipc/binary'
 import type { SerializedIpcError } from '@shared/ipc/errors/IpcError'
 import { IpcChannel } from '@shared/IpcChannel'
 
 import { ipcApi } from './ipcApi'
 import { fileApi } from './webFile'
+import { fsApi } from './webFs'
 
 type Listener = (payload: unknown) => void
 
@@ -367,6 +369,40 @@ function requireFileName(fileName: string | undefined): string {
   return fileName
 }
 
+/**
+ * `window.api.trace` — the desktop preload exposed the developer-mode span
+ * viewer here. Forward it over the same IpcApi transport so the browser reads
+ * the server's `TraceStorageService` snapshot.
+ */
+const trace = {
+  getData: (topicId: string, traceId: string, cursor?: TraceDataCursor) =>
+    ipcApi.request('trace.get_data', { topicId, traceId, cursor })
+}
+
+/**
+ * `window.api.copilot` — GitHub Copilot's device flow. The server runs the
+ * GitHub calls and stores the OAuth token in SecretService, so the browser only
+ * ever sees the short-lived values the settings UI needs.
+ */
+const copilot = {
+  getAuthMessage: (headers?: Record<string, string>) => ipcApi.request('copilot.get_auth_message', { headers }),
+  getCopilotToken: (deviceCode: string, headers?: Record<string, string>) =>
+    ipcApi.request('copilot.get_copilot_token', { deviceCode, headers }),
+  saveCopilotToken: (token: string) => ipcApi.request('copilot.save_copilot_token', { token }),
+  getToken: (headers?: Record<string, string>) => ipcApi.request('copilot.get_token', { headers }),
+  getUser: (accessToken: string) => ipcApi.request('copilot.get_user', { accessToken }),
+  logout: () => ipcApi.request('copilot.logout')
+}
+
+/**
+ * Desktop `window.api.quoteToMainWindow` sent an IPC event to the window that
+ * owns the composer. A browser tab is its own window, so dispatch the same
+ * channel as a DOM event; `useComposerQuoteInsertion` listens for both forms.
+ */
+function quoteToMainWindow(text: string): void {
+  window.dispatchEvent(new CustomEvent(IpcChannel.App_QuoteToMain, { detail: text }))
+}
+
 /** Installs the browser implementation of the preload bridge. Idempotent. */
 export function installWebApi(): void {
   installElectronShim()
@@ -379,8 +415,12 @@ export function installWebApi(): void {
     },
     preference,
     file: fileApi,
+    fs: fsApi,
     cache,
     backup,
-    system
+    system,
+    trace,
+    copilot,
+    quoteToMainWindow
   }
 }

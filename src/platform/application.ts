@@ -165,6 +165,7 @@ export class WebApplication {
       'sys.home': process.cwd(),
       'feature.files.data': this.dataPaths.files,
       'feature.files.trash': path.join(this.dataPaths.files, '.trash'),
+      'feature.copilot.token_file': path.join(this.dataPaths.root, '.copilot_token'),
       'feature.notes.data': this.dataPaths.notes,
       // Agent + skill data lives under DATA_DIR, matching the desktop layout
       // (`Data/Agents`, `Data/Skills`) without ever pointing at a user home.

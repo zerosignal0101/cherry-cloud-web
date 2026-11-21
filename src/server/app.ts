@@ -48,6 +48,7 @@ import { SecretStore } from './platform/secretStore'
 import { registerAuthRoutes, sanitizeNext } from './routes/auth'
 import { registerCacheRoutes } from './routes/cache'
 import { registerComputerUseRoutes } from './routes/computerUse'
+import { registerCopilotRoutes } from './routes/copilot'
 import { getApiServer, registerDataRoutes } from './routes/data'
 import { registerEntityImageRoutes } from './routes/entityImages'
 import { registerHostRoutes } from './routes/host'
@@ -55,6 +56,7 @@ import { registerNotificationRoutes } from './routes/notification'
 import { registerPreferenceRoutes } from './routes/preference'
 import { registerPreviewRoutes } from './routes/previews'
 import { registerSystemRoutes } from './routes/system'
+import { registerTraceRoutes } from './routes/trace'
 import { registerTrashRoutes } from './routes/trash'
 import { registerUiRoutes } from './routes/ui'
 import { ConnectionRegistry } from './transport/connections'
@@ -124,6 +126,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   registerNotificationRoutes(registry)
   registerCacheRoutes(registry)
   registerComputerUseRoutes(registry)
+  registerCopilotRoutes(registry)
   registerExportRoutes(registry)
   const miniAppAssets = new MiniAppAssets(dataPaths.root)
   registerMiniAppRoutes(registry, miniAppAssets)
@@ -140,6 +143,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   registerTrashRoutes(registry)
   registerEntityImageRoutes(registry)
   registerPreviewRoutes(registry)
+  registerTraceRoutes(registry)
   registerWorkspaceRoutes(registry, workspaceService)
 
   const secretStore = new SecretStore(dataPaths.secretStore, new SecretBox(config.appSecret, dataPaths.secrets))
