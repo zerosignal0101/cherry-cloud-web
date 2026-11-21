@@ -351,6 +351,17 @@ const backup = {
   }
 }
 
+/**
+ * `window.api.system` — the desktop preload exposed host probes here. The shared
+ * renderer still reads `getHostname()` to build a default backup file name; in
+ * the web build the server that owns the data is the only host, so the page's
+ * own host name is the closest equivalent. Leaving the namespace out made that
+ * call throw before the backup dialog could open.
+ */
+const system = {
+  getHostname: async (): Promise<string> => window.location.hostname || 'web'
+}
+
 function requireFileName(fileName: string | undefined): string {
   if (!fileName) throw new Error('A backup file name is required')
   return fileName
@@ -369,6 +380,7 @@ export function installWebApi(): void {
     preference,
     file: fileApi,
     cache,
-    backup
+    backup,
+    system
   }
 }

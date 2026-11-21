@@ -131,7 +131,18 @@ const S3Settings: FC = () => {
   const { isModalVisible, handleBackup, handleCancel, backuping, customFileName, setCustomFileName, showBackupModal } =
     useS3BackupModal()
 
-  const showBackupManager = () => {
+  // Same blur race as the WebDAV panel: save a typed secret before an action reads it.
+  const saveSecretDraft = async () => {
+    if (secretDraft) await saveSecret()
+  }
+
+  const handleShowBackupModal = async () => {
+    await saveSecretDraft()
+    await showBackupModal()
+  }
+
+  const showBackupManager = async () => {
+    await saveSecretDraft()
     setBackupManagerVisible(true)
   }
 
@@ -237,16 +248,16 @@ const S3Settings: FC = () => {
         <SettingRowTitle>{t('settings.data.s3.backup.operation')}</SettingRowTitle>
         <RowFlex className="flex-wrap items-center justify-end gap-2">
           <Button
-            onClick={showBackupModal}
+            onClick={() => void handleShowBackupModal()}
             variant="outline"
-            disabled={backuping || !s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId || !secretSet}>
+            disabled={backuping || !s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId}>
             <Save size={14} />
             {t('settings.data.s3.backup.button')}
           </Button>
           <Button
-            onClick={showBackupManager}
+            onClick={() => void showBackupManager()}
             variant="outline"
-            disabled={!s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId || !secretSet}>
+            disabled={!s3Endpoint || !s3Region || !s3Bucket || !s3AccessKeyId}>
             <FolderOpen size={14} />
             {t('settings.data.s3.backup.manager.button')}
           </Button>

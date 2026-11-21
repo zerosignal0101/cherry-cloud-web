@@ -125,7 +125,20 @@ const WebDavSettings: FC = () => {
   const { isModalVisible, handleBackup, handleCancel, backuping, customFileName, setCustomFileName, showBackupModal } =
     useWebdavBackupModal()
 
-  const showBackupManager = () => {
+  // The password field saves on blur. Clicking an action while it still has
+  // focus reaches the button before `passwordSet` catches up, so persist the
+  // draft first instead of leaving the click with no effect.
+  const savePasswordDraft = async () => {
+    if (passwordDraft) await savePassword()
+  }
+
+  const handleShowBackupModal = async () => {
+    await savePasswordDraft()
+    await showBackupModal()
+  }
+
+  const showBackupManager = async () => {
+    await savePasswordDraft()
     setBackupManagerVisible(true)
   }
 
@@ -196,11 +209,11 @@ const WebDavSettings: FC = () => {
       <SettingRow>
         <SettingRowTitle>{t('settings.general.backup.title')}</SettingRowTitle>
         <RowFlex className="flex-wrap items-center justify-end gap-2">
-          <Button onClick={showBackupModal} disabled={backuping || !webdavHost || !passwordSet} variant="outline">
+          <Button onClick={() => void handleShowBackupModal()} disabled={backuping || !webdavHost} variant="outline">
             <Save size={14} />
             {t('settings.data.webdav.backup.button')}
           </Button>
-          <Button onClick={showBackupManager} disabled={!webdavHost || !passwordSet} variant="outline">
+          <Button onClick={() => void showBackupManager()} disabled={!webdavHost} variant="outline">
             <FolderOpen size={14} />
             {t('settings.data.webdav.restore.button')}
           </Button>

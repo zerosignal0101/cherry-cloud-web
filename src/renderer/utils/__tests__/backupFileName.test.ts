@@ -46,4 +46,14 @@ describe('createDefaultBackupFileName', () => {
 
     await expect(fileName).resolves.toMatch(/^cherry-studio\.\d{14}\.macbook\.desktop\.zip$/)
   })
+
+  it('falls back to a usable name when the host probes are unavailable', async () => {
+    vi.mocked(ipcApi.request).mockRejectedValueOnce(new Error('Unknown IpcApi route'))
+    vi.stubGlobal('window', {
+      ...window,
+      api: { ...window.api, system: undefined }
+    })
+
+    await expect(createDefaultBackupFileName()).resolves.toMatch(/^cherry-studio\.\d{14}\.web\.web\.zip$/)
+  })
 })
