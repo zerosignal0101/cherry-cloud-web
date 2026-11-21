@@ -118,28 +118,6 @@ describe('useConversationNavigation', () => {
     expect(() => result.current.openConversationTab('t1')).not.toThrow()
   })
 
-  it('openConversationWindow detaches a fresh window for the conversation key without touching tabs', () => {
-    const ctx = makeCtx([{ id: 'tab-1', type: 'route', url: '/app/chat?topicId=t1' }])
-    tabsMock.ctx = ctx
-    const { result } = renderHook(() => useConversationNavigation('assistants'))
-
-    result.current.openConversationWindow('t1', 'Topic 1')
-
-    expect(ipcMock.request).toHaveBeenCalledTimes(1)
-    const [channel, payload] = ipcMock.request.mock.calls[0] as [string, Record<string, unknown>]
-    expect(channel).toBe('tab.detach')
-    expect(payload).toMatchObject({
-      url: '/app/chat?topicId=t1',
-      title: 'Topic 1',
-      type: 'route'
-    })
-    expect(payload.metadata).toBeUndefined()
-    expect(typeof payload.id).toBe('string')
-    // Opening elsewhere must not focus or duplicate a tab in the current window.
-    expect(ctx.openTab).not.toHaveBeenCalled()
-    expect(ctx.setActiveTab).not.toHaveBeenCalled()
-  })
-
   it('openConversation routes through current tabs when embedded and tabs are available', () => {
     const ctx = makeCtx([])
     ctx.openTab.mockReturnValue('new-agent-tab')
@@ -206,16 +184,6 @@ describe('useConversationNavigation', () => {
       // A URL can only hold one page: reusing the current tab would replace this conversation.
       expect(ctx.openTab).not.toHaveBeenCalled()
       expect(ctx.setActiveTab).not.toHaveBeenCalled()
-    })
-
-    it('openConversationWindow opens a browser tab without calling the desktop detach route', () => {
-      tabsMock.ctx = makeCtx([])
-      const { result } = renderHook(() => useConversationNavigation('assistants'))
-
-      result.current.openConversationWindow('t1', 'Topic 1')
-
-      expect(openWindowSpy).toHaveBeenCalledWith('/app/chat?topicId=t1', '_blank', 'noopener,noreferrer')
-      expect(ipcMock.request).not.toHaveBeenCalled()
     })
 
     it('openConversation still navigates the current page for result selection', () => {

@@ -28,7 +28,6 @@ interface SessionListBodyProps {
   permanentDeleteShortcut: string
   deletingSessionId: string | null
   onOpenInNewTab?: (session: AgentSessionEntity) => void
-  onOpenInNewWindow?: (session: AgentSessionEntity) => void
   onOpenRenameDialog: (session: AgentSessionEntity) => void
   onRetry: () => Promise<unknown>
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
@@ -53,7 +52,6 @@ export function SessionListBody({
   permanentDeleteShortcut,
   deletingSessionId,
   onOpenInNewTab,
-  onOpenInNewWindow,
   onOpenRenameDialog,
   onRetry,
   onSetPanePosition,
@@ -89,7 +87,6 @@ export function SessionListBody({
         permanentDeleteShortcut={permanentDeleteShortcut}
         isDeleting={deletingSessionId === session.id}
         onOpenInNewTab={onOpenInNewTab}
-        onOpenInNewWindow={onOpenInNewWindow}
         onOpenRenameDialog={onOpenRenameDialog}
         onSetPanePosition={onSetPanePosition}
         panePosition={panePosition}
@@ -107,7 +104,6 @@ export function SessionListBody({
       onDeleteSession,
       permanentDeleteShortcut,
       onOpenInNewTab,
-      onOpenInNewWindow,
       onOpenRenameDialog,
       onSetPanePosition,
       onTogglePin,

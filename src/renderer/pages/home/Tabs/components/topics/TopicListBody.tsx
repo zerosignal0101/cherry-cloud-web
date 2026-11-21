@@ -98,7 +98,6 @@ interface TopicListBodyProps {
   permanentDeleteShortcut: string
   onMoveToAssistant: (topic: Topic, assistantId: string) => void | Promise<void>
   onOpenInNewTab?: (topic: Topic) => void
-  onOpenInNewWindow?: (topic: Topic) => void
   onPinTopic: (topic: Topic) => Promise<void>
   onToggleSidebar: (topic: Topic) => void
   onRequestTopicImageAction: (type: TopicImageActionType, topic: Topic) => void
@@ -128,7 +127,6 @@ export function TopicListBody(props: TopicListBodyProps) {
     permanentDeleteShortcut,
     onMoveToAssistant,
     onOpenInNewTab,
-    onOpenInNewWindow,
     onPinTopic,
     onToggleSidebar,
     onRequestTopicImageAction,
@@ -153,7 +151,6 @@ export function TopicListBody(props: TopicListBodyProps) {
       permanentDeleteShortcut,
       onMoveToAssistant,
       onOpenInNewTab,
-      onOpenInNewWindow,
       onPinTopic,
       onToggleSidebar,
       onRequestTopicImageAction,
@@ -175,7 +172,6 @@ export function TopicListBody(props: TopicListBodyProps) {
       permanentDeleteShortcut,
       onMoveToAssistant,
       onOpenInNewTab,
-      onOpenInNewWindow,
       onPinTopic,
       onToggleSidebar,
       onRequestTopicImageAction,
@@ -238,7 +234,6 @@ const TopicRow = memo(function TopicRow({
   permanentDeleteShortcut,
   onMoveToAssistant,
   onOpenInNewTab,
-  onOpenInNewWindow,
   onPinTopic,
   onToggleSidebar,
   onRequestTopicImageAction,
@@ -314,7 +309,6 @@ const TopicRow = memo(function TopicRow({
     onExportImage: (topic) => onRequestTopicImageAction('export', topic),
     onMoveToAssistant,
     onOpenInNewTab,
-    onOpenInNewWindow,
     onPinTopic,
     onToggleSidebar,
     onSetPanePosition,

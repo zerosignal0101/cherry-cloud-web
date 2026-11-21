@@ -257,4 +257,10 @@ describe('topic context menu actions', () => {
     await expect(executeTopicMenuAction(moveAction!.children[0], context)).resolves.toBe(false)
     expect(onMoveToAssistant).not.toHaveBeenCalled()
   })
+
+  it('does not expose a separate open-in-new-window action', () => {
+    const actions = resolveTopicMenuActions(createTopicActionFixture())
+
+    expect(actions.find((action) => action.id === 'topic.open-in-new-window')).toBeUndefined()
+  })
 })

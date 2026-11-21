@@ -37,7 +37,6 @@ interface SessionItemProps {
   permanentDeleteShortcut?: string
   isDeleting?: boolean
   onOpenInNewTab?: (session: AgentSessionEntity) => void
-  onOpenInNewWindow?: (session: AgentSessionEntity) => void
   onOpenRenameDialog: (session: AgentSessionEntity) => void
   onPress: (id: string) => void
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
@@ -78,7 +77,6 @@ const SessionItem = ({
   permanentDeleteShortcut,
   isDeleting = false,
   onOpenInNewTab,
-  onOpenInNewWindow,
   onOpenRenameDialog,
   onPress,
   onSetPanePosition,
@@ -171,9 +169,6 @@ const SessionItem = ({
   const handleOpenInNewTab = useCallback(() => {
     onOpenInNewTab?.(session)
   }, [onOpenInNewTab, session])
-  const handleOpenInNewWindow = useCallback(() => {
-    onOpenInNewWindow?.(session)
-  }, [onOpenInNewWindow, session])
 
   const actionContext = useMemo<SessionActionContext>(
     () => ({
@@ -199,7 +194,6 @@ const SessionItem = ({
       onExportWord: () => sessionMenuActions.onExportWord(session),
       onExportYuque: () => sessionMenuActions.onExportYuque(session),
       onOpenInNewTab: onOpenInNewTab ? handleOpenInNewTab : undefined,
-      onOpenInNewWindow: onOpenInNewWindow ? handleOpenInNewWindow : undefined,
       onSaveToKnowledge: () => sessionMenuActions.onSaveToKnowledge(session),
       onSaveToNotes: () => sessionMenuActions.onSaveToNotes(session),
       onSetPanePosition,
@@ -220,13 +214,11 @@ const SessionItem = ({
       isStreamPending,
       showAwaitingApprovalBadge,
       handleOpenInNewTab,
-      handleOpenInNewWindow,
       handleTogglePin,
       handleToggleSidebar,
       active,
       isRenaming,
       onOpenInNewTab,
-      onOpenInNewWindow,
       onSetPanePosition,
       onTogglePin,
       onToggleSidebar,

@@ -87,17 +87,10 @@ describe('session item actions', () => {
     expect(onTogglePin).not.toHaveBeenCalled()
   })
 
-  it('keeps open-in-new-window available even when the session is active in the current tab', async () => {
-    const onOpenInNewWindow = vi.fn()
-    const actionContext = createSessionActionFixture({
-      isActiveInCurrentTab: true,
-      onOpenInNewWindow
-    })
-    const actions = resolveSessionMenuActions(actionContext)
+  it('does not expose a separate open-in-new-window action', () => {
+    const actions = resolveSessionMenuActions(createSessionActionFixture())
 
-    const action = actions.find((candidate) => candidate.id === 'session.open-in-new-window')
-    await executeSessionMenuAction(action as (typeof actions)[number], actionContext)
-    expect(onOpenInNewWindow).toHaveBeenCalled()
+    expect(actions.find((candidate) => candidate.id === 'session.open-in-new-window')).toBeUndefined()
   })
 
   it('sets the pane position from the position submenu', async () => {

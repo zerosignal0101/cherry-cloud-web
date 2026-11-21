@@ -19,7 +19,6 @@ import { createActionRegistry } from '@renderer/components/chat/actions/actionRe
 import type { ResolvedAction } from '@renderer/components/chat/actions/actionTypes'
 import EditIcon from '@renderer/components/icons/EditIcon'
 import SidebarShortcutIcon from '@renderer/components/icons/SidebarShortcutIcon'
-import { OpenInNewWindowIcon } from '@renderer/components/icons/WindowIcons'
 import type { TopicTabPosition } from '@shared/data/preference/preferenceTypes'
 
 export type SessionExportMenuOptions = Record<
@@ -59,7 +58,6 @@ export interface SessionActionContext {
   onExportWord?: () => void | Promise<void>
   onExportYuque?: () => void | Promise<void>
   onOpenInNewTab?: () => void
-  onOpenInNewWindow?: () => void
   onSaveToKnowledge?: () => void | Promise<void>
   onSaveToNotes?: () => void | Promise<void>
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
@@ -136,15 +134,6 @@ sessionActionRegistry.registerCommand({
     enabled: !!onOpenInNewTab && !isActiveInCurrentTab
   }),
   run: ({ onOpenInNewTab }) => onOpenInNewTab?.()
-})
-
-sessionActionRegistry.registerCommand({
-  id: 'session.open-in-new-window',
-  availability: ({ onOpenInNewWindow }) => ({
-    visible: !!onOpenInNewWindow,
-    enabled: !!onOpenInNewWindow
-  }),
-  run: ({ onOpenInNewWindow }) => onOpenInNewWindow?.()
 })
 
 sessionActionRegistry.registerCommand({
@@ -340,15 +329,6 @@ sessionActionRegistry.registerAction({
   label: ({ t }) => t('common.open_in_new_tab'),
   icon: () => <ExternalLink size={14} />,
   order: 35,
-  surface: 'menu'
-})
-
-sessionActionRegistry.registerAction({
-  id: 'session.open-in-new-window',
-  commandId: 'session.open-in-new-window',
-  label: ({ t }) => t('tab.open_in_new_window'),
-  icon: () => <OpenInNewWindowIcon size={14} />,
-  order: 37,
   surface: 'menu'
 })
 

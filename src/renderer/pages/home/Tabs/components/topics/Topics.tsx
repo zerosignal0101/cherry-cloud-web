@@ -843,12 +843,6 @@ export function Topics({
     },
     [conversationNav]
   )
-  const openTopicInNewWindow = useCallback(
-    (topic: Topic) => {
-      conversationNav.openConversationWindow(topic.id, topic.name)
-    },
-    [conversationNav]
-  )
 
   const handleToggleAssistantPin = useCallback(
     async (assistantId: string) => {
@@ -1659,7 +1653,6 @@ export function Topics({
             onDeletePermanently={handlePermanentDeleteTopic}
             permanentDeleteShortcut={permanentDeleteShortcut}
             onOpenInNewTab={tabs && !isWindowFrame ? openTopicInNewTab : undefined}
-            onOpenInNewWindow={tabs ? openTopicInNewWindow : undefined}
             onMoveToAssistant={handleMoveTopicToAssistant}
             onPinTopic={handlePinTopic}
             onToggleSidebar={handleToggleTopicSidebar}

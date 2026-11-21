@@ -1292,13 +1292,6 @@ const Sessions = ({
     },
     [conversationNav, t]
   )
-  const openSessionInNewWindow = useCallback(
-    (session: AgentSessionEntity) => {
-      conversationNav.openConversationWindow(session.id, session.name || t('common.unnamed'))
-    },
-    [conversationNav, t]
-  )
-
   const handleSelectSession = useCallback(
     (id: string | null) => {
       setActiveSessionId(id)
@@ -1742,7 +1735,6 @@ const Sessions = ({
           permanentDeleteShortcut={permanentDeleteShortcut}
           deletingSessionId={deletingSessionId}
           onOpenInNewTab={isWindowFrame ? undefined : openSessionInNewTab}
-          onOpenInNewWindow={openSessionInNewWindow}
           onOpenRenameDialog={handleOpenRenameSessionDialog}
           onRetry={handleRetry}
           onSetPanePosition={canSetPanePosition ? setResolvedPanePosition : undefined}

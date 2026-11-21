@@ -39,7 +39,6 @@ export interface TopicMenuActionOptions {
   assistantMoveTargets?: readonly TopicMoveAssistantTarget[]
   onMoveToAssistant?: TopicMoveToAssistantHandler
   onOpenInNewTab?: TopicMenuHandler
-  onOpenInNewWindow?: TopicMenuHandler
   onPinTopic: TopicMenuHandler
   onToggleSidebar?: TopicMenuHandler
   onSetPanePosition?: (position: TopicTabPosition) => void | Promise<void>
@@ -66,7 +65,6 @@ export function createTopicActionContext({
   onExportImage,
   onMoveToAssistant,
   onOpenInNewTab,
-  onOpenInNewWindow,
   onPinTopic,
   onToggleSidebar,
   onSetPanePosition,
@@ -131,7 +129,6 @@ export function createTopicActionContext({
     assistantMoveTargets: assistantMoveTargets.filter((target) => target.id !== topic.assistantId),
     onMoveToAssistant,
     onOpenInNewTab,
-    onOpenInNewWindow,
     onPinTopic,
     onToggleSidebar,
     onSetPanePosition,
@@ -224,7 +221,6 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
     onExportImage,
     onMoveToAssistant,
     onOpenInNewTab,
-    onOpenInNewWindow,
     onPinTopic,
     onToggleSidebar,
     onSetPanePosition,
@@ -253,7 +249,6 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
         onExportImage,
         onMoveToAssistant,
         onOpenInNewTab,
-        onOpenInNewWindow,
         onPinTopic,
         onToggleSidebar,
         onSetPanePosition,
@@ -280,7 +275,6 @@ export function useTopicMenuActions(options: TopicMenuActionOptions) {
       onExportImage,
       onMoveToAssistant,
       onOpenInNewTab,
-      onOpenInNewWindow,
       onPinTopic,
       onToggleSidebar,
       onSetPanePosition,
