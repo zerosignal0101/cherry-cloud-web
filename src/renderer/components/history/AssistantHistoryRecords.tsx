@@ -241,7 +241,7 @@ const AssistantHistoryRecords = ({
   const handleTopicSelect = useCallback(
     (topic: ApiTopic) => {
       const title = topic.name || t('chat.default.topic.name')
-      const openedTabId = conversationNav.openConversationTab(topic.id, title, { forceNew: true })
+      const openedTabId = conversationNav.openConversation(topic.id, title)
       // Opening a tab can reuse this page when the shell is URL-backed, so the
       // history surface has to close either way — otherwise it keeps painting over
       // the conversation the URL now points at.

@@ -375,7 +375,7 @@ vi.mock('@renderer/hooks/tab', () => ({
 vi.mock('@renderer/hooks/useConversationNavigation', () => ({
   useConversationNavigation: (appId: string) => {
     return {
-      openConversationTab: (key: string, title?: string) => {
+      openConversation: (key: string, title?: string) => {
         const url =
           appId === 'agents'
             ? `/app/agents?sessionId=${encodeURIComponent(key)}`

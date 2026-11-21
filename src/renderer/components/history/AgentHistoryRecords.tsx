@@ -190,7 +190,7 @@ const AgentHistoryRecords = ({
   const handleSessionSelect = useCallback(
     (session: SessionListItem) => {
       const title = session.name || t('common.unnamed')
-      const openedTabId = conversationNav.openConversationTab(session.id, title, { forceNew: true })
+      const openedTabId = conversationNav.openConversation(session.id, title)
       // See AssistantHistoryRecords: the page can be reused when the shell is
       // URL-backed, so the history surface must close regardless of the tab result.
       onClose()

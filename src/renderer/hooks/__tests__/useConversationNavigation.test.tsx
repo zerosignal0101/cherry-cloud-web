@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useConversationNavigation } from '../useConversationNavigation'
 
@@ -27,15 +27,31 @@ vi.mock('@renderer/hooks/useWindowFrame', () => ({
 const ipcMock = vi.hoisted(() => ({ request: vi.fn() }))
 vi.mock('@renderer/ipc', () => ({ ipcApi: { request: ipcMock.request }, useIpcOn: vi.fn() }))
 
+// The browser build reports `web`; the desktop build reports a real platform.
+const platformMock = vi.hoisted(() => ({ isWeb: false }))
+vi.mock('@renderer/utils/platform', () => ({
+  get isWeb() {
+    return platformMock.isWeb
+  }
+}))
+
 function makeCtx(tabs: Array<{ id: string; type: string; url: string; metadata?: Record<string, unknown> }>) {
   return { tabs, openTab: vi.fn(), setActiveTab: vi.fn() }
 }
+
+let openWindowSpy: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
   tabsMock.ctx = null
   tabsMock.emitResourceListReveal.mockClear()
   tabsMock.windowFrameMode = 'embedded'
   ipcMock.request.mockClear()
+  platformMock.isWeb = false
+  openWindowSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+})
+
+afterEach(() => {
+  openWindowSpy.mockRestore()
 })
 
 describe('useConversationNavigation', () => {
@@ -173,5 +189,47 @@ describe('useConversationNavigation', () => {
 
     expect(ipcMock.request).toHaveBeenCalledTimes(1)
     expect(ipcMock.request.mock.calls[0][1]).toMatchObject({ url: '/app/agents?sessionId=s1' })
+  })
+
+  describe('browser build', () => {
+    beforeEach(() => {
+      platformMock.isWeb = true
+    })
+
+    it('openConversationTab opens a real browser tab instead of navigating the current page', () => {
+      const ctx = makeCtx([])
+      tabsMock.ctx = ctx
+      const { result } = renderHook(() => useConversationNavigation('assistants'))
+
+      expect(result.current.openConversationTab('t1', 'Topic 1')).toBe('/app/chat?topicId=t1')
+      expect(openWindowSpy).toHaveBeenCalledWith('/app/chat?topicId=t1', '_blank', 'noopener,noreferrer')
+      // A URL can only hold one page: reusing the current tab would replace this conversation.
+      expect(ctx.openTab).not.toHaveBeenCalled()
+      expect(ctx.setActiveTab).not.toHaveBeenCalled()
+    })
+
+    it('openConversationWindow opens a browser tab without calling the desktop detach route', () => {
+      tabsMock.ctx = makeCtx([])
+      const { result } = renderHook(() => useConversationNavigation('assistants'))
+
+      result.current.openConversationWindow('t1', 'Topic 1')
+
+      expect(openWindowSpy).toHaveBeenCalledWith('/app/chat?topicId=t1', '_blank', 'noopener,noreferrer')
+      expect(ipcMock.request).not.toHaveBeenCalled()
+    })
+
+    it('openConversation still navigates the current page for result selection', () => {
+      const ctx = makeCtx([])
+      ctx.openTab.mockReturnValue('/app/chat?topicId=t1')
+      tabsMock.ctx = ctx
+      const { result } = renderHook(() => useConversationNavigation('assistants'))
+
+      expect(result.current.openConversation('t1', 'Topic 1')).toBe('/app/chat?topicId=t1')
+      expect(ctx.openTab).toHaveBeenCalledWith('/app/chat?topicId=t1', {
+        forceNew: true,
+        title: 'Topic 1'
+      })
+      expect(openWindowSpy).not.toHaveBeenCalled()
+    })
   })
 })

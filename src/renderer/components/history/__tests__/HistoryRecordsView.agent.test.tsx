@@ -25,7 +25,7 @@ const hookMocks = vi.hoisted(() => ({
   reload: vi.fn(),
   togglePin: vi.fn(),
   updateSession: vi.fn(),
-  openConversationTab: vi.fn(),
+  openConversation: vi.fn(),
   restoreSession: vi.fn(),
   useAgents: vi.fn(),
   useTopics: vi.fn(),
@@ -185,7 +185,7 @@ vi.mock('@renderer/hooks/useAssistant', () => ({
 }))
 
 vi.mock('@renderer/hooks/useConversationNavigation', () => {
-  const navigation = { openConversationTab: hookMocks.openConversationTab }
+  const navigation = { openConversation: hookMocks.openConversation }
   return { useConversationNavigation: () => navigation }
 })
 
@@ -504,8 +504,8 @@ describe('HistoryRecordsView agent mode', () => {
     hookMocks.useAgents.mockReset()
     hookMocks.useTopics.mockReset()
     hookMocks.useAssistants.mockReset()
-    hookMocks.openConversationTab.mockReset()
-    hookMocks.openConversationTab.mockReturnValue('new-history-session-tab')
+    hookMocks.openConversation.mockReset()
+    hookMocks.openConversation.mockReturnValue('new-history-session-tab')
     hookMocks.useDataApiQuery.mockReset()
     hookMocks.useDataApiQuery.mockReturnValue({ data: [], error: undefined, isLoading: false })
     hookMocks.useMultiplePreferences.mockReset()
@@ -586,7 +586,7 @@ describe('HistoryRecordsView agent mode', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Alpha session' }))
 
-    expect(hookMocks.openConversationTab).toHaveBeenCalledWith('session-alpha', 'Alpha session', { forceNew: true })
+    expect(hookMocks.openConversation).toHaveBeenCalledWith('session-alpha', 'Alpha session')
     expect(onRecordSelect).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -733,18 +733,18 @@ describe('HistoryRecordsView agent mode', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Beta session' }))
 
-    expect(hookMocks.openConversationTab).toHaveBeenCalledWith('session-beta', 'Beta session', { forceNew: true })
+    expect(hookMocks.openConversation).toHaveBeenCalledWith('session-beta', 'Beta session')
     expect(onRecordSelect).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
 
   it('falls back to record selection when no conversation tab context exists', () => {
     const { onClose, onRecordSelect } = setupAgentHistory()
-    hookMocks.openConversationTab.mockReturnValueOnce(undefined)
+    hookMocks.openConversation.mockReturnValueOnce(undefined)
 
     fireEvent.click(screen.getByRole('button', { name: 'Alpha session' }))
 
-    expect(hookMocks.openConversationTab).toHaveBeenCalledWith('session-alpha', 'Alpha session', { forceNew: true })
+    expect(hookMocks.openConversation).toHaveBeenCalledWith('session-alpha', 'Alpha session')
     expect(onRecordSelect).toHaveBeenCalledWith('session-alpha')
     expect(onClose).toHaveBeenCalledTimes(1)
   })

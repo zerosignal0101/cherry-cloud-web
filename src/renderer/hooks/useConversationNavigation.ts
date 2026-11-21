@@ -5,12 +5,14 @@ import { type TabsContextValue, useOptionalTabsContext } from '@renderer/hooks/t
 import { useWindowFrame } from '@renderer/hooks/useWindowFrame'
 import { ipcApi } from '@renderer/ipc'
 import type { ConversationAppId } from '@renderer/types/conversation'
+import { isWeb } from '@renderer/utils/platform'
 import { getSidebarApp } from '@renderer/utils/sidebar'
 
 export interface ConversationNavigation {
   /**
-   * Open a new tab on the conversation's own URL. Detached windows return
-   * `undefined` instead of creating a hidden internal tab.
+   * Open the conversation in a new tab. In the browser build a tab is a URL, so
+   * this opens a real browser tab instead of reusing the current page. Detached
+   * windows return `undefined` instead of creating a hidden internal tab.
    */
   openConversationTab: (key: string, title?: string, options?: { forceNew?: boolean }) => string | undefined
   /**
@@ -21,10 +23,16 @@ export interface ConversationNavigation {
   /**
    * Open conversation `key` in a fresh detached window, leaving the current window's
    * tabs untouched. Unlike a tab detach this does not require `key` to be an open tab.
+   * In the browser build this opens a real browser tab.
    */
   openConversationWindow: (key: string, title?: string) => void
   /** Route URL for `key`, for callers that need a real link (new-tab affordances). */
   urlForKey: (key: string) => string | undefined
+}
+
+/** A browser tab is the web build's equivalent of a detached window. */
+function openInBrowserTab(url: string): void {
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function openConversationTabImpl(
@@ -41,11 +49,16 @@ function openConversationTabImpl(
 function openConversationWindowImpl(appId: ConversationAppId, key: string, title?: string): void {
   const app = getSidebarApp(appId)
   if (!app?.conversationRoute) return
+  const url = app.conversationRoute.urlForKey(key)
+  if (isWeb) {
+    openInBrowserTab(url)
+    return
+  }
   // Mirrors TabsContext.detachTab's tab.detach payload, but with a fresh tab id and
   // without closing any current-window tab — this is "open elsewhere", not "move".
   void ipcApi.request('tab.detach', {
     id: uuid(),
-    url: app.conversationRoute.urlForKey(key),
+    url,
     title,
     type: 'route'
   })
@@ -66,8 +79,16 @@ export function useConversationNavigation(appId: ConversationAppId): Conversatio
 
   return useMemo<ConversationNavigation>(
     () => ({
-      openConversationTab: (key, title) =>
-        isDetachedWindowFrame ? undefined : openConversationTabImpl(tabs, appId, key, title),
+      openConversationTab: (key, title) => {
+        if (isDetachedWindowFrame) return undefined
+        if (isWeb) {
+          const url = getSidebarApp(appId)?.conversationRoute?.urlForKey(key)
+          if (!url) return undefined
+          openInBrowserTab(url)
+          return url
+        }
+        return openConversationTabImpl(tabs, appId, key, title)
+      },
       openConversation: (key, title) => {
         if (tabs && !isDetachedWindowFrame) return openConversationTabImpl(tabs, appId, key, title)
         openConversationWindowImpl(appId, key, title)

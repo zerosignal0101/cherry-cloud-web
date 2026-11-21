@@ -80,6 +80,7 @@
   - 已验证：`pnpm typecheck`、`pnpm lint`、`pnpm test`、`pnpm build`、`pnpm test:e2e` 通过。
 - 渲染进程不再引用 Electron 类型。`src/renderer/types/web-globals.d.ts` 只声明 `installWebApi()` 安装的 `window.electron` 兼容对象（平台/环境探测与空操作 IPC），不包含 Electron 运行时。
 - `pnpm lint` 目前只覆盖 `src/server`、`src/platform` 与脚本；`src/shared`、`src/renderer` 待 `window.api` 真实类型收敛后再纳入。
+- 新窗口/新标签页：浏览器没有桌面端的独立窗口标签页，URL Shell 下调用 `openTab` 只会复用当前页面。侧栏对话条目的“从新窗口打开”“在新标签页打开”改为 `window.open(url, '_blank', 'noopener,noreferrer')`，桌面构建仍走 `tab.detach`。全局搜索与历史记录行属于“在当前页选中该会话”，继续走 `openConversation` 原地导航；只有显式的新开动作才弹新页面。
 - 移动端可用性修正：
   - 软键盘：Shell 保持 `dvh` 高度，不再按 `visualViewport` 改写高度，也不再声明 `interactive-widget=resizes-content`。原先二者会把底部导航顶到键盘上方并重排整页，连输入框位于顶部的表单也跟着跳动。键盘避让只发生在对话舞台：`useKeyboardViewportInset` 给出被遮挡高度，`ComposerDockTransitionFrame` 按“舞台底部到视口底部的距离”折算后只上移 composer，且只在焦点位于 composer 内时生效——点开选择器的搜索框同样会唤起键盘，此时页面必须保持不动。聊天内容区因此仍会在键盘打开时收缩（与桌面聊天一致），其余页面布局不动。
   - 顶栏选择器层级：`ChatAppShell` 的 top bar 从 `z-10` 提到 `z-20`。选择器浮层挂载在触发器旁，若与问候层、composer 同处 `z-10`，DOM 靠后的内容会盖住浮层。

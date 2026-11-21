@@ -32,7 +32,7 @@ const hookMocks = vi.hoisted(() => ({
   startTopicRenaming: vi.fn(),
   togglePin: vi.fn(),
   updateTopic: vi.fn(),
-  openConversationTab: vi.fn(),
+  openConversation: vi.fn(),
   restoreTopic: vi.fn(),
   useAgents: vi.fn(),
   useTopics: vi.fn(),
@@ -186,7 +186,7 @@ vi.mock('@renderer/hooks/useAssistant', () => ({
 
 vi.mock('@renderer/hooks/useConversationNavigation', () => ({
   useConversationNavigation: () => ({
-    openConversationTab: hookMocks.openConversationTab
+    openConversation: hookMocks.openConversation
   })
 }))
 
@@ -500,8 +500,8 @@ describe('HistoryRecordsView assistant mode', () => {
     hookMocks.useAgents.mockReset()
     hookMocks.useTopics.mockReset()
     hookMocks.useAssistants.mockReset()
-    hookMocks.openConversationTab.mockReset()
-    hookMocks.openConversationTab.mockReturnValue('new-history-topic-tab')
+    hookMocks.openConversation.mockReset()
+    hookMocks.openConversation.mockReturnValue('new-history-topic-tab')
     hookMocks.useCache.mockReset()
     hookMocks.useCache.mockReturnValue([[], vi.fn()])
     hookMocks.useMultiplePreferences.mockReset()
@@ -722,7 +722,7 @@ describe('HistoryRecordsView assistant mode', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Alpha topic' }))
 
-    expect(hookMocks.openConversationTab).toHaveBeenCalledWith('topic-alpha', 'Alpha topic', { forceNew: true })
+    expect(hookMocks.openConversation).toHaveBeenCalledWith('topic-alpha', 'Alpha topic')
     expect(onRecordSelect).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -744,13 +744,13 @@ describe('HistoryRecordsView assistant mode', () => {
   })
 
   it('falls back to record selection when no conversation tab context exists', () => {
-    hookMocks.openConversationTab.mockReturnValueOnce(undefined)
+    hookMocks.openConversation.mockReturnValueOnce(undefined)
 
     const { onClose, onRecordSelect } = setupAssistantHistory()
 
     fireEvent.click(screen.getByRole('button', { name: 'Alpha topic' }))
 
-    expect(hookMocks.openConversationTab).toHaveBeenCalledWith('topic-alpha', 'Alpha topic', { forceNew: true })
+    expect(hookMocks.openConversation).toHaveBeenCalledWith('topic-alpha', 'Alpha topic')
     expect(onRecordSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'topic-alpha' }))
     expect(onClose).toHaveBeenCalledTimes(1)
   })

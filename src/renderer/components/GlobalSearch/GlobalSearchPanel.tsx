@@ -490,7 +490,7 @@ export function GlobalSearchPanel({ onClose }: GlobalSearchPanelProps) {
     async (topicId: string) => {
       const apiTopic = await dataApiService.get(`/topics/${topicId}`)
       const topic = mapApiTopicToRendererTopic(apiTopic)
-      const targetTabId = chatNav.openConversationTab(topic.id)
+      const targetTabId = chatNav.openConversation(topic.id)
       if (!targetTabId) {
         logMissingSelectionTarget({ eventName: EVENT_NAMES.GLOBAL_SEARCH_SELECT_TOPIC, topicId })
         onClose()
@@ -518,7 +518,7 @@ export function GlobalSearchPanel({ onClose }: GlobalSearchPanelProps) {
 
   const openSession = useCallback(
     (sessionId: string) => {
-      const targetTabId = agentNav.openConversationTab(sessionId)
+      const targetTabId = agentNav.openConversation(sessionId)
       if (!targetTabId) {
         logMissingSelectionTarget({ eventName: EVENT_NAMES.GLOBAL_SEARCH_SELECT_AGENT_SESSION, sessionId })
         onClose()
@@ -561,7 +561,7 @@ export function GlobalSearchPanel({ onClose }: GlobalSearchPanelProps) {
 
       await dataApiService.put(`/topics/${topicId}/active-node`, { body: { nodeId: activeNodeId } })
       await invalidateCache([`/topics/${topicId}/messages`, `/topics/${topicId}/tree`])
-      const targetTabId = chatNav.openConversationTab(topic.id)
+      const targetTabId = chatNav.openConversation(topic.id)
       if (!targetTabId) {
         logMissingSelectionTarget({ eventName: EVENT_NAMES.GLOBAL_SEARCH_SELECT_TOPIC_MESSAGE, messageId, topicId })
         onClose()
@@ -592,7 +592,7 @@ export function GlobalSearchPanel({ onClose }: GlobalSearchPanelProps) {
         `/agent-sessions/${sessionId}`,
         `/agent-sessions/${sessionId}/messages`
       ])
-      const targetTabId = agentNav.openConversationTab(sessionId)
+      const targetTabId = agentNav.openConversation(sessionId)
       if (!targetTabId) {
         logMissingSelectionTarget({
           eventName: EVENT_NAMES.GLOBAL_SEARCH_SELECT_AGENT_SESSION_MESSAGE,
