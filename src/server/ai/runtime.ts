@@ -21,6 +21,7 @@ import { PowerService } from '@main/core/power/PowerService'
 import { SchedulerService } from '@main/core/scheduler/SchedulerService'
 import { ApiGatewayService } from '@main/features/apiGateway/ApiGatewayService'
 import { TesseractRuntimeService } from '@main/features/fileProcessing'
+import { CitationPreviewService } from '@main/services/CitationPreviewService'
 import { FileEditService } from '@main/services/file/FileEditService'
 import { FileManager } from '@main/services/file/FileManager'
 import { FileObservationService } from '@main/services/file/observation/FileObservationService'
@@ -76,6 +77,7 @@ const webServices = [
   TrashService,
   WebChannelManager,
   WebNotificationService,
+  CitationPreviewService,
   WebClaudeCodeProcessManager,
   WebClaudeCodeWarmQueryManager,
   WebRemoteAccessService,
