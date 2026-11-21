@@ -1,4 +1,4 @@
-import { Minus, Monitor, Moon, Plus, Sun } from 'lucide-react'
+import { Monitor, Moon, Sun } from 'lucide-react'
 import type React from 'react'
 import type { FC } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -45,7 +45,6 @@ import { hasV1CustomCssMarker } from '@shared/utils/customCssMigration'
 import ThemeColorPicker from './components/ThemeColorPicker'
 
 const DEFAULT_COLOR_PRIMARY = '#00b96b'
-const DEFAULT_ZOOM_FACTOR = 1
 const THEME_COLOR_PRESETS = [
   DEFAULT_COLOR_PRIMARY,
   '#EF4444', // Red
@@ -114,7 +113,6 @@ const AppearanceSettings: FC = () => {
   const { userTheme, setUserTheme } = useUserTheme()
 
   const [windowStyle, setWindowStyle] = usePreference('ui.window_style')
-  const [menuPresentationMode, setMenuPresentationMode] = usePreference('menu.presentation_mode')
   const [customCss, setCustomCss] = usePreference('ui.custom_css')
   const [fontSize] = usePreference('chat.message.font_size')
   const [useSystemTitleBar, setUseSystemTitleBar] = usePreference('app.use_system_title_bar')
@@ -126,9 +124,7 @@ const AppearanceSettings: FC = () => {
   })
   const [codeImageTools, setCodeImageTools] = usePreference('chat.code.image_tools')
 
-  const [currentZoom, setCurrentZoom] = useState(1.0)
   const [fontList, setFontList] = useState<string[]>([])
-  const isDefaultZoom = Math.abs(currentZoom - DEFAULT_ZOOM_FACTOR) < 0.001
 
   const themeOptions: ThemePreviewOption[] = [
     { value: ThemeMode.light, label: t('settings.theme.light'), icon: Sun },
@@ -146,27 +142,7 @@ const AppearanceSettings: FC = () => {
       }
     }
 
-    const updateCurrentZoom = async () => {
-      try {
-        const factor = await ipcApi.request('app.adjust_zoom', { delta: 0 })
-        setCurrentZoom(factor)
-      } catch (error) {
-        logger.error('Failed to get current zoom factor', error as Error)
-      }
-    }
-
     void loadSystemFonts()
-    void updateCurrentZoom()
-
-    const handleResize = () => {
-      void updateCurrentZoom()
-    }
-
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      window.removeEventListener('resize', handleResize)
-    }
   }, [])
 
   const handleWindowStyleChange = useCallback(
@@ -176,33 +152,12 @@ const AppearanceSettings: FC = () => {
     [setWindowStyle]
   )
 
-  const menuPresentationModeOptions = useMemo(
-    () => [
-      { value: 'cherry' as const, label: t('settings.general.common.menu.presentation_mode.cherry') },
-      { value: 'native' as const, label: t('settings.general.common.menu.presentation_mode.native') }
-    ],
-    [t]
-  )
-
   const listPositionOptions = useMemo(
     () => [
       { value: 'left' as const, label: t('settings.topic.position.left') },
       { value: 'right' as const, label: t('settings.topic.position.right') }
     ],
     [t]
-  )
-
-  const handleMenuPresentationModeChange = useCallback(
-    (mode: MenuPresentationMode) => {
-      void confirmMenuPresentationModeChange({
-        currentMode: menuPresentationMode,
-        mode,
-        setMenuPresentationMode,
-        setTimeoutTimer,
-        t
-      })
-    },
-    [menuPresentationMode, setMenuPresentationMode, setTimeoutTimer, t]
   )
 
   const handleUseSystemTitleBarChange = async (checked: boolean) => {
@@ -229,11 +184,6 @@ const AppearanceSettings: FC = () => {
       },
       500
     )
-  }
-
-  const handleZoomFactor = async (delta: number, reset: boolean = false) => {
-    const zoomFactor = await ipcApi.request('app.adjust_zoom', { delta, reset })
-    setCurrentZoom(zoomFactor)
   }
 
   const handleColorPrimaryChange = useCallback(
@@ -342,44 +292,6 @@ const AppearanceSettings: FC = () => {
             <SettingDivider />
           </>
         )}
-        <SettingRow id="setting-appearance-zoom" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.zoom.title')}</SettingRowTitle>
-          <ZoomButtonGroup>
-            {!isDefaultZoom && (
-              <Tooltip content={t('preview.reset')} delay={800}>
-                <Button
-                  onClick={() => handleZoomFactor(0, true)}
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('preview.reset')}
-                  className="text-muted-foreground">
-                  <ResetIcon size="14" />
-                </Button>
-              </Tooltip>
-            )}
-            <Tooltip content={t('preview.zoom_out')} delay={800}>
-              <Button
-                onClick={() => handleZoomFactor(-0.1)}
-                variant="ghost"
-                size="icon"
-                aria-label={t('preview.zoom_out')}
-                className="text-muted-foreground">
-                <Minus size="14" />
-              </Button>
-            </Tooltip>
-            <ZoomValue>{Math.round(currentZoom * 100)}%</ZoomValue>
-            <Tooltip content={t('preview.zoom_in')} delay={800}>
-              <Button
-                onClick={() => handleZoomFactor(0.1)}
-                variant="ghost"
-                size="icon"
-                aria-label={t('preview.zoom_in')}
-                className="text-muted-foreground">
-                <Plus size="14" />
-              </Button>
-            </Tooltip>
-          </ZoomButtonGroup>
-        </SettingRow>
         {isMac && (
           <>
             <SettingDivider />
@@ -389,16 +301,6 @@ const AppearanceSettings: FC = () => {
             </SettingRow>
           </>
         )}
-        <SettingDivider />
-        <SettingRow id="setting-appearance-menu-presentation-mode" className="scroll-mt-6">
-          <SettingRowTitle>{t('settings.general.common.menu.presentation_mode.title')}</SettingRowTitle>
-          <SegmentedControl<MenuPresentationMode>
-            value={menuPresentationMode}
-            onValueChange={handleMenuPresentationModeChange}
-            options={menuPresentationModeOptions}
-            size="sm"
-          />
-        </SettingRow>
         <SettingDivider />
         <SettingRow id="setting-appearance-chat-list-position" className="scroll-mt-6">
           <SettingRowTitle>{t('settings.display.list_position.chat')}</SettingRowTitle>
@@ -656,20 +558,12 @@ const ThemePreviewSelector = ({
   </div>
 )
 
-const ZoomButtonGroup = ({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) => (
-  <div className={cn('flex w-full max-w-52.5 min-w-0 items-center justify-end', className)} {...props} />
-)
-
 const SelectorRow = ({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) => (
   <div className={cn('flex w-full max-w-55 min-w-0 items-center justify-end', className)} {...props} />
 )
 
 const WideControlRow = ({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) => (
   <div className={cn('flex w-full max-w-95 min-w-0 items-center justify-end', className)} {...props} />
-)
-
-const ZoomValue = ({ className, ...props }: React.ComponentPropsWithoutRef<'span'>) => (
-  <span className={cn('mx-1.25 w-10 text-center', className)} {...props} />
 )
 
 export default AppearanceSettings

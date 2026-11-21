@@ -98,7 +98,10 @@ export function useCommandShortcutPreferences(): Partial<Record<CommandId, Prefe
 }
 
 export function useCommandMenuPresentationMode(): MenuPresentationMode | undefined {
-  return use(CommandSharedPreferencesContext)?.menuPresentationMode
+  const mode = use(CommandSharedPreferencesContext)?.menuPresentationMode
+  // The browser has no native popup-menu host. Treat a preference left at
+  // `native` by an older/desktop profile as `cherry` so menus still open.
+  return mode === 'native' ? 'cherry' : mode
 }
 
 export function useCommandOrigin() {
