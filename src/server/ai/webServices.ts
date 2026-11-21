@@ -15,7 +15,6 @@ import {
 import { sweepAbandonedStaging } from '@main/features/miniApp/install/installer'
 import { recoverInterruptedPublishes } from '@main/features/miniApp/install/publishJournal'
 import { MiniAppRuntimeService } from '@main/features/miniApp/runtime/MiniAppRuntimeService'
-import type { ClaudeCodeBinaryStatus } from '@shared/ai/claudeCodeBinary'
 import { IpcChannel } from '@shared/IpcChannel'
 
 import type { WindowManagerBridge } from '../data/windowManager'
@@ -320,34 +319,6 @@ export class WebClaudeCodeWarmQueryManager extends BaseService {
   async close(_key: string): Promise<void> {}
 
   closeAgentSessionWarm(_sessionId: string): void {}
-}
-
-/**
- * The desktop service auto-downloads a Claude Code CLI on first ready. The web
- * build defers that runtime, but the chat core still registers the binary
- * status routes and `AgentSessionRuntimeService` probes them when it meets an
- * agent created on the desktop. Answering `unsupported` keeps both paths
- * branchable instead of failing with "Service is not registered", and never
- * downloads an executable the web runtime cannot spawn.
- */
-@Injectable('ClaudeCodeBinaryService')
-@ServicePhase(Phase.WhenReady)
-export class WebClaudeCodeBinaryService extends BaseService {
-  getStatus(): ClaudeCodeBinaryStatus {
-    return { version: '', phase: 'error', receivedBytes: 0, error: 'unsupported' }
-  }
-
-  ensure(_retry = false): ClaudeCodeBinaryStatus {
-    return this.getStatus()
-  }
-
-  async ensureExecutable(): Promise<never> {
-    throw new Error('Claude Code runtime is not available in the web build')
-  }
-
-  requireExecutable(): never {
-    throw new Error('Claude Code runtime is not available in the web build')
-  }
 }
 
 /**

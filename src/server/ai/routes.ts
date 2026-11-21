@@ -23,6 +23,27 @@ export interface AiRouteOptions {
   workspaceService?: WorkspaceService
 }
 
+/**
+ * The `claude-code` runtime is deferred (it needs a server-side binary and a
+ * subprocess policy — see docs/architecture/feature-migration.md). Registering
+ * its binary routes would only reach a service the web runtime does not start,
+ * so leave them out and let callers see `ROUTE_NOT_FOUND`.
+ */
+type DeferredClaudeCodeRoute =
+  | 'ai.claude_code.binary.status'
+  | 'ai.claude_code.binary.ensure'
+  | 'ai.claude_code.binary.retry'
+
+const deferredClaudeCodeRoutes: ReadonlySet<string> = new Set<DeferredClaudeCodeRoute>([
+  'ai.claude_code.binary.status',
+  'ai.claude_code.binary.ensure',
+  'ai.claude_code.binary.retry'
+])
+
+const webAiRequestSchemas = Object.fromEntries(
+  Object.entries(aiRequestSchemas).filter(([route]) => !deferredClaudeCodeRoutes.has(route))
+) as Omit<typeof aiRequestSchemas, DeferredClaudeCodeRoute>
+
 export function registerAiRoutes(registry: RpcRegistry, options: AiRouteOptions = {}): void {
   const handlers = {
     ...aiHandlers,
@@ -39,7 +60,7 @@ export function registerAiRoutes(registry: RpcRegistry, options: AiRouteOptions 
       return { ...workspace, path: input.path }
     }
   }
-  registry.register(aiRequestSchemas, handlers)
+  registry.register(webAiRequestSchemas, handlers)
 }
 
 /**
