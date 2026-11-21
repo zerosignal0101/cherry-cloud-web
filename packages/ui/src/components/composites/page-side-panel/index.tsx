@@ -127,7 +127,8 @@ function PageSidePanel({
             data-slot="page-side-panel"
             className={cn(
               isScopedPortal ? 'absolute' : 'fixed',
-              'top-3 bottom-3 z-70 flex w-100 flex-col overflow-hidden rounded-3xl bg-card text-card-foreground shadow-xl outline-none',
+              // `min()` keeps the panel inside the viewport on phones while desktop keeps 400px.
+              'top-3 bottom-3 z-70 flex w-[min(400px,calc(100%-1.5rem))] flex-col overflow-hidden rounded-3xl bg-card text-card-foreground shadow-xl outline-none',
               side === 'right' ? 'right-3' : 'left-3',
               contentClassName
             )}>

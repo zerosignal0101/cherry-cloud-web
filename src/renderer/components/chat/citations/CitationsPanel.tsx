@@ -33,7 +33,7 @@ export const CitationsPanelContent: React.FC<CitationsPanelContentProps> = ({ ci
           key={`${citation.number}-${citation.url || citation.title}`}
           className="border-b-[0.5px] border-border last:border-b-0">
           {citation.type === 'websearch' ? (
-            <div className="max-w-[min(400px,60vw)] px-3">
+            <div className="max-w-100 px-3">
               <WebCitationCard citation={citation} previewSession={previewSession} actions={actions} />
             </div>
           ) : (

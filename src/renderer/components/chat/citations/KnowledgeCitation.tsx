@@ -35,14 +35,14 @@ export const KnowledgeCitationCard: React.FC<{ citation: Citation; actions?: Cit
           {citation.showFavicon && <FileSearch width={16} />}
           {citation.url ? (
             <a
-              className="flex-1 text-sm leading-[1.6] text-nowrap text-foreground no-underline"
+              className="min-w-0 flex-1 truncate text-sm leading-[1.6] text-foreground no-underline"
               href={citation.url}
               onAuxClick={(e) => handleLinkClick(citation.url, e, linkActions)}
               onClick={(e) => handleLinkClick(citation.url, e, linkActions)}>
               {documentTitle(citation.title)}
             </a>
           ) : (
-            <span className="flex-1 text-sm leading-[1.6] text-nowrap text-foreground">
+            <span className="min-w-0 flex-1 truncate text-sm leading-[1.6] text-foreground">
               {documentTitle(citation.title)}
             </span>
           )}

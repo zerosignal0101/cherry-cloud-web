@@ -57,14 +57,14 @@ export const WebCitationCard: React.FC<{
           )}
           {citation.url ? (
             <a
-              className="flex-1 text-sm leading-[1.6] text-nowrap text-foreground no-underline"
+              className="min-w-0 flex-1 truncate text-sm leading-[1.6] text-foreground no-underline"
               href={citation.url}
               onAuxClick={(e) => handleLinkClick(citation.url, e, linkActions)}
               onClick={(e) => handleLinkClick(citation.url, e, linkActions)}>
               {displayTitle || <span className="text-link">{citation.hostname}</span>}
             </a>
           ) : (
-            <span className="flex-1 text-sm leading-[1.6] text-nowrap text-foreground">{titleContent}</span>
+            <span className="min-w-0 flex-1 truncate text-sm leading-[1.6] text-foreground">{titleContent}</span>
           )}
 
           <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] leading-[1.6] text-primary opacity-100 transition-opacity duration-300 group-hover:opacity-0">

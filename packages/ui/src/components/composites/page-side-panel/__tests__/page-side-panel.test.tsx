@@ -172,6 +172,20 @@ describe('PageSidePanel', () => {
     })
   })
 
+  describe('responsive width', () => {
+    it('keeps the default width inside a narrow viewport', () => {
+      render(<PageSidePanel open={true} onClose={vi.fn()} />)
+      expect(screen.getByRole('dialog')).toHaveClass('w-[min(400px,calc(100%-1.5rem))]')
+    })
+
+    it('lets callers override the default width', () => {
+      render(<PageSidePanel open={true} onClose={vi.fn()} contentClassName="w-[min(calc(100vw-24px),620px)]" />)
+      const panel = screen.getByRole('dialog')
+      expect(panel).toHaveClass('w-[min(calc(100vw-24px),620px)]')
+      expect(panel).not.toHaveClass('w-[min(400px,calc(100%-1.5rem))]')
+    })
+  })
+
   describe('placement', () => {
     function ScopedPanel() {
       const [container, setContainer] = React.useState<HTMLDivElement | null>(null)
