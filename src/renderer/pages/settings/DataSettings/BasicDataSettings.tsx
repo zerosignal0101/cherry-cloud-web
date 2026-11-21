@@ -267,20 +267,25 @@ const BasicDataSettings: React.FC = () => {
               onClick={() => handleOpenPath(appInfo?.appDataPath)}>
               {appInfo?.appDataPath}
             </PathText>
-            <Tooltip title={t('settings.data.app_data.select')}>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t('settings.data.app_data.select')}
-                onClick={handleSelectAppDataPath}>
-                <FolderOutput size={16} />
-              </Button>
-            </Tooltip>
-            <RowFlex className="ml-2 gap-1.25">
-              <Button onClick={() => handleOpenPath(appInfo?.appDataPath)} variant="outline">
-                {t('settings.data.app_data.open')}
-              </Button>
-            </RowFlex>
+            {/* Host paths are empty in the web build; host-only actions stay hidden. */}
+            {appInfo?.appDataPath && (
+              <>
+                <Tooltip title={t('settings.data.app_data.select')}>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('settings.data.app_data.select')}
+                    onClick={handleSelectAppDataPath}>
+                    <FolderOutput size={16} />
+                  </Button>
+                </Tooltip>
+                <RowFlex className="ml-2 gap-1.25">
+                  <Button onClick={() => handleOpenPath(appInfo?.appDataPath)} variant="outline">
+                    {t('settings.data.app_data.open')}
+                  </Button>
+                </RowFlex>
+              </>
+            )}
           </PathRow>
         </SettingRow>
         <SettingDivider />
@@ -292,11 +297,13 @@ const BasicDataSettings: React.FC = () => {
               onClick={() => handleOpenPath(appInfo?.logsPath)}>
               {appInfo?.logsPath}
             </PathText>
-            <RowFlex className="ml-2 gap-1.25">
-              <Button onClick={() => handleOpenPath(appInfo?.logsPath)} variant="outline">
-                {t('settings.data.app_logs.button')}
-              </Button>
-            </RowFlex>
+            {appInfo?.logsPath && (
+              <RowFlex className="ml-2 gap-1.25">
+                <Button onClick={() => handleOpenPath(appInfo?.logsPath)} variant="outline">
+                  {t('settings.data.app_logs.button')}
+                </Button>
+              </RowFlex>
+            )}
           </PathRow>
         </SettingRow>
         <SettingDivider />

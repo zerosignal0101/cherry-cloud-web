@@ -302,6 +302,24 @@ export const fileApi = {
   },
   batchUploadMarkdown: async (): Promise<[]> => [],
   binaryImage: async (): Promise<never> => UNSUPPORTED('binaryImage'),
-  open: async (): Promise<void> => undefined,
+  /**
+   * Desktop `file.open` presented a dialog and returned the chosen file's path
+   * and bytes. Browsers only expose the bytes, so import flows read `content`
+   * while `filePath` stays the display name. Returning `undefined` (the old
+   * stub) made the import dialog sit on "selecting" forever.
+   */
+  async open(options?: {
+    filters?: Array<{ name: string; extensions: string[] }>
+  }): Promise<{ filePath: string; content: string } | undefined> {
+    const extensions = (options?.filters ?? []).flatMap((filter) =>
+      filter.extensions.filter((ext) => ext && ext !== '*').map((ext) => `.${ext.replace(/^\./, '')}`)
+    )
+    const [file] = await pickBrowserFiles({
+      multiple: false,
+      accept: extensions.length > 0 ? extensions.join(',') : undefined
+    })
+    if (!file) return undefined
+    return { filePath: file.name, content: await file.text() }
+  },
   showInFolder: async (): Promise<void> => undefined
 }

@@ -139,12 +139,6 @@ export const entries: SettingsSearchEntry[] = [
     groupKey: 'settings.data.export_menu.title'
   },
   {
-    anchorId: 'markdown-export-path',
-    titleKey: 'settings.data.markdown_export.path',
-    panel: 'markdown_export',
-    groupKey: 'settings.data.markdown_export.title'
-  },
-  {
     anchorId: 'markdown-export-model-name',
     titleKey: 'settings.data.markdown_export.show_model_name.title',
     panel: 'markdown_export',
