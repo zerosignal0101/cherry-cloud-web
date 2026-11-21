@@ -57,6 +57,7 @@ import type { ServingAuthMethod, ServingCredentialReceipt } from './credential'
 import { normalizeComfyuiBaseUrl } from './custom/comfyui/comfyuiHttp'
 import { appendDashScopeWebExtractor } from './custom/dashscope/dashscopeWebExtractor'
 import { dmxapiUsesCustomTransport } from './custom/dmxapi/dmxapiImageRouting'
+import { rewriteDeepSeekWebSearchBody } from './deepseekWebSearch'
 import { resolveAiSdkProviderId, type ResolvedEndpoint, resolveEffectiveEndpoint } from './endpoint'
 import { buildGrokCliRequestHeaders, rewriteGrokCliResponsesBody } from './grokCli'
 import { transformLmStudioRequestBody } from './lmstudio'
@@ -348,6 +349,19 @@ export async function resolveProviderAiSdkConfig(
         }
         config.providerSettings.fetch = (input: RequestInfo | URL, init?: RequestInit) =>
           customFetch(input, { ...init, body: appendDashScopeWebExtractor(init?.body) })
+        return config
+      })
+    },
+    // DeepSeek's Responses endpoint runs the OpenAI-shaped web_search tool only on deepseek-v4-pro;
+    // every other model (the V4.1 Flash line included) needs DeepSeek's own `deepseek_web_search`
+    // server tool, whose id @ai-sdk/openai drops. Swap it in the serialized body
+    // (deepseekWebSearch.ts) instead of declaring it through a factory.
+    {
+      match: (p, id) => id === 'openai' && matchesPreset(p, SystemProviderIds.deepseek),
+      build: withSelectedApiKey((ctx) => {
+        const config = buildGenericProviderConfig(ctx)
+        config.providerSettings.fetch = (input: RequestInfo | URL, init?: RequestInit) =>
+          customFetch(input, { ...init, body: rewriteDeepSeekWebSearchBody(init?.body) })
         return config
       })
     },

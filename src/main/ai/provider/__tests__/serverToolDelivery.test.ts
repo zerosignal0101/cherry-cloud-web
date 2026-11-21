@@ -63,7 +63,9 @@ const DELIVERY: Record<string, Partial<Record<string, Delivery>>> = {
   perplexity: { 'web-search': { kind: 'implicit' } },
   // Responses-endpoint models only; the openai extension's factory emits the bare tool shape.
   doubao: { 'web-search': factories('openai') },
-  deepseek: { 'web-search': factories('openai') },
+  // deepseek-v4-pro runs the factory's `web_search`; every other model needs DeepSeek's own
+  // `deepseek_web_search`, swapped into the serialized body (deepseekWebSearch.ts).
+  deepseek: { 'web-search': { kind: 'body-transform' } },
   // web-search: enable_search body params (getWebSearchParams). url-context (web_extractor): chat upgrades
   // search_strategy to `agent_max` (provider-options), Responses appends the `web_extractor` tool via a
   // custom-fetch body transform (appendDashScopeWebExtractor) — the openai adapter drops unknown tool ids.
