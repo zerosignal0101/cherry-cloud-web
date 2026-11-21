@@ -12,6 +12,7 @@ import { McpCatalogService } from '@main/ai/mcp/McpCatalogService'
 import { McpPackageService } from '@main/ai/mcp/McpPackageService'
 import { McpRuntimeService } from '@main/ai/mcp/McpRuntimeService'
 import { TraceStorageService } from '@main/ai/observability/storage/TraceStorageService'
+import { SkillSubscriptionService } from '@main/ai/skills/SkillSubscriptionService'
 import { AiStreamManager } from '@main/ai/streamManager'
 import { RuntimeActivityService } from '@main/core/application/RuntimeActivityService'
 import { JobManager } from '@main/core/job/JobManager'
@@ -25,6 +26,7 @@ import { FileManager } from '@main/services/file/FileManager'
 import { FileObservationService } from '@main/services/file/observation/FileObservationService'
 import { DirectoryTreeManager } from '@main/services/file/tree/DirectoryTreeManager'
 import { ProviderRegistryUpdaterService } from '@main/services/ProviderRegistryUpdaterService'
+import { TrashService } from '@main/services/trash'
 import { WebSearchService } from '@main/services/webSearch/WebSearchService'
 
 import { WebDbService } from '../data/dbService'
@@ -33,11 +35,14 @@ import { WebFileProcessingService } from '../features/fileProcessing/WebFileProc
 import { WebNotificationService } from './webNotificationService'
 import {
   WebAnalyticsService,
+  WebAttachmentPresenceService,
   WebAutomationReplService,
   WebMiniAppRuntimeService,
   WebChannelManager,
   WebClaudeCodeProcessManager,
   WebClaudeCodeWarmQueryManager,
+  WebClaudeCodeBinaryService,
+  WebKnowledgeService,
   WebRemoteAccessService,
   WebIpcApiService,
   WebProtocolService,
@@ -69,10 +74,12 @@ const webServices = [
   TraceStorageService,
   SchedulerService,
   JobManager,
+  TrashService,
   WebChannelManager,
   WebNotificationService,
   WebClaudeCodeProcessManager,
   WebClaudeCodeWarmQueryManager,
+  WebClaudeCodeBinaryService,
   WebRemoteAccessService,
   ApiGatewayService,
   AgentSessionRuntimeService,
@@ -81,6 +88,8 @@ const webServices = [
   AgentLifecycleService,
   AgentJobsService,
   FileObservationService,
+  WebAttachmentPresenceService,
+  WebKnowledgeService,
   DirectoryTreeManager,
   FileEditService,
   FileManager,
@@ -91,6 +100,7 @@ const webServices = [
   McpPackageService,
   McpRuntimeService,
   McpCatalogService,
+  SkillSubscriptionService,
   AiStreamManager,
   AiService,
   WebAnalyticsService

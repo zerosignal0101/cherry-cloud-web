@@ -1,4 +1,5 @@
 import { application } from '@application'
+import type { AgentAttachmentSelection } from '@cherrystudio/remote-protocol/agent'
 import { agentSessionMessageService } from '@data/services/AgentSessionMessageService'
 import { agentSessionService } from '@data/services/AgentSessionService'
 import { agentTaskService } from '@data/services/AgentTaskService'
@@ -14,6 +15,7 @@ import {
 import { sweepAbandonedStaging } from '@main/features/miniApp/install/installer'
 import { recoverInterruptedPublishes } from '@main/features/miniApp/install/publishJournal'
 import { MiniAppRuntimeService } from '@main/features/miniApp/runtime/MiniAppRuntimeService'
+import type { ClaudeCodeBinaryStatus } from '@shared/ai/claudeCodeBinary'
 import { IpcChannel } from '@shared/IpcChannel'
 
 import type { WindowManagerBridge } from '../data/windowManager'
@@ -273,6 +275,34 @@ export class WebRemoteAccessService extends BaseService {
 }
 
 /**
+ * Pending remote attachment selections come from the desktop remote-control
+ * upload intake. Browsers upload through `POST /api/files`, so there is never a
+ * remote selection to report; answering an empty list keeps the agent chat
+ * subscription working without starting the desktop intake services.
+ */
+@Injectable('AttachmentPresenceService')
+@ServicePhase(Phase.WhenReady)
+export class WebAttachmentPresenceService extends BaseService {
+  async list(_sessionId: string): Promise<AgentAttachmentSelection[]> {
+    return []
+  }
+}
+
+/**
+ * Knowledge bases need a vector store and an embedding runtime the web build
+ * does not ship. `buildAgentParams` still asks `hasAnyBase()` on every turn to
+ * gate the `kb_*` tools; answering false lets them drop out normally instead of
+ * taking the fail-open error path on each request.
+ */
+@Injectable('KnowledgeService')
+@ServicePhase(Phase.WhenReady)
+export class WebKnowledgeService extends BaseService {
+  hasAnyBase(): boolean {
+    return false
+  }
+}
+
+/**
  * Claude Code executes a downloaded CLI through Electron-era spawn plumbing and
  * is explicitly deferred from the web runtime. `AgentSessionRuntimeService`
  * declares these owners in `@DependsOn` (and calls their close hooks on every
@@ -290,6 +320,34 @@ export class WebClaudeCodeWarmQueryManager extends BaseService {
   async close(_key: string): Promise<void> {}
 
   closeAgentSessionWarm(_sessionId: string): void {}
+}
+
+/**
+ * The desktop service auto-downloads a Claude Code CLI on first ready. The web
+ * build defers that runtime, but the chat core still registers the binary
+ * status routes and `AgentSessionRuntimeService` probes them when it meets an
+ * agent created on the desktop. Answering `unsupported` keeps both paths
+ * branchable instead of failing with "Service is not registered", and never
+ * downloads an executable the web runtime cannot spawn.
+ */
+@Injectable('ClaudeCodeBinaryService')
+@ServicePhase(Phase.WhenReady)
+export class WebClaudeCodeBinaryService extends BaseService {
+  getStatus(): ClaudeCodeBinaryStatus {
+    return { version: '', phase: 'error', receivedBytes: 0, error: 'unsupported' }
+  }
+
+  ensure(_retry = false): ClaudeCodeBinaryStatus {
+    return this.getStatus()
+  }
+
+  async ensureExecutable(): Promise<never> {
+    throw new Error('Claude Code runtime is not available in the web build')
+  }
+
+  requireExecutable(): never {
+    throw new Error('Claude Code runtime is not available in the web build')
+  }
 }
 
 /**
