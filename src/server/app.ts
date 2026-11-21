@@ -53,6 +53,7 @@ import { registerHostRoutes } from './routes/host'
 import { registerNotificationRoutes } from './routes/notification'
 import { registerPreferenceRoutes } from './routes/preference'
 import { registerSystemRoutes } from './routes/system'
+import { registerTrashRoutes } from './routes/trash'
 import { registerUiRoutes } from './routes/ui'
 import { ConnectionRegistry } from './transport/connections'
 import { EventHub } from './transport/events'
@@ -134,6 +135,7 @@ export async function buildApp(config: ServerConfig): Promise<FastifyInstance> {
   registerCapabilityRoutes(registry)
   registerFileProcessingRoutes(registry)
   registerPreferenceRoutes(registry, connections)
+  registerTrashRoutes(registry)
   registerWorkspaceRoutes(registry, workspaceService)
 
   const secretStore = new SecretStore(dataPaths.secretStore, new SecretBox(config.appSecret, dataPaths.secrets))
