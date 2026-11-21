@@ -37,9 +37,13 @@ export function useBundledCatalog<TItem>({ catalog, enabled = true, load }: UseB
     }
 
     if (!resourcesPath) {
+      // The web build ships no `resources/` bundle. Treat that as an empty
+      // catalog instead of an eternally pending load, so Marketplace falls
+      // back to its empty state rather than spinning forever.
       logger.warn('Bundled catalog resources path is not ready', { catalog })
+      setError(null)
       setItems([])
-      setIsLoading(true)
+      setIsLoading(false)
       return
     }
 
