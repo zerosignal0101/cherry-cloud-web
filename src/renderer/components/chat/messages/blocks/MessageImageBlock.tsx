@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React from 'react'
 
-import { ipcApi } from '@renderer/ipc'
 import type { FileHandle } from '@shared/data/types/file'
-import { isFileEntryHandle, toFileUrl } from '@shared/utils/file'
+import { isFileEntryHandle } from '@shared/utils/file'
 
 import ImageBlock from './ImageBlock'
 
@@ -19,51 +18,19 @@ interface Props {
   className?: string
 }
 
-function entryIdOf(source: MessageImageSource): string | undefined {
-  return source.handle && isFileEntryHandle(source.handle) ? source.handle.entryId : undefined
-}
-
 /**
- * Managed images render from their current FileManager location, asked for at mount like
- * `MessageAttachments` does on open; the stored url shows until the lookup lands and stays
- * when the entry is gone.
+ * Browsers cannot read `file://` URLs, so the desktop habit of resolving an
+ * entry to its current physical path is wrong here: that swap broke every
+ * managed image *and* reflowed the virtualized list once the request landed.
+ * The server already owns the id → file mapping, so `/media/:id` is the live
+ * location the browser can actually render.
  */
-function useImageSourceUrls(sources: readonly MessageImageSource[]): string[] {
-  const key = useMemo(() => [...new Set(sources.map(entryIdOf).filter(Boolean))].join(','), [sources])
-  const [resolved, setResolved] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    if (!key) return
-    let cancelled = false
-    ipcApi
-      .request('file.batch_get_physical_paths', { ids: key.split(',') })
-      .then((paths) => {
-        if (cancelled) return
-        const urls: Record<string, string> = {}
-        for (const [id, path] of Object.entries(paths)) {
-          if (path) urls[id] = toFileUrl(path)
-        }
-        setResolved((current) => ({ ...current, ...urls }))
-      })
-      .catch(() => {})
-    return () => {
-      cancelled = true
-    }
-  }, [key])
-
-  return useMemo(
-    () =>
-      sources.map((source) => {
-        const entryId = entryIdOf(source)
-        return (entryId && resolved[entryId]) || source.url
-      }),
-    [sources, resolved]
-  )
+function imageUrl(source: MessageImageSource): string {
+  return source.handle && isFileEntryHandle(source.handle) ? `/media/${source.handle.entryId}` : source.url
 }
 
 const MessageImageBlock: React.FC<Props> = ({ sources, isSingle, thumbnail, className }) => {
-  const images = useImageSourceUrls(sources)
-  return <ImageBlock images={images} isSingle={isSingle} thumbnail={thumbnail} className={className} />
+  return <ImageBlock images={sources.map(imageUrl)} isSingle={isSingle} thumbnail={thumbnail} className={className} />
 }
 
 export default React.memo(MessageImageBlock)
